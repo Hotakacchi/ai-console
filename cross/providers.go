@@ -82,7 +82,7 @@ func (h *httpBase) reply(text string, onText func(string), send func(ctx context
 	if err != nil || content == nil {
 		h.history = h.history[:len(h.history)-1]
 		if err != nil && !h.aborted {
-			onText("ごめんなさい、AIにつながりませんでした。（" + err.Error() + "）")
+			onText(T("ai.connectFailed", err.Error()))
 		}
 		return
 	}
@@ -169,7 +169,7 @@ func (p *anthropicProvider) Label() string { return "anthropic: " + p.model }
 func (p *anthropicProvider) Reply(text string, onText func(string)) {
 	p.reply(text, onText, func(ctx context.Context) (any, error) {
 		if p.key == "" {
-			return nil, errors.New("APIキーの環境変数が設定されていません")
+			return nil, errors.New(T("ai.noKey"))
 		}
 		body := map[string]any{
 			"model":      p.model,
@@ -225,7 +225,7 @@ func (p *anthropicProvider) Reply(text string, onText func(string)) {
 			return nil, err
 		}
 		if stop == "refusal" {
-			onText("ごめんなさい、その内容にはお答えできません。")
+			onText(T("ai.refusal"))
 			return nil, nil
 		}
 		return blocks, nil
@@ -408,7 +408,7 @@ func (c *commandProvider) Abort() {
 func (c *commandProvider) Reply(text string, onText func(string)) {
 	command := c.s.Get("command", "")
 	if command == "" {
-		onText("settings.json の command が空です。")
+		onText(T("command.empty"))
 		return
 	}
 	c.history = append(c.history, Message{"role": "user", "content": text})
@@ -428,7 +428,7 @@ func (c *commandProvider) Reply(text string, onText func(string)) {
 
 	var reply strings.Builder
 	if err := cmd.Start(); err != nil {
-		onText("コマンドを実行できませんでした。（" + err.Error() + "）")
+		onText(T("command.failed", err.Error()))
 		c.history = c.history[:len(c.history)-1]
 		return
 	}
@@ -447,7 +447,7 @@ func (c *commandProvider) Reply(text string, onText func(string)) {
 	err := cmd.Wait()
 	if err != nil && !c.aborted && strings.TrimSpace(reply.String()) == "" {
 		lines := strings.Split(strings.TrimSpace(stderr.String()), "\n")
-		onText("コマンドがエラーで終了しました。（" + strings.TrimSpace(lines[len(lines)-1]) + "）")
+		onText(T("command.errorExit", strings.TrimSpace(lines[len(lines)-1])))
 	}
 	if r := strings.TrimSpace(reply.String()); r != "" && !c.aborted {
 		c.history = append(c.history, Message{"role": "assistant", "content": r})
@@ -474,29 +474,50 @@ func (offlineProvider) Clear()        {}
 
 func (offlineProvider) Reply(text string, onText func(string)) {
 	now := time.Now()
-	has := func(words ...string) bool {
-		for _, w := range words {
-			if strings.Contains(text, w) {
+	lower := strings.ToLower(text)
+	// 言語ごとの言葉の一覧 (offline.words.*) のどれかを含むか。英単語は単語の区切りで比べる
+	has := func(key string) bool {
+		for _, w := range TList(key) {
+			w = strings.ToLower(w)
+			if isASCII(w) {
+				if regexp.MustCompile(`\b` + regexp.QuoteMeta(w) + `\b`).MatchString(lower) {
+					return true
+				}
+			} else if strings.Contains(lower, w) {
 				return true
 			}
 		}
 		return false
 	}
-	switch {
-	case has("何時", "時間", "時刻"):
-		onText(fmt.Sprintf("いまは%d時%d分です。", now.Hour(), now.Minute()))
-	case has("何日", "日付", "今日", "曜日"):
-		wd := []string{"日", "月", "火", "水", "木", "金", "土"}[now.Weekday()]
-		onText(fmt.Sprintf("今日は%d月%d日、%s曜日です。", int(now.Month()), now.Day(), wd))
-	case has("こんにちは", "こんばんは", "おはよう", "はじめまして", "やあ"):
-		onText("こんにちは！ルミです。今日もよろしくお願いします。")
-	case has("名前", "だれ", "誰"):
-		onText("わたしはルミ。暗い画面でほのかに光っているアシスタントです。")
-	case has("ありがと"):
-		onText("どういたしまして！")
-	default:
-		onText("いまはAIにつながっていないので、時間や日付くらいしか分かりません。/set provider local などでAIを設定すると、もっとお話しできますよ。")
+	pick := func(key string, i int) string {
+		if list := TList(key); i < len(list) {
+			return list[i]
+		}
+		return ""
 	}
+	switch {
+	case has("offline.words.time"):
+		onText(T("offline.time", now.Hour(), now.Minute()))
+	case has("offline.words.date"):
+		onText(T("offline.date", int(now.Month()), now.Day(), pick("offline.weekdays", int(now.Weekday())), pick("offline.months", int(now.Month())-1)))
+	case has("offline.words.hello"):
+		onText(T("offline.hello"))
+	case has("offline.words.name"):
+		onText(T("offline.name"))
+	case has("offline.words.thanks"):
+		onText(T("offline.thanks"))
+	default:
+		onText(T("offline.default"))
+	}
+}
+
+func isASCII(s string) bool {
+	for _, r := range s {
+		if r > 127 {
+			return false
+		}
+	}
+	return true
 }
 
 // ---------------- 文の区切り ----------------

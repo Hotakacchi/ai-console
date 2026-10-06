@@ -25,11 +25,15 @@ func main() {
 	args := os.Args[1:]
 	var lumi *Lumi
 
+	// 窓やトレイの文言を作る前に言語を決める
+	loadLocales()
+	setLanguage(LoadSettings().Get("language", "auto"))
+
 	app := application.New(application.Options{
 		Name:        "Lumi",
-		Description: "顔のあるコンソール風アシスタント",
+		Description: T("app.description"),
 		Icon:        icon,
-		Assets:      application.AssetOptions{Handler: application.BundledAssetFileServer(assets)},
+		Assets:      application.AssetOptions{Handler: withVoiceFiles(application.BundledAssetFileServer(assets))},
 		Mac: application.MacOptions{
 			// ウィンドウを閉じてもトレイ (メニューバー) で動き続ける
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
@@ -44,11 +48,11 @@ func main() {
 			},
 		},
 	})
-	lumi = newLumi(app, slices.Contains(args, "--mute"))
+	lumi = newLumi(app, slices.Contains(args, "--mute"), slices.Contains(args, "--no-mic"))
 
 	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:             "main",
-		Title:            "ルミ",
+		Title:            T("app.title"),
 		Width:            1000,
 		Height:           640,
 		MinWidth:         480,
@@ -70,7 +74,7 @@ func main() {
 			win.Hide()
 			if !toldAboutTray {
 				toldAboutTray = true
-				log.Println("ルミはトレイで動いています")
+				log.Println("Lumi keeps running in the tray")
 			}
 			return
 		}
@@ -80,13 +84,18 @@ func main() {
 	// トレイのアイコンとメニュー
 	tray := app.SystemTray.New()
 	tray.SetIcon(icon)
-	tray.SetTooltip("ルミ")
-	menu := application.NewMenu()
-	menu.Add("表示").OnClick(func(*application.Context) { lumi.show() })
-	menu.Add("呼ばれたときの動きを試す").OnClick(func(*application.Context) { lumi.demoPeek() })
-	menu.AddSeparator()
-	menu.Add("終了").OnClick(func(*application.Context) { lumi.quit() })
-	tray.SetMenu(menu)
+	buildTray := func() {
+		tray.SetTooltip(T("app.title"))
+		menu := application.NewMenu()
+		menu.Add(T("tray.show")).OnClick(func(*application.Context) { lumi.show() })
+		menu.Add(T("tray.mic")).OnClick(func(*application.Context) { lumi.submit("/mic") })
+		menu.Add(T("tray.peekDemo")).OnClick(func(*application.Context) { lumi.demoPeek() })
+		menu.AddSeparator()
+		menu.Add(T("tray.quit")).OnClick(func(*application.Context) { lumi.quit() })
+		tray.SetMenu(menu)
+	}
+	buildTray()
+	lumi.onLanguageChanged = buildTray
 	if runtime.GOOS != "darwin" {
 		tray.OnClick(func() { lumi.show() })
 	}
@@ -119,6 +128,19 @@ func main() {
 		}
 		lumi.showVoices(names, asString(m["current"]))
 	})
+	app.Event.On("voiceState", func(e *application.CustomEvent) {
+		m, _ := e.Data.(map[string]any)
+		lumi.voiceState(asString(m["state"]), asString(m["message"]))
+	})
+	app.Event.On("voiceWoke", func(*application.CustomEvent) { lumi.voiceWoke() })
+	app.Event.On("voiceDebug", func(e *application.CustomEvent) {
+		// 聞き取った文をそのまま出す (呼びかけがうまく反応しないときの調整用)
+		if lumi.s.Get("voice_debug", "off") == "on" {
+			lumi.write("  [voice] "+asString(e.Data)+"\n", "dim")
+		}
+	})
+	app.Event.On("voiceHeard", func(e *application.CustomEvent) { lumi.voiceHeard(asString(e.Data)) })
+	app.Event.On("voiceTimeout", func(*application.CustomEvent) { lumi.voiceTimeout() })
 	app.Event.On("peekDone", func(*application.CustomEvent) { lumi.peek.hide() })
 	app.Event.On("peekClicked", func(*application.CustomEvent) {
 		lumi.peek.retract(false, "")
@@ -163,9 +185,9 @@ func (l *Lumi) demoPeek() {
 	l.win.Hide()
 	go func() {
 		time.Sleep(700 * time.Millisecond)
-		l.peek.pop("なあに？")
+		l.peek.pop(T("peek.hey"))
 		time.Sleep(2800 * time.Millisecond)
-		l.peek.retract(false, "はーい！")
+		l.peek.retract(false, T("peek.ok"))
 		time.Sleep(300 * time.Millisecond)
 		l.show()
 	}()

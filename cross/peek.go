@@ -18,7 +18,7 @@ type Peek struct {
 func newPeek(app *application.App) *Peek {
 	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:           "peek",
-		Title:          "ルミ",
+		Title:          T("app.title"),
 		Width:          peekW,
 		Height:         peekH,
 		URL:            "/#peek",

@@ -30,15 +30,20 @@ type Lumi struct {
 	ai    Provider
 	muted bool
 
+	micOn     bool // 音声入力をこのセッションで使うか (--no-mic や /mic で切り替え)
+	listening bool // 画面側で聞き取りが動いているか
+
 	busy    bool
 	cancel  chan struct{}
 	answers chan string
 	spoken  chan int
 	speakID int
+
+	onLanguageChanged func() // トレイのメニューなど、言語で変わるものを作り直す
 }
 
-func newLumi(app *application.App, muted bool) *Lumi {
-	l := &Lumi{app: app, muted: muted, answers: make(chan string, 1), spoken: make(chan int, 8)}
+func newLumi(app *application.App, muted, noMic bool) *Lumi {
+	l := &Lumi{app: app, muted: muted, micOn: !noMic, answers: make(chan string, 1), spoken: make(chan int, 8)}
 	l.loadSettings()
 	return l
 }
@@ -71,23 +76,44 @@ func (l *Lumi) updateTitle() {
 	if l.muted {
 		voice = "mute"
 	}
-	l.win.SetTitle("ルミ  —  " + l.ai.Label() + " | " + voice)
+	if l.listening {
+		voice += " | mic"
+	}
+	l.win.SetTitle(T("app.title") + "  —  " + l.ai.Label() + " | " + voice)
 }
 
 // ---- 設定 ----
 
 func (l *Lumi) loadSettings() {
 	l.s = LoadSettings()
+	before := currentLang()
+	setLanguage(l.s.Get("language", "auto"))
 	l.ai = newProvider(l.s)
 	l.updateTitle()
+	if currentLang() != before {
+		l.emit("i18n", clientMessages())
+		if l.onLanguageChanged != nil {
+			l.onLanguageChanged()
+		}
+	}
+}
+
+func (l *Lumi) wakeWord() string { return l.s.WakeWord() }
+
+func (l *Lumi) voiceKey() string {
+	return currentLang() + "|" + l.s.WakeWord() + "|" + l.s.Get("voice_input", "on")
 }
 
 func (l *Lumi) reload(announce bool) {
+	before := l.voiceKey()
 	l.loadSettings()
+	if l.voiceKey() != before {
+		defer l.applyVoice(true)   // 言語・呼びかけ・オンオフが変わったときだけ聞き取りをやり直す
+	}
 	if l.s.Err != nil {
-		l.errorText("settings.json を読めませんでした: " + l.s.Err.Error())
+		l.errorText(T("settings.readError", l.s.Err.Error()))
 	} else if announce {
-		l.info("設定を読み直しました。（" + l.ai.Label() + "）")
+		l.info(T("settings.reloaded", l.ai.Label()))
 	}
 	if !strings.HasPrefix(l.ai.Label(), "local:") {
 		localServer.Stop()
@@ -115,14 +141,16 @@ func (l *Lumi) ready() {
 		names[i] = c.name
 	}
 	l.emit("commands", names)
+	l.emit("i18n", clientMessages())
 	l.sendVoiceSettings()
 	l.write("Lumi Assistant [Version "+version+"]\n", "fg")
-	l.write("話しかけると声で返事をします。/help でコマンド一覧。\n\n", "dim")
+	l.write(T("welcome.hint")+"\n\n", "dim")
 	if l.s.Err != nil {
-		l.errorText("settings.json を読めませんでした: " + l.s.Err.Error())
+		l.errorText(T("settings.readError", l.s.Err.Error()))
 	}
 	l.emit("flash", map[string]any{"expr": "happy", "seconds": 2.5})
 	l.warmupLocal()
+	l.applyVoice(true)
 }
 
 // ローカルAIなら、最初の返事を待たせないように先にモデルを読み込んでおく
@@ -132,11 +160,10 @@ func (l *Lumi) warmupLocal() {
 	}
 	dir := dataDir()
 	if !localInstalled(dir) {
-		l.write(fmt.Sprintf("ローカルAIがまだ入っていません。/install-local と入力するとダウンロードします（約%.1fGB）。\n\n",
-			float64(localTotalSize())/1e9), "yellow")
+		l.write(T("local.notInstalledHint", float64(localTotalSize())/1e9)+"\n\n", "yellow")
 		return
 	}
-	l.write("ローカルAIを起動しています…\n", "dim")
+	l.write(T("local.starting")+"\n", "dim")
 	go func() {
 		p := l.ai
 		if op, ok := p.(*thinkFiltered); ok && op.before != nil {
@@ -145,7 +172,7 @@ func (l *Lumi) warmupLocal() {
 				return
 			}
 		}
-		l.info("ローカルAIの準備ができました。")
+		l.info(T("local.ready"))
 	}()
 }
 
@@ -179,19 +206,25 @@ func (l *Lumi) submit(text string) {
 		l.updateTitle()
 		l.sendVoiceSettings()
 		if l.muted {
-			l.info("読み上げをオフにしました。")
+			l.info(T("mute.on"))
 		} else {
-			l.info("読み上げをオンにしました。")
+			l.info(T("mute.off"))
 		}
 	case "/mic":
-		l.info("音声入力はこのバージョンではまだ使えません (準備中)。")
+		l.toggleMic()
+	case "/install-voice":
+		l.installVoice()
+	case "/voicetest":
+		// 開発用 (一覧には出さない): データフォルダの voice/<ファイル> をマイクの代わりに聞かせる
+		l.emit("voiceTest", map[string]any{"lang": currentLang(), "model": "/voice/" + currentLang() + "/model.tar.gz",
+			"wake": l.s.WakeWord(), "file": "/voice/" + arg(1)})
 	case "/reload":
 		l.reload(true)
 	case "/install-local":
 		l.installLocal()
 	case "/config":
 		openFile(l.s.Path)
-		l.info("settings.json を開きました。保存したら /reload で反映されます。")
+		l.info(T("config.opened"))
 	case "/settings":
 		l.showSettings()
 	case "/set":
@@ -208,52 +241,62 @@ func (l *Lumi) submit(text string) {
 	case "/help":
 		var b strings.Builder
 		for _, c := range commands {
-			b.WriteString("  " + padRight(c.name+" "+c.args, 24) + c.help + "\n")
+			args := ""
+			if c.args != "" {
+				args = " " + T(c.args)
+			}
+			b.WriteString("  " + padRight(c.name+args, 24) + c.help() + "\n")
 		}
-		b.WriteString("\n  Tab でコマンドを補完できます。\n")
-		b.WriteString("  Ctrl+C / Esc  返事を止める     ↑↓  入力履歴")
+		b.WriteString("\n  " + T("help.wake", l.wakeWord()) + "\n  " + T("help.tab") + "\n")
+		b.WriteString("  " + T("help.keys"))
 		l.info(b.String())
 	default:
-		l.errorText("知らないコマンドです: " + cmd + "（/help で一覧）")
+		l.errorText(T("cmd.unknown", cmd))
 	}
 }
 
-type command struct{ name, args, help string }
+// / コマンド (説明は locales の cmd.<名前>)
+type command struct{ name, args string }
+
+func (c command) help() string { return T("cmd." + strings.TrimPrefix(c.name, "/")) }
 
 var commands = []command{
-	{"/help", "", "コマンド一覧"},
-	{"/settings", "", "今の設定を一覧する"},
-	{"/set", "<項目> <値>", "設定を変える (例: /set voice_rate 3)"},
-	{"/voices", "", "使える声の一覧"},
-	{"/config", "", "設定ファイル (settings.json) を開く"},
-	{"/reload", "", "設定ファイルを読み直す"},
-	{"/mute", "", "読み上げのオン/オフ"},
-	{"/mic", "", "音声入力のオン/オフ"},
-	{"/install-local", "", "ローカルAIをダウンロードする"},
-	{"/peek", "", "バックグラウンドで呼ばれたときの動きを試す"},
-	{"/cls", "", "画面と会話をリセット"},
-	{"/exit", "", "終了"},
+	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
+	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""},
+	{"/peek", ""}, {"/cls", ""}, {"/exit", ""},
 }
 
-type settingKey struct{ key, help, rule string } // rule: 選べる値 (カンマ区切り) か #int:min:max / #num:min:max
+// 設定項目 (説明は locales の set.<項目>)。rule: 選べる値 (カンマ区切り) か #int:min:max / #num:min:max
+type settingKey struct{ key, rule string }
+
+func (k settingKey) help() string { return T("set." + k.key) }
 
 var settingKeys = []settingKey{
-	{"provider", "使うAI", "local,offline,anthropic,openai,command"},
-	{"model", "モデル名 (local では .gguf のファイル名)", ""},
-	{"endpoint", "API の URL", ""},
-	{"api_key_env", "API キーが入っている環境変数の名前", ""},
-	{"command", "command で実行するコマンド", ""},
-	{"max_tokens", "返答の最大トークン数 (0 で既定)", "#int:0:1000000"},
-	{"effort", "Anthropic の effort", ",low,medium,high,xhigh,max"},
-	{"local_gpu", "ローカルAIで GPU を使うか", "auto,off"},
-	{"pc_control", "PC の操作 (毎回確認あり)", "on,off"},
-	{"web_search", "Web 検索 (ask は毎回確認)", "on,ask,off"},
-	{"search_url", "SearXNG の URL (空なら DuckDuckGo)", ""},
-	{"system_prompt", "キャラクター設定 (空なら既定)", ""},
-	{"voice", "声の名前 (/voices で一覧)", ""},
-	{"voice_rate", "読み上げの速さ (-10〜10)", "#int:-10:10"},
-	{"background", "閉じてもトレイで動き続ける", "on,off"},
-	{"startup", "ログイン時にトレイで起動する", "on,off"},
+	{"language", "#lang"},
+	{"provider", "local,offline,anthropic,openai,command"},
+	{"model", ""}, {"endpoint", ""}, {"api_key_env", ""}, {"command", ""},
+	{"max_tokens", "#int:0:1000000"},
+	{"effort", ",low,medium,high,xhigh,max"},
+	{"local_gpu", "auto,off"},
+	{"pc_control", "on,off"},
+	{"web_search", "on,ask,off"},
+	{"search_url", ""},
+	{"voice_input", "on,off"},
+	{"wake_word", ""},
+	{"voice_debug", "off,on"},
+	{"system_prompt", ""},
+	{"voice", ""},
+	{"voice_rate", "#int:-10:10"},
+	{"background", "on,off"},
+	{"startup", "on,off"},
+}
+
+// 言語は入っている翻訳から選ぶ
+func (k settingKey) choices() string {
+	if k.rule == "#lang" {
+		return "auto," + strings.Join(languages(), ",")
+	}
+	return k.rule
 }
 
 func (l *Lumi) showSettings() {
@@ -264,11 +307,11 @@ func (l *Lumi) showSettings() {
 			v = string(r[:40]) + "…"
 		}
 		if v == "" {
-			v = "(既定)"
+			v = T("set.default")
 		}
-		b.WriteString("  " + padRight(k.key, 16) + padRight(v, 28) + k.help + "\n")
+		b.WriteString("  " + padRight(k.key, 16) + padRight(v, 28) + k.help() + "\n")
 	}
-	b.WriteString("\n  変えるには /set <項目> <値>。空に戻すには /set <項目> \"\"")
+	b.WriteString("\n  " + T("set.howto"))
 	l.info(b.String())
 }
 
@@ -284,40 +327,41 @@ func (l *Lumi) setCommand(key, value string, hasValue bool) {
 		}
 	}
 	if def == nil {
-		l.errorText("そんな設定項目はありません: " + key + "（/settings で一覧）")
+		l.errorText(T("set.noKey", key))
 		return
 	}
 	if !hasValue {
 		v := l.s.Get(def.key, "")
 		if v == "" {
-			v = "(既定)"
+			v = T("set.default")
 		}
-		msg := def.key + " = " + v + "    " + def.help
-		if def.rule != "" && !strings.HasPrefix(def.rule, "#") {
-			msg += "\n  選べる値: " + strings.ReplaceAll(strings.Trim(def.rule, ","), ",", " / ")
+		msg := def.key + " = " + v + "    " + def.help()
+		if rule := def.choices(); rule != "" && !strings.HasPrefix(rule, "#") {
+			msg += "\n  " + T("set.choices", strings.ReplaceAll(strings.Trim(rule, ","), ",", " / "))
 		}
 		l.info(msg)
 		return
 	}
 	if l.s.Err != nil {
-		l.errorText("settings.json が壊れているので変更できません。/config で直してください。")
+		l.errorText(T("settings.broken"))
 		return
 	}
 	if value == `""` {
 		value = ""
 	}
 	var stored any = value
-	if strings.HasPrefix(def.rule, "#") {
-		r := strings.Split(def.rule, ":")
+	rule := def.choices()
+	if strings.HasPrefix(rule, "#") {
+		r := strings.Split(rule, ":")
 		lo, _ := strconv.ParseFloat(r[1], 64)
 		hi, _ := strconv.ParseFloat(r[2], 64)
 		n, err := strconv.ParseFloat(value, 64)
 		if err != nil || n < lo || n > hi || (r[0] == "#int" && n != math.Floor(n)) {
-			kind := "数"
+			kind := T("set.num")
 			if r[0] == "#int" {
-				kind = "整数"
+				kind = T("set.int")
 			}
-			l.errorText(fmt.Sprintf("%s は %s〜%s の%sで指定してください。", def.key, r[1], r[2], kind))
+			l.errorText(T("set.range", def.key, r[1], r[2], kind))
 			return
 		}
 		if r[0] == "#int" {
@@ -325,27 +369,27 @@ func (l *Lumi) setCommand(key, value string, hasValue bool) {
 		} else {
 			stored = n
 		}
-	} else if def.rule != "" {
+	} else if rule != "" {
 		value = strings.ToLower(value)
 		ok := false
-		for _, v := range strings.Split(def.rule, ",") {
+		for _, v := range strings.Split(rule, ",") {
 			ok = ok || v == value
 		}
 		if !ok {
-			l.errorText(def.key + " に使える値: " + strings.ReplaceAll(strings.Trim(def.rule, ","), ",", " / "))
+			l.errorText(T("set.allowed", def.key, strings.ReplaceAll(strings.Trim(rule, ","), ",", " / ")))
 			return
 		}
 		stored = value
 	}
 	if err := l.s.Set(def.key, stored); err != nil {
-		l.errorText("保存できませんでした: " + err.Error())
+		l.errorText(T("set.saveFailed", err.Error()))
 		return
 	}
 	shown := value
 	if shown == "" {
-		shown = "(既定)"
+		shown = T("set.default")
 	}
-	l.info(def.key + " を " + shown + " にしました。")
+	l.info(T("set.done", def.key, shown))
 	l.reload(false)
 }
 
@@ -371,7 +415,7 @@ func (l *Lumi) installLocal() {
 	l.mu.Lock()
 	l.cancel = cancel
 	l.mu.Unlock()
-	l.write("ローカルAIをダウンロードします。Ctrl+C で中断できます（次回は続きから再開します）。\n", "dim")
+	l.write(T("local.installStart")+"\n", "dim")
 	go func() {
 		defer l.setBusy(false)
 		lastStep, lastPct := "", -1
@@ -392,15 +436,15 @@ func (l *Lumi) installLocal() {
 		})
 		switch {
 		case err == errCancelled:
-			l.write("^C\nダウンロードを中断しました。もう一度 /install-local で続きから再開します。\n\n", "dim")
+			l.write("^C\n"+T("local.installCancelled", "/install-local")+"\n\n", "dim")
 		case err != nil:
-			l.errorText("ダウンロードに失敗しました: " + err.Error())
+			l.errorText(T("download.failed", err.Error()))
 		default:
 			if l.s.Get("provider", "offline") == "offline" {
 				l.s.Set("provider", "local")
 			}
 			l.loadSettings()
-			l.write("ローカルAIを入れました。（"+l.ai.Label()+"）\n", "dim")
+			l.write(T("local.installed", l.ai.Label())+"\n", "dim")
 			l.warmupLocal()
 		}
 	}()
@@ -473,7 +517,7 @@ func (l *Lumi) respond(userText string) {
 		}
 		// 1 つずつ処理して (コマンドは必ず確認してから実行)、結果をまとめて AI に返す
 		var report strings.Builder
-		report.WriteString("[ツールの結果]\n")
+		report.WriteString(T("tool.results") + "\n")
 		for _, r := range requests {
 			if l.cancelled() {
 				break
@@ -483,27 +527,27 @@ func (l *Lumi) respond(userText string) {
 				continue
 			}
 			if !l.s.PcControl() {
-				report.WriteString("\n$ " + r.Command + "\n(PC の操作はオフになっています)\n")
+				report.WriteString("\n$ " + r.Command + "\n" + T("tool.pcOff") + "\n")
 				continue
 			}
 			admin := ""
 			if r.Admin {
-				admin = "  (管理者)"
+				admin = "  " + T("tool.adminTag")
 			}
 			report.WriteString("\n$ " + r.Command + admin + "\n")
 			answer := l.confirm(r)
 			if answer != "y" && answer != "a" {
-				l.write("実行しませんでした。\n", "dim")
-				report.WriteString("(ユーザーが実行を許可しませんでした。別のコマンドは提案せず、言葉だけで答えてください)\n")
+				l.write(T("tool.notRun")+"\n", "dim")
+				report.WriteString(T("tool.declined") + "\n")
 				declined = true
 				continue
 			}
 			l.emit("thinking", true)
 			l.face("think")
-			result := runCommand(r.Command, r.Admin || answer == "a", l.cancelChan())
+			result, ok := runCommand(r.Command, r.Admin || answer == "a", l.cancelChan())
 			l.showOutput(result)
 			mood := "sad"
-			if strings.HasPrefix(result, "終了コード 0") && !strings.Contains(result, "Exception") {
+			if ok && !strings.Contains(result, "Exception") {
 				mood = "happy"
 			}
 			l.emit("flash", map[string]any{"expr": mood, "seconds": 2})
@@ -613,15 +657,15 @@ func (l *Lumi) confirm(r toolRequest) string {
 	l.face("normal")
 	need := ""
 	if r.Admin {
-		need = "（管理者権限が必要です）"
+		need = T("confirm.needAdmin")
 	}
-	l.write("\nルミがコマンドを実行しようとしています"+need+":\n", "yellow")
+	l.write("\n"+T("confirm.title", need)+"\n", "yellow")
 	for _, line := range strings.Split(r.Command, "\n") {
 		l.write("  "+strings.TrimRight(line, "\r")+"\n", "white")
 	}
-	question := "実行しますか？ [y=実行 / a=管理者として実行 / N=やめる] "
+	question := T("confirm.question")
 	if r.Admin {
-		question = "管理者として実行しますか？ [y/N] "
+		question = T("confirm.questionAdmin")
 	}
 	answer := strings.ToLower(l.ask(question))
 	if r.Admin && answer == "a" {
@@ -649,7 +693,7 @@ func (l *Lumi) showOutput(result string) {
 	const max = 15
 	for i, line := range lines {
 		if i >= max {
-			l.write(fmt.Sprintf("  …(%d 行省略)\n", len(lines)-max), "dim")
+			l.write("  "+T("output.omitted", len(lines)-max)+"\n", "dim")
 			break
 		}
 		l.write("  "+line+"\n", "dim")
@@ -660,28 +704,28 @@ func (l *Lumi) showOutput(result string) {
 // Web 検索 / ページの読み込みをして、AI に返す結果の文章を作る
 func (l *Lumi) webTool(r toolRequest) string {
 	search := r.Kind == "search"
-	label := "ページ"
+	label := T("web.page")
 	if search {
-		label = "Web検索"
+		label = T("web.search")
 	}
 	head := "\n[" + label + "] " + r.Command + "\n"
 	mode := strings.ToLower(l.s.Get("web_search", "on"))
 	if mode == "off" {
-		return head + "(Web 検索はオフになっています)\n"
+		return head + T("web.off") + "\n"
 	}
 	if search {
-		l.write("検索: "+r.Command+"\n", "cyan")
+		l.write(T("web.searching", r.Command)+"\n", "cyan")
 	} else {
-		l.write("ページを読む: "+r.Command+"\n", "cyan")
+		l.write(T("web.reading", r.Command)+"\n", "cyan")
 	}
 	if mode == "ask" {
-		q := "読みますか？ [y/N] "
+		q := T("web.askRead")
 		if search {
-			q = "検索しますか？ [y/N] "
+			q = T("web.askSearch")
 		}
 		if a := strings.ToLower(l.ask(q)); a != "y" && a != "a" {
-			l.write("やめました。\n", "dim")
-			return head + "(ユーザーが許可しませんでした)\n"
+			l.write(T("web.stopped")+"\n", "dim")
+			return head + T("web.denied") + "\n"
 		}
 	}
 	l.emit("thinking", true)
@@ -694,7 +738,7 @@ func (l *Lumi) webTool(r toolRequest) string {
 		result, err = fetchPage(r.Command)
 	}
 	if err != nil {
-		result = "(読み込めませんでした: " + err.Error() + ")"
+		result = T("web.failed", err.Error())
 	}
 	// 画面には要点だけ (検索ならタイトル、ページなら先頭数行) を出す
 	lines := strings.Split(result, "\n")
@@ -731,7 +775,7 @@ func (l *Lumi) quit() {
 // 使える声の一覧 (画面側から名前が届く) を並べて表示する
 func (l *Lumi) showVoices(names []string, current string) {
 	if len(names) == 0 {
-		l.info("この環境では画面側の音声合成が使えません。")
+		l.info(T("voices.none"))
 		return
 	}
 	sort.Strings(names)
@@ -739,10 +783,10 @@ func (l *Lumi) showVoices(names []string, current string) {
 	for _, n := range names {
 		mark := ""
 		if n == current {
-			mark = "  ← 使用中"
+			mark = "  " + T("voices.current")
 		}
 		b.WriteString("  " + n + mark + "\n")
 	}
-	b.WriteString("\n  変えるには /set voice <名前>")
+	b.WriteString("\n  " + T("voices.howto"))
 	l.info(b.String())
 }

@@ -102,8 +102,8 @@ const (
 	maxOutput      = 4000
 )
 
-// OS のシェルでコマンドを実行し、出力を返す。admin なら OS の管理者確認を通す
-func runCommand(command string, admin bool, cancel <-chan struct{}) string {
+// OS のシェルでコマンドを実行し、出力と成功したかを返す。admin なら OS の管理者確認を通す
+func runCommand(command string, admin bool, cancel <-chan struct{}) (string, bool) {
 	ctx, stop := context.WithTimeout(context.Background(), commandTimeout)
 	defer stop()
 	go func() {
@@ -130,7 +130,7 @@ func runCommand(command string, admin bool, cancel <-chan struct{}) string {
 	default:
 		if admin {
 			if _, err := exec.LookPath("pkexec"); err != nil {
-				return "(管理者として実行するための pkexec が見つかりません)"
+				return T("run.noPkexec"), false
 			}
 			cmd = exec.CommandContext(ctx, "pkexec", "/bin/bash", "-c", command) // 認証画面が出る
 		} else {
@@ -152,27 +152,27 @@ func runCommand(command string, admin bool, cancel <-chan struct{}) string {
 	}
 	out = strings.TrimSpace(strings.ReplaceAll(out, "\r", ""))
 	if ctx.Err() == context.DeadlineExceeded {
-		return fmt.Sprintf("(%d 秒たっても終わらなかったので止めました)", int(commandTimeout.Seconds()))
+		return T("run.timeout", int(commandTimeout.Seconds())), false
 	}
 	if ctx.Err() == context.Canceled {
-		return "(中断しました)"
+		return T("run.cancelled"), false
 	}
 	if strings.Contains(out, "LUMI_UAC_DENIED") {
-		return "(管理者権限の確認画面で許可されませんでした)"
+		return T("run.uacDenied"), false
 	}
 	code := 0
 	if ee, ok := err.(*exec.ExitError); ok {
 		code = ee.ExitCode()
 	} else if err != nil {
-		return "(実行できませんでした: " + err.Error() + ")"
+		return T("run.failed", err.Error()), false
 	}
 	if len([]rune(out)) > maxOutput {
-		out = string([]rune(out)[:maxOutput]) + "\n…(以下省略)"
+		out = string([]rune(out)[:maxOutput]) + "\n" + T("run.truncated")
 	}
 	if out == "" {
-		out = "(出力なし)"
+		out = T("run.noOutput")
 	}
-	return fmt.Sprintf("終了コード %d\n%s", code, out)
+	return T("run.exitCode", code) + "\n" + out, code == 0
 }
 
 // PowerShell で実行する。出力は UTF-8 で一時ファイルに書かせる (管理者として動かした PowerShell の出力は直接受け取れないため)

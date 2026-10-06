@@ -41,7 +41,7 @@ func webSearch(query, searxng string) (string, error) {
 		return "", err
 	}
 	if len(hits) == 0 {
-		return "(検索結果がありませんでした)", nil
+		return T("web.noResults"), nil
 	}
 	var b strings.Builder
 	for i, h := range hits {
@@ -121,10 +121,10 @@ var (
 func fetchPage(raw string) (string, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		return "(http か https の URL だけ読めます)", nil
+		return T("web.httpOnly"), nil
 	}
 	if isPrivateHost(u.Hostname()) {
-		return "(PC 内や家庭内ネットワークのページは読めません)", nil
+		return T("web.private"), nil
 	}
 	body, err := fetchRaw(u.String(), nil, true)
 	if err != nil {
@@ -138,10 +138,10 @@ func fetchPage(raw string) (string, error) {
 	text = breakRe.ReplaceAllString(text, "\n")
 	text = blankLnRe.ReplaceAllString(plainText(text), "\n")
 	if r := []rune(text); len(r) > maxPageChars {
-		text = string(r[:maxPageChars]) + "…(以下省略)"
+		text = string(r[:maxPageChars]) + T("web.truncated")
 	}
 	if title != "" {
-		text = "タイトル: " + title + "\n" + text
+		text = T("web.title", title) + "\n" + text
 	}
 	return text, nil
 }
@@ -169,10 +169,10 @@ func fetchRaw(target string, form url.Values, checkHosts bool) (string, error) {
 		Timeout: 15 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
-				return errors.New("転送が多すぎます")
+				return errors.New(T("web.tooManyRedirects"))
 			}
 			if checkHosts && ((req.URL.Scheme != "http" && req.URL.Scheme != "https") || isPrivateHost(req.URL.Hostname())) {
-				return errors.New("PC 内や家庭内ネットワークへの転送なので読みません")
+				return errors.New(T("web.privateRedirect"))
 			}
 			return nil
 		},

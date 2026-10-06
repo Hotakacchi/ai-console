@@ -100,13 +100,13 @@ func localInstalled(base string) bool {
 	return serverExe(base) != "" && err == nil
 }
 
-var errCancelled = errors.New("中断しました")
+var errCancelled = errors.New("cancelled")
 
 // llama.cpp と標準モデルをダウンロードする。progress(説明, 0〜1)
 func installLocal(base string, progress func(string, float64), cancelled func() bool) error {
 	la, ok := llamaAsset()
 	if !ok {
-		return fmt.Errorf("この環境 (%s/%s) 用のローカルAIはありません", runtime.GOOS, runtime.GOARCH)
+		return errors.New(T("local.noBuild", runtime.GOOS+"/"+runtime.GOARCH))
 	}
 	total := float64(la.Size + modelAsset.Size)
 	os.MkdirAll(modelsDir(base), 0o755)
@@ -114,12 +114,12 @@ func installLocal(base string, progress func(string, float64), cancelled func() 
 	if serverExe(base) == "" {
 		archive := filepath.Join(localDir(base), filepath.Base(la.URL))
 		err := download(la, archive, func(done int64) {
-			progress("AIエンジン (llama.cpp) をダウンロード中", float64(done)/total)
+			progress(T("local.dlEngine"), float64(done)/total)
 		}, cancelled, nil)
 		if err != nil {
 			return err
 		}
-		progress("AIエンジンを展開中", float64(la.Size)/total)
+		progress(T("local.extracting"), float64(la.Size)/total)
 		os.RemoveAll(llamaDir(base))
 		if err := extract(archive, llamaDir(base)); err != nil {
 			return err
@@ -130,13 +130,13 @@ func installLocal(base string, progress func(string, float64), cancelled func() 
 	model := localModelPath(base, "")
 	if _, err := os.Stat(model); err != nil {
 		err := download(modelAsset, model, func(done int64) {
-			progress("AIモデル ("+modelName+") をダウンロード中", float64(la.Size+done)/total)
-		}, cancelled, func() { progress("AIモデルを検証中", 1) })
+			progress(T("local.dlModel", modelName), float64(la.Size+done)/total)
+		}, cancelled, func() { progress(T("local.verifying"), 1) })
 		if err != nil {
 			return err
 		}
 	}
-	progress("完了", 1)
+	progress(T("local.done"), 1)
 	return nil
 }
 
@@ -163,7 +163,7 @@ func download(a asset, dest string, progress func(int64), cancelled func() bool,
 		}
 		defer res.Body.Close()
 		if res.StatusCode >= 300 {
-			return fmt.Errorf("ダウンロードに失敗しました (HTTP %d)", res.StatusCode)
+			return errors.New(T("download.http", res.StatusCode))
 		}
 		flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND
 		if have > 0 && res.StatusCode != http.StatusPartialContent {
@@ -212,7 +212,7 @@ func download(a asset, dest string, progress func(int64), cancelled func() bool,
 	sum, err := fileSHA256(part)
 	if st, _ := os.Stat(part); err != nil || st.Size() != a.Size || sum != a.SHA256 {
 		os.Remove(part)
-		return fmt.Errorf("%s の中身が正しくありません。もう一度試してください", filepath.Base(dest))
+		return errors.New(T("download.corrupt", filepath.Base(dest)))
 	}
 	os.Remove(dest)
 	return os.Rename(part, dest)
@@ -336,7 +336,7 @@ func (s *llamaServer) Start(base, modelPath string, gpu bool, context int) error
 	defer s.mu.Unlock()
 	exe := serverExe(base)
 	if _, err := os.Stat(modelPath); exe == "" || err != nil {
-		return errors.New("ローカルAIが入っていません。/install-local と入力するとダウンロードします")
+		return errors.New(T("local.notInstalled"))
 	}
 	key := fmt.Sprintf("%s|%v|%d", modelPath, gpu, context)
 	if s.cmd != nil && s.cmd.ProcessState == nil && s.args == key {
@@ -389,7 +389,7 @@ func (s *llamaServer) Start(base, modelPath string, gpu bool, context int) error
 		select {
 		case <-exited:
 			s.cmd = nil
-			return errors.New("ローカルAIの起動に失敗しました。詳しくは local/server.log を見てください")
+			return errors.New(T("local.startFailed"))
 		default:
 		}
 		res, err := (&http.Client{Timeout: 2 * time.Second}).Get(s.endpoint + "/health")
@@ -401,7 +401,7 @@ func (s *llamaServer) Start(base, modelPath string, gpu bool, context int) error
 		}
 		if time.Now().After(deadline) {
 			s.stopLocked()
-			return errors.New("ローカルAIの起動がタイムアウトしました")
+			return errors.New(T("local.timeout"))
 		}
 		time.Sleep(500 * time.Millisecond)
 	}

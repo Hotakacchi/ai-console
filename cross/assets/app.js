@@ -3,6 +3,7 @@
 
 import * as wails from "/wails/runtime.js";
 import { Face } from "./face.js";
+import { Voice } from "./voice.js";
 
 const emit = (name, data) => wails.Events.Emit(name, data);
 const on = (name, fn) => wails.Events.On(name, e => fn(e.data));
@@ -70,6 +71,7 @@ function termMain() {
     '<span class="cursor"></span><span class="ghost"></span><span class="hint"></span><span class="spinner"></span>';
   const [promptEl, typedEl, composeEl, cursorEl, ghostEl, hintEl, spinnerEl] = input.children;
   let buffer = "", compose = "", busy = false, thinking = false, askPrompt = null;
+  let hint = "", lastWasVoice = false, msgs = {};
   let commands = [], history = [], historyIndex = 0, tabPrefix = null, tabIndex = -1;
 
   function placeInput() { current.appendChild(input); render(); }
@@ -82,7 +84,7 @@ function termMain() {
     composeEl.textContent = editing ? compose : "";
     cursorEl.style.display = editing ? "" : "none";
     ghostEl.textContent = editing && !compose ? ghost() : "";
-    hintEl.textContent = "";
+    hintEl.textContent = editing && !buffer && !compose && hint ? " " + hint : "";
     spinnerEl.textContent = !editing && thinking ? "|/-\\"[Math.floor(performance.now() / 125) % 4] : "";
     // 日本語変換の窓がカーソルの位置に出るよう、見えない入力欄を動かす
     const r = cursorEl.getBoundingClientRect(), t = term.getBoundingClientRect();
@@ -131,12 +133,8 @@ function termMain() {
     const ctrl = e.ctrlKey || e.metaKey;
     if (askPrompt !== null && (e.key === "Enter" || e.key === "Escape" || (ctrl && e.key === "c"))) {
       e.preventDefault();
-      const answer = e.key === "Enter" ? buffer : "";
-      write(askPrompt, "yellow");
-      write(buffer + (e.key === "Enter" ? "" : "^C") + "\n", "white");
-      askPrompt = null; buffer = "";
-      emit("answer", answer);
-      render();
+      if (e.key === "Enter") answerAsk(buffer, buffer, "");
+      else answerAsk("", buffer + "^C", "");
       return;
     }
     if (e.key === "Escape" || (ctrl && e.key === "c" && !window.getSelection().toString())) {
@@ -163,6 +161,7 @@ function termMain() {
       write(PROMPT, "fg");
       write(text + "\n", "white");
       if (text.trim()) { history.push(text); historyIndex = history.length; }
+      lastWasVoice = false;
       emit("submit", text);
     } else if (e.key === "Backspace" && buffer) {
       e.preventDefault();
@@ -192,10 +191,12 @@ function termMain() {
   function pickVoice() {
     if (!voices.length) loadVoices();
     if (voiceName) return voices.find(v => v.name === voiceName) || null;
-    const ja = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith("ja"));
-    const local = ja.filter(v => v.localService);
-    const pool = local.length ? local : ja;
-    return pool.find(v => /Haruka|Nanami|Kyoko|Ayumi|Sayaka/.test(v.name)) || pool[0] || null;
+    // 今の言語の声を選ぶ (端末にある声を優先、日本語なら女性の声を優先)
+    const lang = (msgs.lang || "ja").toLowerCase();
+    const same = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(lang));
+    const local = same.filter(v => v.localService);
+    const pool = local.length ? local : same;
+    return pool.find(v => /Haruka|Nanami|Kyoko|Ayumi|Sayaka|Zira|Aria|Jenny|Samantha/.test(v.name)) || pool[0] || null;
   }
 
   let speaking = null;   // 今喋っている文 { id, text, shown, done }
@@ -240,14 +241,76 @@ function termMain() {
     }
   }
 
+  // ---- 確認の質問への答え (キーボードでも声でも) ----
+  function answerAsk(answer, shown, note) {
+    write(askPrompt, "yellow");
+    write(shown, "white");
+    write((note ? "  " + note : "") + "\n", "dim");
+    askPrompt = null; buffer = "";
+    voice.confirming(false);
+    emit("answer", answer);
+    render();
+  }
+
+  // ---- 声での入力 ----
+  const voice = new Voice({
+    woke() {
+      face.expression = "listen";
+      face.poke(false);
+      hint = msgs["voice.listening"] || "";
+      render();
+      emit("voiceWoke");
+    },
+    heard(text) {
+      hint = "";
+      if (face.expression === "listen") face.expression = "normal";
+      if (busy || askPrompt !== null) { render(); return; }
+      write(PROMPT, "fg");
+      write(text, "white");
+      write("  " + (msgs["voice.mark"] || "") + "\n", "dim");
+      history.push(text); historyIndex = history.length;
+      lastWasVoice = true;
+      emit("voiceHeard", text);
+    },
+    timeout() {
+      hint = "";
+      if (face.expression === "listen") face.expression = "normal";
+      render();
+      emit("voiceTimeout");
+    },
+    confirm(yes) { if (askPrompt !== null) answerAsk(yes ? "y" : "n", yes ? "y" : "n", msgs["voice.mark"]); },
+    state(state, message) { emit("voiceState", { state, message: message || "" }); },
+    debug(text) { emit("voiceDebug", text); },
+  });
+  // 喋っている間・考えている間は聞かない。喋り終わった直後も自分の声の残りを拾わないよう少し待つ
+  let quietUntil = 0;
+  setInterval(() => {
+    const talking = !!speaking || (synth && synth.speaking);
+    if (talking) quietUntil = performance.now() + 800;
+    voice.paused = talking || performance.now() < quietUntil || (busy && askPrompt === null);
+  }, 100);
+
   // ---- Go からのイベント ----
   on("write", d => write(d.text, d.color));
   on("clear", () => clear());
-  on("busy", b => { busy = b; if (!b) { thinking = false; askPrompt = null; } render(); });
+  on("busy", b => {
+    busy = b;
+    if (!b) {
+      thinking = false; askPrompt = null;
+      // 声で話しかけられていたら、返事のあと呼びかけなしで続けて話せるようにする
+      if (lastWasVoice) { lastWasVoice = false; setTimeout(() => voice.listen(), 900); }
+    }
+    render();
+  });
   on("thinking", b => { thinking = b; render(); });
   on("face", expr => { face.expression = expr; });
   on("flash", d => face.flash(d.expr, d.seconds));
-  on("ask", q => { askPrompt = q; buffer = ""; thinking = false; render(); keys.focus(); });
+  on("ask", q => { askPrompt = q; buffer = ""; thinking = false; voice.confirming(true); render(); keys.focus(); });
+  on("i18n", m => { msgs = m; });
+  on("voiceStart", d => voice.start(d, msgs));
+  on("voiceStop", () => voice.stop());
+  // テスト用: マイクの代わりに音声ファイルを聞かせる
+  on("voiceTest", async d => { await voice.start(d, msgs, false); await voice.feedFile(d.file); });
   on("speak", d => speak(d.id, d.text));
   on("stopSpeaking", () => { if (synth) synth.cancel(); if (speaking) speaking.stop(); });
   on("commands", list => { commands = list; });

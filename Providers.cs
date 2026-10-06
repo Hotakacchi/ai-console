@@ -19,20 +19,29 @@ class Settings
         "返答は音声で読み上げられるので、日本語の話し言葉で、親しみやすく、基本は2〜4文で短く答えてください。" +
         "マークダウン、箇条書き、記号、絵文字、URLは使わないでください。";
 
-    const string Template =
+    // settings.json のひな形
+    public static string Template(string provider)
+    {
+        return
 @"{
-  ""provider"": ""offline"",
+  ""provider"": """ + provider + @""",
   ""model"": """",
   ""endpoint"": """",
   ""api_key_env"": """",
   ""command"": """",
   ""max_tokens"": 0,
   ""effort"": """",
+  ""local_gpu"": ""auto"",
+  ""pc_control"": ""on"",
+  ""voice_input"": ""on"",
+  ""wake_word"": ""ルミ"",
+  ""wake_confidence"": 0.6,
   ""system_prompt"": """",
   ""voice"": """",
   ""voice_rate"": 1
 }
 ";
+    }
 
     readonly Dictionary<string, object> d;
     public readonly string Path;
@@ -52,7 +61,8 @@ class Settings
         string path = System.IO.Path.Combine(dir, "settings.json");
         try
         {
-            if (!File.Exists(path)) File.WriteAllText(path, Template, new UTF8Encoding(false));
+            if (!File.Exists(path))
+                File.WriteAllText(path, Template(LocalAI.IsInstalled(dir) ? "local" : "offline"), new UTF8Encoding(false));
             var d = new JavaScriptSerializer().DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
             return new Settings(path, d ?? new Dictionary<string, object>(), null);
         }
@@ -60,6 +70,19 @@ class Settings
         {
             return new Settings(path, new Dictionary<string, object>(), e.Message);
         }
+    }
+
+    // 1 項目を書き換えて settings.json に保存する (項目の並びはそのまま)
+    public void Set(string key, object value)
+    {
+        d[key] = value;
+        var js = new JavaScriptSerializer();
+        var sb = new StringBuilder("{\n");
+        int i = 0;
+        foreach (var kv in d)
+            sb.Append("  " + js.Serialize(kv.Key) + ": " + js.Serialize(kv.Value) + (++i < d.Count ? "," : "") + "\n");
+        sb.Append("}\n");
+        File.WriteAllText(Path, sb.ToString(), new UTF8Encoding(false));
     }
 
     public string Get(string key, string fallback)
@@ -75,7 +98,17 @@ class Settings
         return int.TryParse(Get(key, ""), out n) && n != 0 ? n : fallback;
     }
 
-    public string SystemPrompt { get { return Get("system_prompt", DefaultSystemPrompt); } }
+    // PC 操作を許すときに AI へ伝える決まりごと (実行前の確認はアプリ側が必ず行う)
+    const string PcControlPrompt =
+        "\n\nあなたはユーザーのWindows PCを操作できます。操作が必要なときは、返事の最後に PowerShell のコマンドを " +
+        "<run>コマンド</run> の形で書いてください。管理者権限が必要なコマンドは <run admin>コマンド</run> と書きます。" +
+        "コマンドは実行前に必ずユーザーに確認され、許可されたときだけ実行されます。実行結果は次のメッセージで渡されるので、それを見て答えてください。" +
+        "コマンドを書く前に、何をするのかを一言で説明してください。ファイルの削除や設定の変更など取り消せない操作は、特に丁寧に説明してください。" +
+        "操作が不要な質問には、コマンドを書かずに答えてください。";
+
+    public bool PcControl { get { return Get("pc_control", "on").ToLowerInvariant() != "off"; } }
+
+    public string SystemPrompt { get { return Get("system_prompt", DefaultSystemPrompt) + (PcControl ? PcControlPrompt : ""); } }
 
     // api_key_env に書かれた環境変数からキーを読む (キーそのものは設定ファイルに書かない)
     public string ApiKey(string defaultEnv)
@@ -107,6 +140,7 @@ static class Providers
         {
             case "anthropic": return new AnthropicProvider(s);
             case "openai": return new OpenAIProvider(s);
+            case "local": return new LocalProvider(s);
             case "command": return new CommandProvider(s);
             default: return new OfflineProvider();
         }
@@ -286,7 +320,7 @@ class AnthropicProvider : HttpProvider
 
 class OpenAIProvider : HttpProvider
 {
-    readonly string model, key, endpoint;
+    protected string model, key, endpoint;
 
     public OpenAIProvider(Settings s) : base(s)
     {
@@ -297,6 +331,9 @@ class OpenAIProvider : HttpProvider
 
     public override string Label { get { return "openai: " + model; } }
 
+    // 派生クラスがリクエストに項目を足すためのフック
+    protected virtual void AddOptions(Dictionary<string, object> body) { }
+
     protected override object Send(Action<string> onText)
     {
         var messages = new List<object> { new Dictionary<string, object> { { "role", "system" }, { "content", settings.SystemPrompt } } };
@@ -304,6 +341,7 @@ class OpenAIProvider : HttpProvider
         var body = new Dictionary<string, object> { { "model", model }, { "messages", messages }, { "stream", true } };
         int max = settings.GetInt("max_tokens", 0);
         if (max > 0) body["max_tokens"] = max;
+        AddOptions(body);
 
         var headers = new Dictionary<string, string>();
         if (key.Length > 0) headers["Authorization"] = "Bearer " + key;
@@ -319,6 +357,99 @@ class OpenAIProvider : HttpProvider
             onText(piece);
         });
         return text.ToString();
+    }
+}
+
+// ---------------- ローカル (同梱の llama.cpp + モデル) ----------------
+
+class LocalProvider : OpenAIProvider
+{
+    readonly string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+    readonly string modelPath;
+    readonly bool gpu;
+
+    public LocalProvider(Settings s) : base(s)
+    {
+        modelPath = LocalAI.ModelPath(baseDir, s.Get("model", ""));
+        gpu = s.Get("local_gpu", "auto").ToLowerInvariant() != "off";
+        model = Path.GetFileNameWithoutExtension(modelPath);
+    }
+
+    public override string Label { get { return "local: " + model; } }
+
+    public bool Installed { get { return LocalAI.ServerExe(baseDir) != null && File.Exists(modelPath); } }
+
+    // llama-server を起動してモデルを読み込む (起動済みなら何もしない)
+    public void Warmup()
+    {
+        LocalServer.Start(baseDir, modelPath, gpu, Math.Max(8192, settings.GetInt("max_tokens", 0) + 4096));
+    }
+
+    protected override void AddOptions(Dictionary<string, object> body)
+    {
+        // Qwen3.5 は既定で考えてから答えるので、会話用に考える過程を切る。サンプリングはモデル推奨値
+        body["chat_template_kwargs"] = new Dictionary<string, object> { { "enable_thinking", false } };
+        body["temperature"] = 0.7;
+        body["top_p"] = 0.8;
+        body["top_k"] = 20;
+        body["presence_penalty"] = 1.5;
+    }
+
+    protected override object Send(Action<string> onText)
+    {
+        Warmup();
+        endpoint = LocalServer.Endpoint + "/v1/chat/completions";
+        key = LocalServer.ApiKey;
+        var filter = new ThinkFilter();
+        object text = base.Send(t => { string v = filter.Push(t); if (v.Length > 0) onText(v); });
+        string rest = filter.Flush();
+        if (rest.Length > 0) onText(rest);
+        return ThinkFilter.Strip(text as string);
+    }
+}
+
+// <think>...</think> が混ざっても読み上げないようにする
+class ThinkFilter
+{
+    readonly StringBuilder pending = new StringBuilder();
+    bool inside;
+
+    public string Push(string chunk)
+    {
+        pending.Append(chunk);
+        var output = new StringBuilder();
+        while (true)
+        {
+            string s = pending.ToString();
+            string tag = inside ? "</think>" : "<think>";
+            int i = s.IndexOf(tag, StringComparison.Ordinal);
+            if (i >= 0)
+            {
+                if (!inside) output.Append(s.Substring(0, i));
+                pending.Remove(0, i + tag.Length);
+                inside = !inside;
+                continue;
+            }
+            // タグの途中で切れているかもしれない末尾は次の断片まで持ち越す
+            int keep = 0;
+            for (int k = Math.Min(tag.Length - 1, s.Length); k > 0; k--)
+                if (tag.StartsWith(s.Substring(s.Length - k), StringComparison.Ordinal)) { keep = k; break; }
+            if (!inside) output.Append(s.Substring(0, s.Length - keep));
+            pending.Remove(0, s.Length - keep);
+            return output.ToString();
+        }
+    }
+
+    public string Flush()
+    {
+        string s = inside ? "" : pending.ToString();
+        pending.Clear();
+        return s;
+    }
+
+    public static string Strip(string s)
+    {
+        return s == null ? null : Regex.Replace(s, @"<think>[\s\S]*?</think>", "").Trim();
     }
 }
 

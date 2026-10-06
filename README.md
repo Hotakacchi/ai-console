@@ -43,6 +43,9 @@
 | `/install-voice` | 音声認識モデルをダウンロードする |
 | `/install-voicevox` | より自然な声 (VOICEVOX、約330MB) を入れる |
 | `/install-whisper` | より正確な音声認識 (Whisper、約110MB) を入れる |
+| `/install-vision` | ローカルAIが画像を読めるようにする (約670MB) |
+| `/attach [パス]` / `/detach` | ファイルを付ける / 外す (窓にドラッグ＆ドロップでも付けられる) |
+| `/screen [質問]` | 画面を撮って見せる (例: `/screen このエラーは何？`) |
 | `/memory` | 覚えていることの一覧 (`/memory delete <番号>`、`/memory clear`) |
 | `/reminders` | タイマー・リマインダーの一覧 (`/reminders cancel <番号>`、`/reminders clear`) |
 | `/history [件数]` | これまでの会話を表示する |
@@ -76,6 +79,8 @@ AI の提案は間違っていることもあります。内容を確かめて�
 - **ショートカット** — どこからでも `Ctrl+Alt+L` (Mac は `Cmd+Option+L`) でウィンドウを出し入れできます (`/set hotkey`)。
 - **見た目** — 顔の色・大きさ、文字の大きさ・フォントを変えられます (`/set face_color pink` など)。
 - **自然な声** — `/install-voicevox` で [VOICEVOX](https://voicevox.hiroshiba.jp/) の声で話し、声に合わせて口が動きます。`/voices` で声を選べます。
+- **ファイルを読ませる** — 窓にファイルをドラッグ＆ドロップして「要約して」「この表の合計は？」のように頼めます。テキスト・PDF・Word・Excel・PowerPoint・画像に対応しています (ローカルAIで長いファイルを読むときは先頭の一部だけになります)。
+- **画面を見せる** — 「この画面のエラーは何？」と聞くか `/screen` で、画面を撮って AI に見せます (撮る前に毎回確認します。`/set screen on` / `off`)。ローカルAIで画像を読むには `/install-vision` が必要です。
 - **正確な聞き取り** — `/install-whisper` で、話しかけた内容を [Whisper](https://github.com/openai/whisper) で書き起こします (呼びかけは Vosk のまま)。`/set whisper_model small` でさらに正確に (約280MB)。
 
 ## 設定 (`settings.json`)
@@ -93,6 +98,7 @@ AI の提案は間違っていることもあります。内容を確かめて�
 | `tts` / `voicevox_voice` | 読み上げ (`system` / `voicevox`) / VOICEVOX の声の番号 |
 | `stt` / `whisper_model` | 書き起こし (`vosk` / `whisper`) / Whisper のモデル (`base` / `small`) |
 | `clipboard` / `hotkey` | クリップボードを読む / ウィンドウを出し入れするショートカット |
+| `screen` | 画面を撮って AI に見せる (`ask` / `on` / `off`) |
 | `keep_history` / `update_check` | 会話を保存して続きから話す / 起動時に新しい版を確かめる |
 | `face_color` / `face_size` / `font_size` / `font` | 見た目 |
 | `background` / `startup` | 閉じてもトレイで動き続ける / ログイン時に起動する |
@@ -129,7 +135,7 @@ Windows では `CGO_ENABLED=0` で、Linux では `libgtk-4-dev` と `libwebkitg
 
 ## ライセンス
 
-[MIT License](LICENSE)。ダウンロードして使う llama.cpp は MIT、Qwen3.5-4B は Apache 2.0、Vosk とその認識モデルは Apache 2.0、Whisper は MIT、transformers.js は Apache 2.0、ONNX Runtime は MIT です。
+[MIT License](LICENSE)。ダウンロードして使う llama.cpp は MIT、Qwen3.5-4B は Apache 2.0、Vosk とその認識モデルは Apache 2.0、Whisper は MIT、Qwen3.5-4B の画像用の部品は Apache 2.0、transformers.js は Apache 2.0、ONNX Runtime は MIT です。
 VOICEVOX はそれぞれのキャラクターの利用規約に従ってください (VOICEVOX の声を使うと、画面に「VOICEVOX:キャラクター名」のクレジットを出します)。
 
 ---
@@ -138,6 +144,6 @@ VOICEVOX はそれぞれのキャラクターの利用規約に従ってくだ�
 
 Lumi is a console-style assistant with an animated face in the background that answers out loud. It runs on **Windows, macOS and Linux**, ships with a **local AI** (llama.cpp + Qwen3.5-4B, downloaded on first use), listens for its **wake word** ("Lumi") with on-device speech recognition (Vosk), can **search the web**, and can **run commands on your PC — always after asking you first**. The UI and the conversation are available in Japanese and English (`/set language en`).
 
-It also changes its expression to match what it says, sets **timers and reminders** ("remind me in 5 minutes"), **remembers** things you tell it (`/memory`), keeps the **conversation history** across restarts, can read your **clipboard** when asked, toggles with a **global hotkey** (`Ctrl+Alt+L`), lets you change its **colors, size and fonts**, and checks for **updates**. Optional downloads: `/install-voicevox` for natural Japanese voices with lip-sync ([VOICEVOX](https://voicevox.hiroshiba.jp/)) and `/install-whisper` for more accurate speech recognition ([Whisper](https://github.com/openai/whisper)).
+It also changes its expression to match what it says, sets **timers and reminders** ("remind me in 5 minutes"), **remembers** things you tell it (`/memory`), keeps the **conversation history** across restarts, can read your **clipboard** when asked, reads **files you drop onto the window** (text, PDF, Word, Excel, PowerPoint, images), can **look at your screen** when you ask (`/screen`, always after asking), toggles with a **global hotkey** (`Ctrl+Alt+L`), lets you change its **colors, size and fonts**, and checks for **updates**. Optional downloads: `/install-voicevox` for natural Japanese voices with lip-sync ([VOICEVOX](https://voicevox.hiroshiba.jp/)) and `/install-whisper` for more accurate speech recognition ([Whisper](https://github.com/openai/whisper)).
 
 Download `Lumi-Windows-Setup-<version>.exe` (Windows), `lumi-mac-<version>.dmg` (macOS) or the `.deb` / `.tar.gz` (Linux) from [Releases](https://github.com/Hotakacchi/ai-console/releases/latest), then type `/help`.

@@ -65,8 +65,12 @@ func main() {
 		Hidden:           slices.Contains(args, "--background"),
 		BackgroundColour: application.NewRGB(12, 12, 12),
 		Windows:          application.WindowsWindow{Theme: application.Dark},
+		EnableFileDrop:   true, // ファイルを落として読ませる
 	})
 	lumi.win = win
+	win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
+		go lumi.attachFiles(e.Context().DroppedFiles())
+	})
 	lumi.updateTitle()
 	lumi.peek = newPeek(app)
 

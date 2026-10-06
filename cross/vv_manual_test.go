@@ -3,8 +3,17 @@
 package main
 
 import (
+	"image"
+	"image/draw"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	xdraw "golang.org/x/image/draw"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/math/fixed"
 )
 
 // VOICEVOX を実際に入れて声を作る確認 (CI では動かさない): go test -tags manual -run VV -timeout 60m
@@ -55,5 +64,39 @@ func TestWhisperInstall(t *testing.T) {
 	}
 	if !whisperInstalled(base, "whisper-base") {
 		t.Fatal("not installed")
+	}
+}
+
+// 画面を撮れるか、ローカルAIが画像の文字を読めるかの確認: go test -tags manual -run Vision -timeout 60m
+func TestVisionLocal(t *testing.T) {
+	loadLocales()
+	setLanguage("ja")
+	shot, err := captureDisplay()
+	if err != nil {
+		t.Fatal("capture:", err)
+	}
+	t.Logf("screen %v -> jpeg %d bytes", shot.Bounds().Size(), len(encodeJPEG(shot)))
+
+	base := dataDir()
+	if err := download(visionAsset, filepath.Join(modelsDir(base), visionFile), func(int64) {}, func() bool { return false }, nil); err != nil {
+		t.Fatal(err)
+	}
+	// 文字を描いた画像を読ませる
+	img := image.NewRGBA(image.Rect(0, 0, 320, 80))
+	draw.Draw(img, img.Bounds(), image.White, image.Point{}, draw.Src)
+	d := &font.Drawer{Dst: img, Src: image.Black, Face: basicfont.Face7x13, Dot: fixed.P(20, 45)}
+	d.DrawString("LUMI 2026 PASSWORD: ORANGE")
+	big := image.NewRGBA(image.Rect(0, 0, 960, 240))
+	xdraw.NearestNeighbor.Scale(big, big.Bounds(), img, img.Bounds(), draw.Src, nil)
+
+	s := &Settings{vals: map[string]any{"provider": "local"}}
+	p := newLocal(s)
+	defer localServer.Stop()
+	var out strings.Builder
+	start := time.Now()
+	p.Reply(Turn{Text: "画像に書いてある英語の文字をそのまま書き写して。", Images: [][]byte{encodeJPEG(big)}}, func(s string) { out.WriteString(s) })
+	t.Logf("%s: %q", time.Since(start).Round(time.Millisecond), out.String())
+	if !strings.Contains(strings.ToUpper(out.String()), "ORANGE") {
+		t.Error("could not read the image")
 	}
 }

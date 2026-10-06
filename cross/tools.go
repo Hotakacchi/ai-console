@@ -19,16 +19,16 @@ import (
 )
 
 type toolRequest struct {
-	Kind    string            // run / search / fetch / face / remind / remember / forget / clipboard
+	Kind    string            // run / search / fetch / face / remind / remember / forget / clipboard / screen
 	Command string            // 中身 (コマンド・検索語・URL・表情・覚えること など)
 	Admin   bool              // <run admin>
 	Attrs   map[string]string // <remind in="300"> などの属性
 }
 
-var toolTags = []string{"run", "search", "fetch", "face", "remind", "remember", "forget", "clipboard"}
+var toolTags = []string{"run", "search", "fetch", "face", "remind", "remember", "forget", "clipboard", "screen"}
 
 // 中身が空でも意味のあるタグ
-var emptyOK = map[string]bool{"clipboard": true}
+var emptyOK = map[string]bool{"clipboard": true, "screen": true}
 
 var attrRe = regexp.MustCompile(`(\w+)\s*=\s*"([^"]*)"`)
 

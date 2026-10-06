@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,7 +25,7 @@ import (
 type Provider interface {
 	Label() string
 	// 返事を断片ごとに onText に渡す (呼び出し側のゴルーチンで実行される)
-	Reply(text string, onText func(string))
+	Reply(t Turn, onText func(string))
 	// 返事の取得を途中で打ち切る
 	Abort()
 	// 会話履歴を消す
@@ -34,6 +35,50 @@ type Provider interface {
 }
 
 type Message = map[string]any
+
+// 1 回の発言: 文字と、AI に見せる画像 (JPEG)
+type Turn struct {
+	Text   string
+	Images [][]byte
+}
+
+// 見せた画像は、返事が終わったら履歴から外して印だけ残す (毎回送り直すと重いので)
+func imagePlaceholder(n int) string { return "\n" + T("image.shown", n) }
+
+// 履歴のおおよその大きさ (文字数)。足りなくなりそうなら古い発言から捨てる
+func messageSize(m Message) int {
+	if parts, ok := m["content"].([]any); ok {
+		n := 0
+		for _, p := range parts {
+			pm, _ := p.(map[string]any)
+			if t := str(pm, "type"); t == "image" || t == "image_url" {
+				n += 1500 // 画像 1 枚はおよそこのくらい (縮めてから渡すので)
+				continue
+			}
+			b, _ := json.Marshal(p)
+			n += len([]rune(string(b)))
+		}
+		return n
+	}
+	b, _ := json.Marshal(m["content"])
+	return len([]rune(string(b)))
+}
+
+func trimHistory(history []Message, budget int) []Message {
+	if budget <= 0 {
+		return history
+	}
+	total := 0
+	for _, m := range history {
+		total += messageSize(m)
+	}
+	// 最後 (今の発言) は残す。user から始まるように assistant だけ残ったら一緒に捨てる
+	for len(history) > 1 && (total > budget || history[0]["role"] != "user") {
+		total -= messageSize(history[0])
+		history = history[1:]
+	}
+	return history
+}
 
 func newProvider(s *Settings) Provider {
 	switch strings.ToLower(s.Get("provider", "offline")) {
@@ -57,6 +102,8 @@ type httpBase struct {
 	mu      sync.Mutex
 	cancel  context.CancelFunc
 	aborted bool
+	budget  int                    // 履歴の上限 (文字数のめやす、0 なら制限なし)
+	content func(t Turn) any       // 発言を API の形にする (画像の渡し方が API ごとに違う)
 }
 
 func (h *httpBase) Clear()              { h.history = nil }
@@ -72,8 +119,12 @@ func (h *httpBase) Abort() {
 }
 
 // send が返した assistant の content を履歴に足す (nil なら今回の発言ごと取り消す)
-func (h *httpBase) reply(text string, onText func(string), send func(ctx context.Context) (any, error)) {
-	h.history = append(h.history, Message{"role": "user", "content": text})
+func (h *httpBase) reply(t Turn, onText func(string), send func(ctx context.Context) (any, error)) {
+	var content any = t.Text
+	if len(t.Images) > 0 && h.content != nil {
+		content = h.content(t)
+	}
+	h.history = trimHistory(append(h.history, Message{"role": "user", "content": content}), h.budget)
 	ctx, cancel := context.WithCancel(context.Background())
 	h.mu.Lock()
 	h.aborted = false
@@ -88,6 +139,9 @@ func (h *httpBase) reply(text string, onText func(string), send func(ctx context
 			onText(T("ai.connectFailed", err.Error()))
 		}
 		return
+	}
+	if len(t.Images) > 0 {
+		h.history[len(h.history)-1]["content"] = t.Text + imagePlaceholder(len(t.Images))
 	}
 	h.history = append(h.history, Message{"role": "assistant", "content": content})
 }
@@ -160,7 +214,14 @@ type anthropicProvider struct {
 
 func newAnthropic(s *Settings) *anthropicProvider {
 	return &anthropicProvider{
-		httpBase: httpBase{s: s},
+		httpBase: httpBase{s: s, content: func(t Turn) any {
+			var blocks []any
+			for _, img := range t.Images {
+				blocks = append(blocks, map[string]any{"type": "image", "source": map[string]any{
+					"type": "base64", "media_type": "image/jpeg", "data": base64.StdEncoding.EncodeToString(img)}})
+			}
+			return append(blocks, map[string]any{"type": "text", "text": t.Text})
+		}},
 		model:    s.Get("model", "claude-opus-5-5"),
 		key:      s.APIKey("ANTHROPIC_API_KEY"),
 		endpoint: s.Get("endpoint", "https://api.anthropic.com/v1/messages"),
@@ -169,8 +230,8 @@ func newAnthropic(s *Settings) *anthropicProvider {
 
 func (p *anthropicProvider) Label() string { return "anthropic: " + p.model }
 
-func (p *anthropicProvider) Reply(text string, onText func(string)) {
-	p.reply(text, onText, func(ctx context.Context) (any, error) {
+func (p *anthropicProvider) Reply(t Turn, onText func(string)) {
+	p.reply(t, onText, func(ctx context.Context) (any, error) {
 		if p.key == "" {
 			return nil, errors.New(T("ai.noKey"))
 		}
@@ -251,7 +312,14 @@ type openAIProvider struct {
 
 func newOpenAI(s *Settings) *openAIProvider {
 	p := &openAIProvider{
-		httpBase: httpBase{s: s},
+		httpBase: httpBase{s: s, content: func(t Turn) any {
+			var parts []any
+			for _, img := range t.Images {
+				parts = append(parts, map[string]any{"type": "image_url", "image_url": map[string]any{
+					"url": "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(img)}})
+			}
+			return append(parts, map[string]any{"type": "text", "text": t.Text})
+		}},
 		model:    s.Get("model", ""),
 		key:      s.APIKey(""),
 		endpoint: s.Get("endpoint", "https://api.openai.com/v1/chat/completions"),
@@ -262,8 +330,8 @@ func newOpenAI(s *Settings) *openAIProvider {
 
 func (p *openAIProvider) Label() string { return p.label }
 
-func (p *openAIProvider) Reply(text string, onText func(string)) {
-	p.reply(text, onText, func(ctx context.Context) (any, error) {
+func (p *openAIProvider) Reply(t Turn, onText func(string)) {
+	p.reply(t, onText, func(ctx context.Context) (any, error) {
 		if p.before != nil {
 			if err := p.before(); err != nil {
 				return nil, err
@@ -311,12 +379,11 @@ func newLocal(s *Settings) Provider {
 	p := newOpenAI(s)
 	p.model = strings.TrimSuffix(filepath.Base(modelPath), filepath.Ext(modelPath))
 	p.label = "local: " + p.model
+	ctx := localContext(s)
+	// 指示文と返事の分を残して、履歴はコンテキストに収まる分だけにする (日本語はおよそ 1 文字 1 トークン)
+	p.budget = ctx - 3500
 	p.before = func() error {
-		ctx := s.GetInt("max_tokens", 0) + 4096
-		if ctx < 8192 {
-			ctx = 8192
-		}
-		if err := localServer.Start(dir, modelPath, gpu, ctx); err != nil {
+		if err := localServer.Start(dir, modelPath, visionPath(dir, modelPath), gpu, ctx); err != nil {
 			return err
 		}
 		p.endpoint = localServer.Endpoint() + "/v1/chat/completions"
@@ -339,10 +406,10 @@ type thinkFiltered struct{ *openAIProvider }
 
 var thinkRe = regexp.MustCompile(`(?s)<think>.*?</think>`)
 
-func (t *thinkFiltered) Reply(text string, onText func(string)) {
+func (t *thinkFiltered) Reply(turn Turn, onText func(string)) {
 	var pending strings.Builder
 	inside := false
-	t.openAIProvider.Reply(text, func(chunk string) {
+	t.openAIProvider.Reply(turn, func(chunk string) {
 		pending.WriteString(chunk)
 		s := pending.String()
 		var out strings.Builder
@@ -413,13 +480,32 @@ func (c *commandProvider) Abort() {
 	}
 }
 
-func (c *commandProvider) Reply(text string, onText func(string)) {
+func (c *commandProvider) Reply(t Turn, onText func(string)) {
 	command := c.s.Get("command", "")
 	if command == "" {
 		onText(T("command.empty"))
 		return
 	}
-	c.history = append(c.history, Message{"role": "user", "content": text})
+	// 画像は "images" に base64 の JPEG で渡す (次からは印だけにする)
+	msg := Message{"role": "user", "content": t.Text}
+	if len(t.Images) > 0 {
+		var imgs []string
+		for _, img := range t.Images {
+			imgs = append(imgs, base64.StdEncoding.EncodeToString(img))
+		}
+		msg["images"] = imgs
+	}
+	c.history = append(c.history, msg)
+	defer func() {
+		if len(t.Images) > 0 {
+			for i := range c.history {
+				if _, ok := c.history[i]["images"]; ok {
+					delete(c.history[i], "images")
+					c.history[i]["content"] = t.Text + imagePlaceholder(len(t.Images))
+				}
+			}
+		}
+	}()
 	cmd := shellCommand(command)
 	cmd.Dir = dataDir()
 	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8")
@@ -481,7 +567,8 @@ func (offlineProvider) Abort()        {}
 func (offlineProvider) Clear()        {}
 func (offlineProvider) Seed([]Message) {}
 
-func (offlineProvider) Reply(text string, onText func(string)) {
+func (offlineProvider) Reply(t Turn, onText func(string)) {
+	text := t.Text
 	now := time.Now()
 	lower := strings.ToLower(text)
 	// 言語ごとの言葉の一覧 (offline.words.*) のどれかを含むか。英単語は単語の区切りで比べる

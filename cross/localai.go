@@ -393,8 +393,8 @@ func (s *llamaServer) APIKey() string {
 	return s.p.apiKey
 }
 
-func (s *llamaServer) Start(base, modelPath string, gpu bool, context int) error {
-	p, err := s.spawn(base, modelPath, gpu, context)
+func (s *llamaServer) Start(base, modelPath, mmproj string, gpu bool, context int) error {
+	p, err := s.spawn(base, modelPath, mmproj, gpu, context)
 	if err != nil {
 		return err
 	}
@@ -402,14 +402,14 @@ func (s *llamaServer) Start(base, modelPath string, gpu bool, context int) error
 }
 
 // 同じ設定で動いていればそれを、なければ新しく起動したものを返す (起動を待たない)
-func (s *llamaServer) spawn(base, modelPath string, gpu bool, context int) (*serverProc, error) {
+func (s *llamaServer) spawn(base, modelPath, mmproj string, gpu bool, context int) (*serverProc, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	exe := serverExe(base)
 	if _, err := os.Stat(modelPath); exe == "" || err != nil {
 		return nil, errors.New(T("local.notInstalled"))
 	}
-	key := fmt.Sprintf("%s|%v|%d", modelPath, gpu, context)
+	key := fmt.Sprintf("%s|%s|%v|%d", modelPath, mmproj, gpu, context)
 	if s.p != nil && s.p.args == key && s.p.alive() {
 		return s.p, nil
 	}
@@ -431,8 +431,12 @@ func (s *llamaServer) spawn(base, modelPath string, gpu bool, context int) (*ser
 		ngl = "99"
 	}
 	// -np 1: 会話は 1 つだけなので、コンテキストを丸ごと 1 つの会話に使う
-	cmd := exec.Command(exe, "-m", modelPath, "--host", "127.0.0.1", "--port", fmt.Sprint(port),
-		"-c", fmt.Sprint(context), "-np", "1", "-ngl", ngl, "--api-key", apiKey)
+	args := []string{"-m", modelPath, "--host", "127.0.0.1", "--port", fmt.Sprint(port),
+		"-c", fmt.Sprint(context), "-np", "1", "-ngl", ngl, "--api-key", apiKey}
+	if mmproj != "" {
+		args = append(args, "--mmproj", mmproj) // 画像を読むための部品
+	}
+	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
 	libEnv := map[string]string{"linux": "LD_LIBRARY_PATH", "darwin": "DYLD_LIBRARY_PATH"}[runtime.GOOS]
 	cmd.Env = os.Environ()

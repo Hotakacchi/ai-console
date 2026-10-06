@@ -37,6 +37,7 @@ func settingsTemplate(provider string) string {
   "pc_control": "on",
   "web_search": "on",
   "clipboard": "ask",
+  "screen": "ask",
   "hotkey": "CmdOrCtrl+Alt+L",
   "update_check": "on",
   "keep_history": "on",
@@ -202,6 +203,9 @@ func (s *Settings) SystemPrompt() string {
 	}
 	if s.Get("clipboard", "ask") != "off" {
 		p += "\n\n" + T("prompt.clipboard")
+	}
+	if s.Get("screen", "ask") != "off" {
+		p += "\n\n" + T("prompt.screen")
 	}
 	// 表情・リマインダー (今の時刻つき)・記憶
 	p += "\n\n" + T("prompt.face")

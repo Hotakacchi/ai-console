@@ -62,3 +62,6 @@ body.peek { background: transparent; }
 #bubble.pop { transform: translateY(0); opacity: 1; transition: transform .42s cubic-bezier(.34, 1.9, .64, 1), opacity .25s; }
 #bubble.retract { transform: translateY(110%); opacity: 0; transition: transform .3s ease-in, opacity .3s ease-in; }
 #bubble.sleepy { transform: translateY(110%); opacity: 0; transition: transform .65s ease-in .9s, opacity .65s ease-in .9s; }
+
+/* ファイルを窓の上に持ってきたとき */
+#term.file-drop-target-active { outline: 2px dashed #61d6d6; outline-offset: -6px; }

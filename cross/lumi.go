@@ -52,6 +52,7 @@ type Lumi struct {
 	ttsErrorShown bool
 	whisperErrorShown bool
 	replyText strings.Builder // 今の返事で喋った文 (履歴に残す)
+	pending   []attachment    // 次の発言に付けるファイル (ドラッグ＆ドロップ・/attach)
 }
 
 func newLumi(app *application.App, muted, noMic bool) *Lumi {
@@ -242,6 +243,7 @@ func (l *Lumi) submit(text string) {
 		l.quit()
 	case "/cls", "/clear":
 		l.ai.Clear()
+		l.takePending()
 		clearHistory()
 		l.emit("clear", nil)
 	case "/memory":
@@ -295,6 +297,21 @@ func (l *Lumi) submit(text string) {
 		l.installVoicevoxCmd()
 	case "/install-whisper":
 		l.installWhisperCmd()
+	case "/install-vision":
+		l.installVisionCmd()
+	case "/attach":
+		l.attachCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
+	case "/detach":
+		l.detach()
+	case "/screen":
+		// 画面を撮って、続けて書いた質問 (なければ「この画面について教えて」) と一緒に見せる
+		q := strings.TrimSpace(strings.TrimPrefix(text, parts[0]))
+		if q == "" {
+			q = T("screen.defaultQuestion")
+		}
+		if l.begin() {
+			go l.respond(q, true)
+		}
 	case "/peek":
 		l.demoPeek()
 	case "/help":
@@ -322,7 +339,8 @@ func (c command) help() string { return T("cmd." + strings.TrimPrefix(c.name, "/
 var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
-	{"/install-whisper", ""},
+	{"/install-whisper", ""}, {"/install-vision", ""},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", ""}, {"/cls", ""}, {"/exit", ""},
 }
@@ -356,6 +374,7 @@ var settingKeys = []settingKey{
 	{"startup", "on,off"},
 	{"hotkey", ""},
 	{"clipboard", "ask,on,off"},
+	{"screen", "ask,on,off"},
 	{"keep_history", "on,off"},
 	{"update_check", "on,off"},
 	{"face_color", ""},
@@ -558,7 +577,7 @@ func (l *Lumi) cancelled() bool {
 
 func (l *Lumi) startReply(text string) {
 	if l.begin() {
-		go l.respond(text)
+		go l.respond(text, false)
 	}
 }
 
@@ -577,10 +596,16 @@ func (l *Lumi) begin() bool {
 
 const maxToolRounds = 5
 
-func (l *Lumi) respond(userText string) {
+// screenFirst: /screen のとき、最初に画面を撮って一緒に見せる
+func (l *Lumi) respond(userText string, screenFirst bool) {
+	attached := l.takePending()
 	keep := l.s.On("keep_history", "on")
 	if keep {
-		appendHistory("user", userText)
+		saved := userText
+		for _, a := range attached {
+			saved += "  [" + a.Name + "]"
+		}
+		appendHistory("user", saved)
 	}
 	l.replyText.Reset()
 	defer func() {
@@ -593,10 +618,23 @@ func (l *Lumi) respond(userText string) {
 	if _, offline := l.ai.(offlineProvider); !offline {
 		message = "[" + time.Now().Format("2006-01-02 15:04 (Mon)") + "] " + userText
 	}
+	turn := withAttachments(message, attached)
+	if screenFirst {
+		img, _ := l.screenTool() // 撮れなかった理由は screenTool が画面に出している
+		if img == nil {
+			l.mu.Lock()
+			l.pending = append(attached, l.pending...) // 付けていたファイルは次の発言に残す
+			l.mu.Unlock()
+			l.write("\n", "dim")
+			l.setBusy(false)
+			return
+		}
+		turn.Images = append(turn.Images, img)
+	}
 	declined := false // 一度断られたら、この返事の間はもうコマンドを聞かない
-	for round := 0; round < maxToolRounds && message != "" && !l.cancelled(); round++ {
-		requests := l.replyOnce(message)
-		message = ""
+	for round := 0; round < maxToolRounds && turn.Text != "" && !l.cancelled(); round++ {
+		requests := l.replyOnce(turn)
+		turn = Turn{}
 		if declined {
 			kept := requests[:0]
 			for _, r := range requests {
@@ -611,6 +649,7 @@ func (l *Lumi) respond(userText string) {
 		}
 		// 1 つずつ処理して (コマンドは必ず確認してから実行)、結果をまとめて AI に返す
 		var report strings.Builder
+		var images [][]byte
 		report.WriteString(T("tool.results") + "\n")
 		for _, r := range requests {
 			if l.cancelled() {
@@ -618,6 +657,16 @@ func (l *Lumi) respond(userText string) {
 			}
 			if r.Kind == "clipboard" {
 				report.WriteString(l.clipboardTool())
+				continue
+			}
+			if r.Kind == "screen" {
+				report.WriteString("\n[" + T("screen.label") + "]\n")
+				if img, why := l.screenTool(); img != nil {
+					images = append(images, img)
+					report.WriteString(T("screen.attached") + "\n")
+				} else {
+					report.WriteString(why + "\n")
+				}
 				continue
 			}
 			if r.Kind == "search" || r.Kind == "fetch" {
@@ -654,7 +703,7 @@ func (l *Lumi) respond(userText string) {
 			report.WriteString(result + "\n")
 		}
 		if !l.cancelled() {
-			message = report.String()
+			turn = Turn{Text: report.String(), Images: images}
 		}
 	}
 	l.face("normal")
@@ -692,7 +741,7 @@ func (l *Lumi) cancelChan() <-chan struct{} {
 }
 
 // AI に 1 回話しかけて返事を 1 文ずつ喋らせ、返事に含まれていた道具の呼び出しを返す
-func (l *Lumi) replyOnce(message string) []toolRequest {
+func (l *Lumi) replyOnce(turn Turn) []toolRequest {
 	sentences := make(chan string, 64)
 	done := make(chan struct{})
 	go func() {
@@ -737,7 +786,7 @@ func (l *Lumi) replyOnce(message string) []toolRequest {
 			}
 		},
 	}
-	l.ai.Reply(message, tools.Push)
+	l.ai.Reply(turn, tools.Push)
 	tools.Flush()
 	if rest := sp.Flush(); strings.TrimSpace(rest) != "" {
 		sentences <- rest

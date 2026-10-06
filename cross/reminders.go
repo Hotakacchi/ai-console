@@ -157,9 +157,15 @@ func (l *Lumi) remindTag(r toolRequest) {
 
 // 1 秒ごとに時間が来たリマインダーを知らせる
 func (l *Lumi) runReminders() {
-	for range time.Tick(time.Second) {
-		for _, it := range reminders.due(time.Now()) {
+	lastMinute := ""
+	for now := range time.Tick(time.Second) {
+		for _, it := range reminders.due(now) {
 			l.announce(T("remind.fire", it.Text))
+		}
+		// 毎分 1 回、時刻つきのルーティンを確かめる
+		if m := now.Format("15:04"); m != lastMinute {
+			lastMinute = m
+			l.checkScheduledRoutines(now)
 		}
 	}
 }

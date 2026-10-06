@@ -40,6 +40,7 @@ func settingsTemplate(provider string) string {
   "screen": "ask",
   "hotkey": "CmdOrCtrl+Alt+L",
   "update_check": "on",
+  "weather_location": "",
   "keep_history": "on",
   "search_url": "",
   "voice_input": "on",

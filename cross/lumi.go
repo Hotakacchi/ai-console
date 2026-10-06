@@ -229,6 +229,13 @@ func (l *Lumi) submit(text string) {
 		return
 	}
 	if !strings.HasPrefix(text, "/") {
+		// ルーティンの名前 (「おはよう」など) なら、それを動かす
+		if r, ok := l.findRoutine(text); ok {
+			if l.begin() {
+				go l.runRoutine(r)
+			}
+			return
+		}
 		l.startReply(text)
 		return
 	}
@@ -307,6 +314,8 @@ func (l *Lumi) submit(text string) {
 		l.wordsFile()
 	case "/shell":
 		l.toggleShell()
+	case "/routines", "/routine":
+		l.routinesCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/attach":
 		l.attachCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/detach":
@@ -349,7 +358,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", ""},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", ""}, {"/routines", "cmd.routines.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", ""}, {"/cls", ""}, {"/exit", ""},
 }
@@ -386,6 +395,7 @@ var settingKeys = []settingKey{
 	{"screen", "ask,on,off"},
 	{"keep_history", "on,off"},
 	{"update_check", "on,off"},
+	{"weather_location", ""},
 	{"face_color", ""},
 	{"face_size", "#int:20:100"},
 	{"font_size", "#int:10:28"},

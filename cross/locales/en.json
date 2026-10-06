@@ -296,5 +296,22 @@
   "update.downloading": "Downloading %s",
   "update.installing": "Installing %s. Lumi will close and restart shortly.",
   "update.failed": "Couldn't update: %s",
-  "update.notWritable": "Can't write to %s, so it can't be updated. Please reinstall from the download page"
+  "update.notWritable": "Can't write to %s, so it can't be updated. Please reinstall from the download page",
+  "cmd.routines": "List routines (things done together on \"good morning\" etc.) and open routines.txt. With a name, run that routine",
+  "cmd.routines.args": "[name]",
+  "set.weather_location": "Place for the weather (e.g. Tokyo; empty = detect from your connection)",
+  "routines.template": "# Routines: write the steps under [name], one per line. Type or say the name to run it.\n# Add a time like [name @07:30] to also run it every day at that time (while Lumi is running).\n#   weather          today's weather (/set weather_location Tokyo to choose the place)\n#   reminders        today's reminders\n#   open: path/URL   open a folder, file or web page\n#   run: command     run a command (no confirmation)\n#   say: text        say it as is\n#   ai: request      ask the AI, with the weather/reminders gathered so far\n\n[good morning]\nweather\nreminders\nai: Based on today's weather and reminders, greet me briefly and cheerfully\n\n[good night]\nreminders\nai: Mention tomorrow's reminders and say good night gently\n\n# [work mode]\n# open: https://mail.google.com\n# open: ~/Documents\n# say: Work mode is on. You've got this!\n",
+  "routine.start": "▶ Routine \"%s\"",
+  "routine.opened": "Opened: %s",
+  "routine.info": "(Information to use)",
+  "routine.weather": "Weather in %s: %s, now %s°C (high %s°C / low %s°C), chance of rain %d%%",
+  "routine.weatherFailed": "Couldn't get the weather (%s)",
+  "routine.weatherBad": "Couldn't read the weather data",
+  "routine.webOff": "Web search is turned off",
+  "routine.reminders": "Today's reminders: %s",
+  "routine.reminderItem": "%s %s",
+  "routine.noReminders": "No reminders today",
+  "routine.noSuch": "There's no routine named \"%s\" (/routines to list)",
+  "routine.steps": "(%d steps)",
+  "routine.howto": "Routines are written in %s. Type or say a name to run it."
 }

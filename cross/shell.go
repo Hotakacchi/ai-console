@@ -54,6 +54,7 @@ func (l *Lumi) toggleShell() {
 		l.info(T("shell.off"))
 	}
 	l.emit("prompt", l.promptText())
+	l.emit("shellMode", l.shellOn)
 }
 
 func (l *Lumi) currentDir() string {
@@ -84,6 +85,8 @@ func (l *Lumi) startShell(command string) {
 	}
 	go func() {
 		lines := 0
+		l.emit("running", map[string]any{"on": true, "cmd": command})
+		defer l.emit("running", map[string]any{"on": false})
 		dir, err := runShell(command, l.currentDir(), l.cancelChan(), func(line string) {
 			if lines++; lines <= maxShellLines {
 				l.write(line+"\n", "fg")

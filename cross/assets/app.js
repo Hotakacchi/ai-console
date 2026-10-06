@@ -392,6 +392,9 @@ function termMain() {
   on("ask", q => { askPrompt = q; buffer = ""; thinking = false; voice.confirming(true); render(); keys.focus(); });
   on("i18n", m => { msgs = m; });
   on("prompt", p => { PROMPT = p || NORMAL_PROMPT; render(); });
+  // コマンドの実行中とシェルモードは、顔の見た目を変える
+  on("running", d => face.setRunning(!!d.on, d.cmd || ""));
+  on("shellMode", on => { face.shell = !!on; face.lastState = ""; });
   // QR コードなどの画像を、ログの中に出す
   on("image", src => {
     const img = document.createElement("img");

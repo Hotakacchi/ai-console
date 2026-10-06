@@ -1,5 +1,6 @@
 // ルミの顔 (Windows 版 Lumi.cs の Face を Canvas に移したもの)。
 // expression: normal / happy / think / listen / sad / sleep
+// running: コマンドの実行中 (顔の中をプログラムが流れる)、shell: シェルモード (顔が >_ になる)
 
 const VISEME_OPEN = [0, .6, 1, .8, .5, .6, .4, .5, .7, .8, .7, .8, .3, .4, .3, .2, .3, .3, .2, .3, .4, 0];
 const SLEEP_AFTER = 90_000;
@@ -19,6 +20,16 @@ export class Face {
     this.nextGlance = now + 4000; this.glanceUntil = 0;
     this.lastActivity = now; this.typingUntil = 0;
     this.flashUntil = 0; this.flashExpr = null;
+    this.lastState = "";
+    this.running = false; this.runCmd = ""; this.runStart = 0;
+    this.shell = false;
+  }
+
+  // コマンドの実行を始めた / 終わった
+  setRunning(on, cmd = "") {
+    if (on && !this.running) this.runStart = performance.now();
+    this.running = on;
+    this.runCmd = cmd;
     this.lastState = "";
   }
 
@@ -85,7 +96,8 @@ export class Face {
     if (this.open < 0.01) this.open = 0;
 
     const breathe = ex === "sleep" ? 0.8 : 1.6;
-    const state = [ex, this.speaking, Math.round(Math.sin(t * breathe) * 4), Math.round(this.blink(now) * 6),
+    const anim = this.running ? "run" + Math.floor(t * 30) : this.shell && !this.speaking ? "sh" + Math.floor(t * 2) : "";
+    const state = [anim, ex, this.speaking, Math.round(Math.sin(t * breathe) * 4), Math.round(this.blink(now) * 6),
       Math.round(this.lookX * 12), Math.round(this.lookY * 12), Math.round(this.tilt), Math.round(this.eyeScale * 20),
       Math.round(this.open * 30), (ex === "think" || ex === "listen" || ex === "sleep") ? Math.floor(t * 12) : ""].join(",");
     const changed = state !== this.lastState;
@@ -110,6 +122,19 @@ export class Face {
 
     roundRect(ctx, -300, -200, 600, 400, 90);
     ctx.stroke();
+
+    // コマンドの実行中: 顔の中をプログラムが流れる
+    if (this.running) {
+      drawCode(ctx, (now - this.runStart) / 1000, c, this.runCmd);
+      ctx.restore();
+      return;
+    }
+    // シェルモード: 顔がシェルのマーク (>_) になる (喋っている間はいつもの顔)
+    if (this.shell && !this.speaking) {
+      drawShellMark(ctx, t, c);
+      ctx.restore();
+      return;
+    }
 
     // 呼ばれて聞いているとき: 両側に音の波
     if (ex === "listen") {
@@ -186,6 +211,71 @@ export class Face {
     }
     ctx.restore();
   }
+}
+
+// ---- コマンドの実行中: 顔の中を下から上へ流れるプログラム ----
+const CODE = [
+  "for (i = 0; i < n; i++) {", "  buf[i] ^= key[i % 16];", "}", "if err != nil {", "  return err", "mov rax, [rbp-8]",
+  "call 0x7ff6a1c4", "SELECT * FROM tasks;", "Get-ChildItem -Recurse", "ls -la /usr/bin", "grep -rn TODO .",
+  "while (ok) step();", "fn main() {", "  let x = run()?;", "def hello():", "  print('lumi')", "push rbp",
+  "jmp short loop", "await fetch(url)", "git status", "make -j8", "echo $PATH", "ping 127.0.0.1", "return 0;",
+];
+
+function codeLine(i) {
+  // 行ごとに決まった内容 (同じ行はいつも同じ見た目)
+  const r = Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1;
+  if (r < 0.3) {
+    let hex = "";
+    for (let k = 0; k < 6; k++) hex += Math.floor(Math.abs(Math.sin((i + 1) * (k + 3) * 78.233) * 9999) % 256).toString(16).padStart(2, "0") + " ";
+    return (0x7ff0 + i * 16 % 0xffff).toString(16) + ": " + hex;
+  }
+  return CODE[Math.floor(r * 997) % CODE.length];
+}
+
+function drawCode(ctx, t, c, cmd) {
+  ctx.save();
+  roundRect(ctx, -282, -182, 564, 364, 76);
+  ctx.clip();
+  ctx.font = "28px Consolas, Menlo, monospace";
+  ctx.textBaseline = "alphabetic";
+  const lh = 38, speed = 95;           // 行の高さ、1 秒に流れる量
+  const pos = t * speed, first = Math.floor(pos / lh), off = pos % lh;
+  const top = cmd ? -128 : -170;       // 実行中のコマンドを上に出すときは、その下から
+  for (let k = 0; k < 12; k++) {
+    const y = 175 - k * lh - off;      // 下ほど新しい行
+    if (y < top) break;
+    const fade = Math.min(1, (175 - y) / (175 - top));
+    ctx.fillStyle = lerp(c.fill, c.bg, 0.15 + fade * 0.75);
+    const text = codeLine(first + k);
+    // いちばん下の行は打ち込んでいる途中のように少しずつ出す
+    const shown = k === 0 ? text.slice(0, Math.floor((off / lh) * text.length) + 1) : text;
+    ctx.fillText(shown, -250, y);
+  }
+  if (cmd) {
+    ctx.fillStyle = c.bg;
+    ctx.fillRect(-300, -200, 600, 92);
+    ctx.fillStyle = c.fill;
+    ctx.font = "bold 30px Consolas, Menlo, monospace";
+    const s = "$ " + cmd.replace(/\s+/g, " ");
+    ctx.fillText(s.length > 30 ? s.slice(0, 29) + "…" : s, -250, -138);
+    ctx.fillRect(-250, -122, 500, 3);
+  }
+  ctx.restore();
+}
+
+// ---- シェルモード: >_ ----
+function drawShellMark(ctx, t, c) {
+  ctx.save();
+  ctx.lineWidth = 22;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(-170, -85); ctx.lineTo(-60, 0); ctx.lineTo(-170, 85);
+  ctx.stroke();
+  if (Math.floor(t * 2) % 2 === 0) {   // 点滅するカーソル
+    ctx.beginPath(); ctx.moveTo(10, 85); ctx.lineTo(170, 85); ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function line(ctx, x1, y1, x2, y2) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }

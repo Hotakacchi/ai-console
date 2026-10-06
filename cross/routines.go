@@ -150,10 +150,12 @@ func (l *Lumi) runRoutine(r routine) {
 		case "run":
 			l.write("  $ "+st.Arg+"\n", "dim")
 			var out strings.Builder
+			l.emit("running", map[string]any{"on": true, "cmd": st.Arg})
 			runShell(st.Arg, homeDir(), l.cancelChan(), func(line string) {
 				l.write(line+"\n", "fg")
 				out.WriteString(line + "\n")
 			})
+			l.emit("running", map[string]any{"on": false})
 			info = append(info, "$ "+st.Arg+"\n"+strings.TrimSpace(out.String()))
 		case "say":
 			l.write("\n", "fg")

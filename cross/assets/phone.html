@@ -100,6 +100,8 @@ function connect() {
       case "busy": busy = d; if (!d) $("ask").classList.remove("show"); status(d ? "…" : t("phone.page.hint")); break;
       case "thinking": if (d) face.expression = "think"; else if (face.expression === "think") face.expression = "normal"; break;
       case "face": face.expression = d; break;
+      case "running": face.setRunning(!!d.on, d.cmd || ""); break;
+      case "shellMode": face.shell = !!d; face.lastState = ""; break;
       case "flash": face.flash(d.expr, d.seconds); break;
       case "ask":
         write(d, "yellow");

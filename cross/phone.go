@@ -342,7 +342,7 @@ func (p *phoneServer) events(w http.ResponseWriter, r *http.Request) {
 func (p *phoneServer) publish(name string, data any) {
 	var ev map[string]any
 	switch name {
-	case "write", "echo", "busy", "ask", "askAnswered", "clear", "thinking":
+	case "write", "echo", "busy", "ask", "askAnswered", "clear", "thinking", "running", "shellMode":
 		ev = map[string]any{"type": name, "data": data}
 	case "speak", "speakAudio":
 		// 声の WAV は送らず、文だけ (スマホ側で読み上げる)

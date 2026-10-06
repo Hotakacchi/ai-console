@@ -720,7 +720,9 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 			l.emit("thinking", true)
 			l.face("think")
 			// 管理者として動き始めたら、終わるまで顔の色を変える
+			l.emit("running", map[string]any{"on": true, "cmd": r.Command})
 			result, ok := runCommand(r.Command, r.Admin || answer == "a", l.cancelChan(), func() { l.emit("admin", true) })
+			l.emit("running", map[string]any{"on": false})
 			l.emit("admin", l.elevated)
 			l.showOutput(result)
 			mood := "sad"

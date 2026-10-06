@@ -71,7 +71,7 @@ jobs:
         with:
           name: windows
           path: |
-            cross/dist/LumiSetup.exe
+            cross/dist/Lumi-Windows-Setup.exe
             cross/dist/lumi-windows-amd64.exe
 
   macos:

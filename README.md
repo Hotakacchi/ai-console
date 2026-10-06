@@ -19,7 +19,7 @@
 
 | OS | ファイル | |
 |---|---|---|
-| Windows 10 / 11 | `LumiSetup.exe` | 「自分だけ (管理者権限なし)」か「すべてのユーザー」かを選べます。新しい版を実行すると上書き更新になります。 |
+| Windows 10 / 11 | `Lumi-Windows-Setup.exe` | 「自分だけ (管理者権限なし)」か「すべてのユーザー」かを選べます。新しい版を実行すると上書き更新になります。 |
 | macOS 11 以降 | `Lumi.dmg` | Lumi.app を「アプリケーション」に入れます。署名していないので、初回は右クリック →「開く」で起動してください。 |
 | Linux (x64 / arm64) | `lumi_*.deb` / `lumi-linux-*.tar.gz` | GTK4・WebKitGTK 6.0 が必要です (Ubuntu 24.04 以降など)。 |
 
@@ -140,4 +140,4 @@ Lumi is a console-style assistant with an animated face in the background that a
 
 It also changes its expression to match what it says, sets **timers and reminders** ("remind me in 5 minutes"), **remembers** things you tell it (`/memory`), keeps the **conversation history** across restarts, can read your **clipboard** when asked, toggles with a **global hotkey** (`Ctrl+Alt+L`), lets you change its **colors, size and fonts**, and checks for **updates**. Optional downloads: `/install-voicevox` for natural Japanese voices with lip-sync ([VOICEVOX](https://voicevox.hiroshiba.jp/)) and `/install-whisper` for more accurate speech recognition ([Whisper](https://github.com/openai/whisper)).
 
-Download `LumiSetup.exe` (Windows), `Lumi.dmg` (macOS) or the `.deb` / `.tar.gz` (Linux) from [Releases](https://github.com/Hotakacchi/ai-console/releases/latest), then type `/help`.
+Download `Lumi-Windows-Setup.exe` (Windows), `Lumi.dmg` (macOS) or the `.deb` / `.tar.gz` (Linux) from [Releases](https://github.com/Hotakacchi/ai-console/releases/latest), then type `/help`.

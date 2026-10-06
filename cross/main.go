@@ -49,6 +49,7 @@ func main() {
 		},
 	})
 	lumi = newLumi(app, slices.Contains(args, "--mute"), slices.Contains(args, "--no-mic"))
+	lumi.installLocalOnStart = slices.Contains(args, "--install-local")
 
 	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:             "main",

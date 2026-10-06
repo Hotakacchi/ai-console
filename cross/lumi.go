@@ -19,7 +19,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-const version = "0.3.0-beta"
+const version = "1.0.0"
 
 type Lumi struct {
 	app   *application.App
@@ -29,6 +29,8 @@ type Lumi struct {
 	s     *Settings
 	ai    Provider
 	muted bool
+
+	installLocalOnStart bool // --install-local: 起動したらローカルAIをダウンロードする
 
 	micOn     bool // 音声入力をこのセッションで使うか (--no-mic や /mic で切り替え)
 	listening bool // 画面側で聞き取りが動いているか
@@ -149,7 +151,12 @@ func (l *Lumi) ready() {
 		l.errorText(T("settings.readError", l.s.Err.Error()))
 	}
 	l.emit("flash", map[string]any{"expr": "happy", "seconds": 2.5})
-	l.warmupLocal()
+	// インストーラーで「ローカルAIも入れる」を選んだときは、初回にダウンロードする
+	if l.installLocalOnStart && !localInstalled(dataDir()) {
+		l.installLocal()
+	} else {
+		l.warmupLocal()
+	}
 	l.applyVoice(true)
 }
 

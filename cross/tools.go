@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -18,31 +19,57 @@ import (
 )
 
 type toolRequest struct {
-	Kind    string // run (コマンド) / search (Web 検索) / fetch (ページを読む)
-	Command string // コマンド・検索語・URL
-	Admin   bool
+	Kind    string            // run / search / fetch / face / remind / remember / forget / clipboard
+	Command string            // 中身 (コマンド・検索語・URL・表情・覚えること など)
+	Admin   bool              // <run admin>
+	Attrs   map[string]string // <remind in="300"> などの属性
 }
 
-var toolTags = []string{"run", "search", "fetch"}
+var toolTags = []string{"run", "search", "fetch", "face", "remind", "remember", "forget", "clipboard"}
 
-// ストリーミング中の返事からタグを取り出し、残りの (読み上げる) テキストを返す
+// 中身が空でも意味のあるタグ
+var emptyOK = map[string]bool{"clipboard": true}
+
+var attrRe = regexp.MustCompile(`(\w+)\s*=\s*"([^"]*)"`)
+
+// ストリーミング中の返事からタグを取り出す。
+// OnText には読み上げる文字が、OnTag には取り出したタグが、返事に出てきた順に渡る
 type toolExtractor struct {
-	buf      strings.Builder
-	inside   string
-	admin    bool
-	Requests []toolRequest
+	buf     strings.Builder
+	inside  string
+	openTag string
+	OnText  func(string)
+	OnTag   func(toolRequest)
 }
 
-func (x *toolExtractor) Push(chunk string) string {
+func (x *toolExtractor) text(s string) {
+	if s != "" && x.OnText != nil {
+		x.OnText(s)
+	}
+}
+
+func (x *toolExtractor) Push(chunk string) {
 	x.buf.WriteString(chunk)
-	var visible strings.Builder
 	for {
 		s := x.buf.String()
 		if x.inside == "" {
 			i, tag := -1, ""
 			for _, t := range toolTags {
-				if at := strings.Index(s, "<"+t); at >= 0 && (i < 0 || at < i) {
-					i, tag = at, t
+				// "<run" が "<runtime" などに当たらないよう、タグ名の直後も確かめる
+				for from := 0; ; {
+					at := strings.Index(s[from:], "<"+t)
+					if at < 0 {
+						break
+					}
+					at += from
+					next := at + 1 + len(t)
+					if next >= len(s) || strings.ContainsRune(" >/\t\n", rune(s[next])) {
+						if i < 0 || at < i {
+							i, tag = at, t
+						}
+						break
+					}
+					from = at + 1
 				}
 			}
 			if i < 0 {
@@ -56,43 +83,56 @@ func (x *toolExtractor) Push(chunk string) string {
 						}
 					}
 				}
-				visible.WriteString(s[:len(s)-keep])
+				x.text(s[:len(s)-keep])
 				x.reset(s[len(s)-keep:])
-				return visible.String()
+				return
 			}
 			end := strings.Index(s[i:], ">")
-			visible.WriteString(s[:i])
+			x.text(s[:i])
 			if end < 0 {
 				x.reset(s[i:])
-				return visible.String()
+				return
 			}
-			x.admin = strings.Contains(s[i:i+end], "admin")
-			x.inside = tag
+			x.openTag = s[i : i+end]
 			x.reset(s[i+end+1:])
+			if strings.HasSuffix(x.openTag, "/") { // <clipboard/> のような閉じタグなしの形
+				x.tag(tag, "")
+				continue
+			}
+			x.inside = tag
 		} else {
 			endTag := "</" + x.inside + ">"
 			end := strings.Index(s, endTag)
 			if end < 0 {
-				return visible.String()
+				return
 			}
-			if body := strings.TrimSpace(s[:end]); body != "" {
-				x.Requests = append(x.Requests, toolRequest{x.inside, body, x.admin && x.inside == "run"})
-			}
+			x.tag(x.inside, strings.TrimSpace(s[:end]))
 			x.inside = ""
 			x.reset(s[end+len(endTag):])
 		}
 	}
 }
 
+func (x *toolExtractor) tag(kind, body string) {
+	if (body == "" && !emptyOK[kind]) || x.OnTag == nil {
+		return
+	}
+	attrs := map[string]string{}
+	for _, m := range attrRe.FindAllStringSubmatch(x.openTag, -1) {
+		attrs[strings.ToLower(m[1])] = m[2]
+	}
+	head := strings.TrimSuffix(strings.TrimPrefix(x.openTag, "<"+kind), "/")
+	admin := kind == "run" && strings.Contains(attrRe.ReplaceAllString(head, ""), "admin")
+	x.OnTag(toolRequest{Kind: kind, Command: body, Admin: admin, Attrs: attrs})
+}
+
 func (x *toolExtractor) reset(s string) { x.buf.Reset(); x.buf.WriteString(s) }
 
-func (x *toolExtractor) Flush() string {
-	s := ""
+func (x *toolExtractor) Flush() {
 	if x.inside == "" {
-		s = x.buf.String()
+		x.text(x.buf.String())
 	}
 	x.buf.Reset()
-	return s
 }
 
 // ---------------- コマンドの実行 ----------------

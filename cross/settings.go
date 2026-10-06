@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // AI への指示文 (キャラクター・PC 操作・Web 検索) は locales の prompt.* にある
@@ -36,6 +37,10 @@ func settingsTemplate(provider string) string {
   "local_gpu": "auto",
   "pc_control": "on",
   "web_search": "on",
+  "clipboard": "ask",
+  "hotkey": "CmdOrCtrl+Alt+L",
+  "update_check": "on",
+  "keep_history": "on",
   "search_url": "",
   "voice_input": "on",
   "wake_word": "",
@@ -192,6 +197,14 @@ func (s *Settings) SystemPrompt() string {
 	if s.WebSearch() {
 		p += "\n\n" + T("prompt.web")
 	}
+	if s.Get("clipboard", "ask") != "off" {
+		p += "\n\n" + T("prompt.clipboard")
+	}
+	// 表情・リマインダー (今の時刻つき)・記憶
+	now := time.Now()
+	p += "\n\n" + T("prompt.face")
+	p += "\n\n" + T("prompt.remind", now.Format("2006-01-02 15:04 (Mon)"))
+	p += "\n\n" + T("prompt.memory") + "\n" + memories.prompt()
 	return p
 }
 

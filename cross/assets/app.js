@@ -27,6 +27,32 @@ function animate(canvas, face) {
   frame();
 }
 
+// ---- 顔の色 ----
+// 名前か #rrggbb で指定する。背景の顔は暗く (背景に混ぜる)、右下の顔は明るいまま使う
+const COLORS = { cyan: "#61d6d6", green: "#5fd16a", pink: "#ff8fc8", amber: "#ffa94d", purple: "#b59cff", white: "#e6e6e6", red: "#ff6b6b" };
+const BG = "#0c0c0c";
+
+function mix(a, b, k) {
+  const p = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return "#" + x.map((v, i) => Math.round(v * k + y[i] * (1 - k)).toString(16).padStart(2, "0")).join("");
+}
+
+function baseColor(name) {
+  name = (name || "cyan").toLowerCase();
+  return COLORS[name] || (/^#[0-9a-f]{6}$/.test(name) ? name : COLORS.cyan);
+}
+
+// dim: 背景の顔用 (文字の邪魔にならない暗さ)
+function palette(color, dim) {
+  return dim
+    ? { line: mix(color, BG, 0.22), fill: mix(color, BG, 0.3), cheek: "#461e3c", bg: BG }
+    : { line: color, fill: color, cheek: "#e7488c", bg: BG };
+}
+
+// 管理者権限で動いている間の色 (ふだんの色がオレンジならかぶらないよう赤)
+function adminColor(base) { return base === COLORS.amber ? COLORS.red : COLORS.amber; }
+
 if (location.hash === "#peek") peekMain(); else termMain();
 
 // ================= メインの窓 =================
@@ -37,9 +63,9 @@ function termMain() {
   term.hidden = false;
 
   // 管理者権限で動いている間は、顔をオレンジ系にする
-  const NORMAL = { line: "#223e42", fill: "#284e54", cheek: "#461e3c", bg: "#0c0c0c" };
-  const ADMIN = { line: "#4e3214", fill: "#6a4418", cheek: "#5a1e2a", bg: "#0c0c0c" };
-  const face = new Face(NORMAL);
+  let base = COLORS.cyan, admin = false;
+  const face = new Face(palette(base, true));
+  const recolor = () => { face.c = palette(admin ? adminColor(base) : base, true); face.lastState = ""; };
   animate(document.getElementById("face"), face);
 
   // ---- 出力 ----
@@ -310,7 +336,17 @@ function termMain() {
   on("flash", d => face.flash(d.expr, d.seconds));
   on("ask", q => { askPrompt = q; buffer = ""; thinking = false; voice.confirming(true); render(); keys.focus(); });
   on("i18n", m => { msgs = m; });
-  on("admin", on => { face.c = on ? ADMIN : NORMAL; face.lastState = ""; });   // lastState を消して描き直させる
+  // --script で流し込まれた行を、打ち込んだのと同じように表示する
+  on("echo", text => { write(PROMPT, "fg"); write(text + "\n", "white"); if (!text.startsWith("/")) lastWasVoice = false; });
+  on("admin", on => { admin = on; recolor(); });
+  // 見た目の設定 (顔の色・大きさ、文字の大きさ・フォント)
+  on("appearance", d => {
+    base = baseColor(d.faceColor);
+    face.sizeRatio = Math.max(0.2, Math.min(1, (d.faceSize || 60) / 100));
+    recolor();
+    document.body.style.fontSize = Math.max(10, Math.min(28, d.fontSize || 15)) + "px";
+    document.body.style.fontFamily = d.font ? `"${d.font.replace(/"/g, "")}", var(--mono)` : "";
+  });
   on("voiceStart", d => voice.start(d, msgs));
   on("voiceStop", () => voice.stop());
   // テスト用: マイクの代わりに音声ファイルを聞かせる
@@ -337,15 +373,16 @@ function peekMain() {
   const peek = document.getElementById("peek"), bubble = document.getElementById("bubble");
   const textEl = document.getElementById("peekText");
   peek.hidden = false;
-  const NORMAL = { line: "#61d6d6", fill: "#61d6d6", cheek: "#e7488c", bg: "#0c0c0c" };
-  const ADMIN = { line: "#ffa94d", fill: "#ffa94d", cheek: "#e7488c", bg: "#0c0c0c" };
-  const face = new Face(NORMAL, 0.9);
+  let base = COLORS.cyan, admin = false;
+  const face = new Face(palette(base, false), 0.9);
   animate(document.getElementById("peekFace"), face);
-  on("admin", on => {
-    face.c = on ? ADMIN : NORMAL;
+  const recolor = () => {
+    face.c = palette(admin ? adminColor(base) : base, false);
     face.lastState = "";
     bubble.style.borderColor = face.c.line;
-  });
+  };
+  on("admin", on => { admin = on; recolor(); });
+  on("appearance", d => { base = baseColor(d.faceColor); recolor(); });
 
   let doneTimer = null;
   on("peek", d => {

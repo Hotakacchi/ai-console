@@ -32,7 +32,8 @@ type Lumi struct {
 	muted bool
 
 	installLocalOnStart bool // --install-local: 起動したらローカルAIをダウンロードする
-	elevated            bool // ルミ自体が管理者 (root) として動いている
+	elevated            bool   // ルミ自体が管理者 (root) として動いている
+	scriptPath          string // --script: テスト用に入力を流し込むファイル
 
 	micOn     bool // 音声入力をこのセッションで使うか (--no-mic や /mic で切り替え)
 	listening bool // 画面側で聞き取りが動いているか
@@ -44,10 +45,15 @@ type Lumi struct {
 	speakID int
 
 	onLanguageChanged func() // トレイのメニューなど、言語で変わるものを作り直す
+
+	startOnce sync.Once       // リマインダーの見張りは 1 回だけ始める
+	replyText strings.Builder // 今の返事で喋った文 (履歴に残す)
 }
 
 func newLumi(app *application.App, muted, noMic bool) *Lumi {
 	l := &Lumi{app: app, muted: muted, micOn: !noMic, elevated: isElevated(), answers: make(chan string, 1), spoken: make(chan int, 8)}
+	memories.load()
+	reminders.load()
 	l.loadSettings()
 	return l
 }
@@ -132,7 +138,10 @@ func (l *Lumi) reload(announce bool) {
 		localServer.Stop()
 	}
 	l.sendVoiceSettings()
+	l.sendAppearance()
 	l.applyStartup()
+	l.applyHotkey()
+	l.restoreHistory(false) // AI を作り直したので、前の会話をもう一度渡す
 	l.warmupLocal()
 }
 
@@ -157,11 +166,21 @@ func (l *Lumi) ready() {
 	l.emit("i18n", clientMessages())
 	l.emit("admin", l.elevated)
 	l.sendVoiceSettings()
+	l.sendAppearance()
 	l.write("Lumi Assistant [Version "+version+"]\n", "fg")
 	l.write(T("welcome.hint")+"\n\n", "dim")
 	if l.s.Err != nil {
 		l.errorText(T("settings.readError", l.s.Err.Error()))
 	}
+	l.restoreHistory(true)
+	l.applyHotkey()
+	l.checkUpdate()
+	l.startOnce.Do(func() {
+		go l.runReminders()
+		if l.scriptPath != "" {
+			l.runScript(l.scriptPath)
+		}
+	})
 	l.emit("flash", map[string]any{"expr": "happy", "seconds": 2.5})
 	// インストーラーで「ローカルAIも入れる」を選んだときは、初回にダウンロードする
 	if l.installLocalOnStart && !localInstalled(dataDir()) {
@@ -219,7 +238,16 @@ func (l *Lumi) submit(text string) {
 		l.quit()
 	case "/cls", "/clear":
 		l.ai.Clear()
+		clearHistory()
 		l.emit("clear", nil)
+	case "/memory":
+		l.memoryCommand(parts[1:])
+	case "/reminders":
+		l.remindersCommand(parts[1:])
+	case "/history":
+		l.historyCommand(parts[1:])
+	case "/update":
+		openURL(releasesURL)
 	case "/mute":
 		l.muted = !l.muted
 		l.updateTitle()
@@ -282,6 +310,7 @@ func (c command) help() string { return T("cmd." + strings.TrimPrefix(c.name, "/
 var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""},
+	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", ""}, {"/cls", ""}, {"/exit", ""},
 }
 
@@ -308,6 +337,14 @@ var settingKeys = []settingKey{
 	{"voice_rate", "#int:-10:10"},
 	{"background", "on,off"},
 	{"startup", "on,off"},
+	{"hotkey", ""},
+	{"clipboard", "ask,on,off"},
+	{"keep_history", "on,off"},
+	{"update_check", "on,off"},
+	{"face_color", ""},
+	{"face_size", "#int:20:100"},
+	{"font_size", "#int:10:28"},
+	{"font", ""},
 }
 
 // 言語は入っている翻訳から選ぶ
@@ -517,6 +554,9 @@ func (l *Lumi) startReply(text string) {
 const maxToolRounds = 5
 
 func (l *Lumi) respond(userText string) {
+	appendHistory("user", userText)
+	l.replyText.Reset()
+	defer func() { appendHistory("assistant", l.replyText.String()) }()
 	message := userText
 	declined := false // 一度断られたら、この返事の間はもうコマンドを聞かない
 	for round := 0; round < maxToolRounds && message != "" && !l.cancelled(); round++ {
@@ -540,6 +580,10 @@ func (l *Lumi) respond(userText string) {
 		for _, r := range requests {
 			if l.cancelled() {
 				break
+			}
+			if r.Kind == "clipboard" {
+				report.WriteString(l.clipboardTool())
+				continue
 			}
 			if r.Kind == "search" || r.Kind == "fetch" {
 				report.WriteString(l.webTool(r))
@@ -618,9 +662,14 @@ func (l *Lumi) replyOnce(message string) []toolRequest {
 	done := make(chan struct{})
 	go func() {
 		for s := range sentences {
-			if !l.cancelled() {
-				l.speak(s)
+			if l.cancelled() {
+				continue
 			}
+			if expr, ok := strings.CutPrefix(s, faceMarker); ok {
+				l.showFeeling(expr)
+				continue
+			}
+			l.speak(s)
 		}
 		close(done)
 	}()
@@ -628,22 +677,56 @@ func (l *Lumi) replyOnce(message string) []toolRequest {
 	l.emit("thinking", true)
 	l.face("think")
 	var sp sentenceSplitter
-	var tools toolExtractor
-	l.ai.Reply(message, func(chunk string) {
-		for _, s := range sp.Push(tools.Push(chunk)) {
-			sentences <- s
-		}
-	})
-	for _, s := range sp.Push(tools.Flush()) {
-		sentences <- s
+	var requests []toolRequest
+	tools := toolExtractor{
+		OnText: func(t string) {
+			l.replyText.WriteString(t)
+			for _, s := range sp.Push(t) {
+				sentences <- s
+			}
+		},
+		OnTag: func(r toolRequest) {
+			switch r.Kind {
+			case "face":
+				// 表情は、それより前の文を喋り終えたところで変える
+				for _, s := range sp.Push("\n") {
+					sentences <- s
+				}
+				sentences <- faceMarker + r.Command
+			case "remember", "forget":
+				l.memoryTag(r)
+			case "remind":
+				l.remindTag(r)
+			default:
+				requests = append(requests, r)
+			}
+		},
 	}
+	l.ai.Reply(message, tools.Push)
+	tools.Flush()
 	if rest := sp.Flush(); strings.TrimSpace(rest) != "" {
 		sentences <- rest
 	}
 	close(sentences)
 	<-done
 	l.write("\n", "fg")
-	return tools.Requests
+	return requests
+}
+
+// 読み上げの列にはさむ「ここで表情を変える」印
+const faceMarker = "\x00face:"
+
+// AI が <face> で指定した気持ちを顔に出す
+func (l *Lumi) showFeeling(expr string) {
+	expr = strings.ToLower(strings.TrimSpace(expr))
+	switch expr {
+	case "happy", "sad", "think":
+	case "surprised":
+		expr = "listen" // 目を大きく見開く
+	default:
+		return
+	}
+	l.emit("flash", map[string]any{"expr": expr, "seconds": 4})
 }
 
 // 1 文を画面に喋らせ (読み上げと文字の表示は画面側)、終わるまで待つ

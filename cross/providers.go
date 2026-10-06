@@ -29,6 +29,8 @@ type Provider interface {
 	Abort()
 	// 会話履歴を消す
 	Clear()
+	// 前の会話 (user / assistant の文) を履歴として渡す
+	Seed(msgs []Message)
 }
 
 type Message = map[string]any
@@ -57,7 +59,8 @@ type httpBase struct {
 	aborted bool
 }
 
-func (h *httpBase) Clear() { h.history = nil }
+func (h *httpBase) Clear()              { h.history = nil }
+func (h *httpBase) Seed(msgs []Message) { h.history = append([]Message(nil), msgs...) }
 
 func (h *httpBase) Abort() {
 	h.mu.Lock()
@@ -398,7 +401,8 @@ type commandProvider struct {
 }
 
 func (c *commandProvider) Label() string { return "command: " + c.s.Get("command", "") }
-func (c *commandProvider) Clear()        { c.history = nil }
+func (c *commandProvider) Clear()              { c.history = nil }
+func (c *commandProvider) Seed(msgs []Message) { c.history = append([]Message(nil), msgs...) }
 
 func (c *commandProvider) Abort() {
 	c.mu.Lock()
@@ -475,6 +479,7 @@ type offlineProvider struct{}
 func (offlineProvider) Label() string { return "offline" }
 func (offlineProvider) Abort()        {}
 func (offlineProvider) Clear()        {}
+func (offlineProvider) Seed([]Message) {}
 
 func (offlineProvider) Reply(text string, onText func(string)) {
 	now := time.Now()

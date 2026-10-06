@@ -41,6 +41,12 @@
 | `/mic` | 音声入力のオン/オフ (初回は認識モデル約50MBをダウンロード) |
 | `/install-local` | ローカルAIをダウンロードする |
 | `/install-voice` | 音声認識モデルをダウンロードする |
+| `/install-voicevox` | より自然な声 (VOICEVOX、約330MB) を入れる |
+| `/install-whisper` | より正確な音声認識 (Whisper、約110MB) を入れる |
+| `/memory` | 覚えていることの一覧 (`/memory delete <番号>`、`/memory clear`) |
+| `/reminders` | タイマー・リマインダーの一覧 (`/reminders cancel <番号>`、`/reminders clear`) |
+| `/history [件数]` | これまでの会話を表示する |
+| `/update` | 新しい版が出ているか確かめる |
 | `/peek` | バックグラウンドで呼ばれたときの動きを試す |
 | `/cls` | 画面と会話をリセット |
 | `/exit` | 終了 |
@@ -58,6 +64,19 @@
 - 「メモリの使用量を調べて」のように頼むと、ルミが OS のコマンド (Windows は PowerShell、Mac は zsh、Linux は bash) を提案します。**実行前に必ずコマンドを表示して確認**し、`y` (声なら「実行して」) と答えたときだけ実行します。管理者権限が必要なときは、さらに OS の確認画面が出ます。`/set pc_control off` で無効。
 
 AI の提案は間違っていることもあります。内容を確かめてから許可してください。
+管理者権限で実行している間は、顔の色が琥珀色に変わります。
+
+### そのほかの機能
+
+- **表情** — 返事の内容に合わせて、うれしい顔・考える顔・驚いた顔などをします。
+- **タイマー・リマインダー** — 「5分後に教えて」「15時に会議って言って」と頼むと、時間になったら声で知らせます (トレイにいるときは右下から顔を出します)。
+- **覚える** — 「私の名前はほたかだよ、覚えておいて」と言うと覚えて、次からの会話に活かします。忘れてほしいときは「忘れて」と頼むか `/memory`。
+- **会話の続き** — 前回の会話を覚えていて、起動したときに続きから話せます (`/set keep_history off` で無効、`/cls` で消去)。
+- **クリップボード** — 「コピーした文を要約して」のように頼むと、クリップボードの文章を読みます (`/set clipboard ask` で毎回確認、`on` / `off`)。
+- **ショートカット** — どこからでも `Ctrl+Alt+L` (Mac は `Cmd+Option+L`) でウィンドウを出し入れできます (`/set hotkey`)。
+- **見た目** — 顔の色・大きさ、文字の大きさ・フォントを変えられます (`/set face_color pink` など)。
+- **自然な声** — `/install-voicevox` で [VOICEVOX](https://voicevox.hiroshiba.jp/) の声で話し、声に合わせて口が動きます。`/voices` で声を選べます。
+- **正確な聞き取り** — `/install-whisper` で、話しかけた内容を [Whisper](https://github.com/openai/whisper) で書き起こします (呼びかけは Vosk のまま)。`/set whisper_model small` でさらに正確に (約280MB)。
 
 ## 設定 (`settings.json`)
 
@@ -71,6 +90,11 @@ AI の提案は間違っていることもあります。内容を確かめて�
 | `pc_control` / `web_search` | PC の操作 / Web 検索 |
 | `voice_input` / `wake_word` | 音声入力 / 呼びかけの言葉 (空なら言語ごとの既定) |
 | `voice` / `voice_rate` | 読み上げの声 / 速さ |
+| `tts` / `voicevox_voice` | 読み上げ (`system` / `voicevox`) / VOICEVOX の声の番号 |
+| `stt` / `whisper_model` | 書き起こし (`vosk` / `whisper`) / Whisper のモデル (`base` / `small`) |
+| `clipboard` / `hotkey` | クリップボードを読む / ウィンドウを出し入れするショートカット |
+| `keep_history` / `update_check` | 会話を保存して続きから話す / 起動時に新しい版を確かめる |
+| `face_color` / `face_size` / `font_size` / `font` | 見た目 |
 | `background` / `startup` | 閉じてもトレイで動き続ける / ログイン時に起動する |
 | `system_prompt` | キャラクター設定 (空なら既定のルミ) |
 
@@ -105,12 +129,15 @@ Windows では `CGO_ENABLED=0` で、Linux では `libgtk-4-dev` と `libwebkitg
 
 ## ライセンス
 
-[MIT License](LICENSE)。ダウンロードして使う llama.cpp は MIT、Qwen3.5-4B は Apache 2.0、Vosk とその認識モデルは Apache 2.0 です。
+[MIT License](LICENSE)。ダウンロードして使う llama.cpp は MIT、Qwen3.5-4B は Apache 2.0、Vosk とその認識モデルは Apache 2.0、Whisper は MIT、transformers.js は Apache 2.0、ONNX Runtime は MIT です。
+VOICEVOX はそれぞれのキャラクターの利用規約に従ってください (VOICEVOX の声を使うと、画面に「VOICEVOX:キャラクター名」のクレジットを出します)。
 
 ---
 
 ## English
 
 Lumi is a console-style assistant with an animated face in the background that answers out loud. It runs on **Windows, macOS and Linux**, ships with a **local AI** (llama.cpp + Qwen3.5-4B, downloaded on first use), listens for its **wake word** ("Lumi") with on-device speech recognition (Vosk), can **search the web**, and can **run commands on your PC — always after asking you first**. The UI and the conversation are available in Japanese and English (`/set language en`).
+
+It also changes its expression to match what it says, sets **timers and reminders** ("remind me in 5 minutes"), **remembers** things you tell it (`/memory`), keeps the **conversation history** across restarts, can read your **clipboard** when asked, toggles with a **global hotkey** (`Ctrl+Alt+L`), lets you change its **colors, size and fonts**, and checks for **updates**. Optional downloads: `/install-voicevox` for natural Japanese voices with lip-sync ([VOICEVOX](https://voicevox.hiroshiba.jp/)) and `/install-whisper` for more accurate speech recognition ([Whisper](https://github.com/openai/whisper)).
 
 Download `LumiSetup.exe` (Windows), `Lumi.dmg` (macOS) or the `.deb` / `.tar.gz` (Linux) from [Releases](https://github.com/Hotakacchi/ai-console/releases/latest), then type `/help`.

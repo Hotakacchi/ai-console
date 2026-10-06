@@ -81,7 +81,8 @@ Filename: "{cmd}"; Parameters: "/c taskkill /f /im llama-server.exe"; Flags: run
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
-    if MsgBox(CustomMessage('DeleteData'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+    // サイレント実行 (/SUPPRESSMSGBOXES) のときは聞かずに「いいえ」(残す) にする
+    if SuppressibleMsgBox(CustomMessage('DeleteData'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES then
     begin
       // (すべてのユーザーに入れた場合、消えるのはアンインストールした人の分だけ)
       DelTree(ExpandConstant('{localappdata}\Lumi'), True, True, True);

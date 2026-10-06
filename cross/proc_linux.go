@@ -15,3 +15,5 @@ func killWithParent(cmd *exec.Cmd) {
 func afterStart(cmd *exec.Cmd) {}
 
 func windowsName() string { return "Windows" }
+
+func drives() []string { return []string{"/"} }

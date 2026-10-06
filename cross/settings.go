@@ -201,6 +201,11 @@ func (s *Settings) SystemPrompt() string {
 		p += "\n\n" + T("prompt.pc", osName(), shellName())
 		p += "\n" + T("prompt.pcExample", T("prompt.pcAskDisk"), disk)
 		p += "\n" + T("prompt.pcExample", T("prompt.pcAskFolder"), folder)
+		p += "\n" + T("prompt.pcPlaces", homeDir(), strings.Join(drives(), " "))
+		p += "\n" + T("prompt.pcBook") + "\n" + T("pcbook."+runtime.GOOS)
+		if mine := userCommands(); mine != "" {
+			p += "\n" + T("prompt.pcMine") + "\n" + mine
+		}
 	}
 	if s.WebSearch() {
 		p += "\n\n" + T("prompt.web")

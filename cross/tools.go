@@ -139,7 +139,7 @@ func (x *toolExtractor) Flush() {
 
 const (
 	commandTimeout = 2 * time.Minute
-	maxOutput      = 4000
+	maxOutput      = 20000 // AI に返す出力の上限 (ローカルAIはさらに短くする: localOutputLimit)
 )
 
 // OS のシェルでコマンドを実行し、出力と成功したかを返す。admin なら OS の管理者確認を通す。
@@ -168,16 +168,19 @@ func runCommand(command string, admin bool, cancel <-chan struct{}, onElevated f
 	if marker != "" {
 		touch = "touch '" + strings.ReplaceAll(marker, "'", `'\''`) + "'; "
 	}
+	// どこから起動されても、コマンドはホームフォルダで動かす (管理者として動くシェルは別の場所から始まるので cd も付ける)
+	home := homeDir()
+	cdHome := "cd '" + strings.ReplaceAll(home, "'", `'\''`) + "' 2>/dev/null; "
 
 	var cmd *exec.Cmd
 	var outFile string
 	switch runtime.GOOS {
 	case "windows":
-		cmd, outFile = windowsCommand(ctx, command, admin, marker)
+		cmd, outFile = windowsCommand(ctx, command, admin, marker, home)
 	case "darwin":
 		if admin {
 			// macOS の管理者パスワードの確認画面が出る
-			script := `do shell script "` + appleScriptEscape(touch+command) + ` 2>&1" with administrator privileges`
+			script := `do shell script "` + appleScriptEscape(touch+cdHome+command) + ` 2>&1" with administrator privileges`
 			cmd = exec.CommandContext(ctx, "osascript", "-e", script)
 		} else {
 			cmd = exec.CommandContext(ctx, "/bin/zsh", "-c", command)
@@ -187,11 +190,12 @@ func runCommand(command string, admin bool, cancel <-chan struct{}, onElevated f
 			if _, err := exec.LookPath("pkexec"); err != nil {
 				return T("run.noPkexec"), false
 			}
-			cmd = exec.CommandContext(ctx, "pkexec", "/bin/bash", "-c", touch+command) // 認証画面が出る
+			cmd = exec.CommandContext(ctx, "pkexec", "/bin/bash", "-c", touch+cdHome+command) // 認証画面が出る
 		} else {
 			cmd = exec.CommandContext(ctx, "/bin/bash", "-c", command)
 		}
 	}
+	cmd.Dir = home
 	hideWindow(cmd)
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
@@ -249,12 +253,13 @@ func runCommand(command string, admin bool, cancel <-chan struct{}, onElevated f
 }
 
 // PowerShell で実行する。出力は UTF-8 で一時ファイルに書かせる (管理者として動かした PowerShell の出力は直接受け取れないため)
-func windowsCommand(ctx context.Context, command string, admin bool, marker string) (*exec.Cmd, string) {
+func windowsCommand(ctx context.Context, command string, admin bool, marker, home string) (*exec.Cmd, string) {
 	out := filepath.Join(os.TempDir(), fmt.Sprintf("lumi_run_%d.txt", time.Now().UnixNano()))
 	inner := ""
 	if marker != "" {
 		inner = "New-Item -ItemType File -Force -Path '" + strings.ReplaceAll(marker, "'", "''") + "' | Out-Null\n"
 	}
+	inner += "Set-Location -LiteralPath '" + strings.ReplaceAll(home, "'", "''") + "' -ErrorAction SilentlyContinue\n"
 	inner += "$ErrorActionPreference = 'Continue'\n" +
 		"$o = & { " + command + "\n} 2>&1 | Out-String -Width 200\n" +
 		"[IO.File]::WriteAllText('" + strings.ReplaceAll(out, "'", "''") + "', $o, (New-Object Text.UTF8Encoding $false))\n"
@@ -268,6 +273,13 @@ func windowsCommand(ctx context.Context, command string, admin bool, marker stri
 	// 確認を断ったときの目印は標準出力に出る (そのときは出力ファイルができない)
 	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encodePS(script))
 	return cmd, out
+}
+
+func homeDir() string {
+	if h, err := os.UserHomeDir(); err == nil {
+		return h
+	}
+	return os.TempDir()
 }
 
 func encodePS(s string) string {

@@ -46,6 +46,7 @@
 | `/install-vision` | ローカルAIが画像を読めるようにする (約670MB) |
 | `/attach [パス]` / `/detach` | ファイルを付ける / 外す (窓にドラッグ＆ドロップでも付けられる) |
 | `/screen [質問]` | 画面を撮って見せる (例: `/screen このエラーは何？`) |
+| `/commands` | よく使うコマンドの単語帳 (`commands.txt`) を開く。「やりたいこと → コマンド」と書くと AI が優先して使う |
 | `/memory` | 覚えていることの一覧 (`/memory delete <番号>`、`/memory clear`) |
 | `/reminders` | タイマー・リマインダーの一覧 (`/reminders cancel <番号>`、`/reminders clear`) |
 | `/history [件数]` | これまでの会話を表示する |

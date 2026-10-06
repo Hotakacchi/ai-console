@@ -13,7 +13,7 @@ func TestPCAsk(t *testing.T) {
 	loadLocales()
 	setLanguage("ja")
 	memories.load()
-	for _, q := range []string{"ipconfigを実行して", "Windowsのバージョンを調べて", "コマンドプロンプトでdirを実行して", "メモリの使用量を調べて", "デスクトップにあるファイルを一覧にして"} {
+	for _, q := range []string{"Cドライブで大きいファイルを教えて", "Cドライブで大きいファイルを教えて", "Cドライブで大きいファイルを教えて", "Dドライブ全体を読み込んで", "Dドライブの中にあるフォルダの大きさを調べて"} {
 		s := &Settings{vals: map[string]any{"provider": "local"}}
 		p := newLocal(s)
 		var out strings.Builder

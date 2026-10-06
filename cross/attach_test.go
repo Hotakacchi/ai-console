@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -177,5 +178,27 @@ func TestImageTurn(t *testing.T) {
 	}
 	if c, ok := p.history[0]["content"].(string); !ok || !strings.HasPrefix(c, "これは何？\n") {
 		t.Errorf("history keeps the image: %#v", p.history[0]["content"])
+	}
+}
+
+// コマンドは、どこから起動してもホームフォルダで動く
+func TestRunCommandInHome(t *testing.T) {
+	loadLocales()
+	cmd := "pwd"
+	if runtime.GOOS == "windows" {
+		cmd = "(Get-Location).Path"
+	}
+	out, ok := runCommand(cmd, false, make(chan struct{}), nil)
+	home, _ := os.UserHomeDir()
+	lines := strings.Split(strings.TrimSpace(out), "\n") // 1 行目は終了コード
+	if got := strings.TrimSpace(lines[len(lines)-1]); !ok || !strings.EqualFold(got, home) {
+		t.Errorf("ran in %q, want %q", got, home)
+	}
+}
+
+func TestUserCommands(t *testing.T) {
+	data := "# comment\r\n\r\n写真を数える → (Get-ChildItem D:\\写真).Count\r\n  # also comment\r\n仕事 → Start-Process explorer D:\\仕事\r\n"
+	if got := parseUserCommands(data); got != "写真を数える → (Get-ChildItem D:\\写真).Count\n仕事 → Start-Process explorer D:\\仕事" {
+		t.Errorf("%q", got)
 	}
 }

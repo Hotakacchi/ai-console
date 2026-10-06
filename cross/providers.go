@@ -381,7 +381,7 @@ func newLocal(s *Settings) Provider {
 	p.label = "local: " + p.model
 	ctx := localContext(s)
 	// 指示文と返事の分を残して、履歴はコンテキストに収まる分だけにする (日本語はおよそ 1 文字 1 トークン)
-	p.budget = ctx - 3500
+	p.budget = ctx - 5500
 	p.before = func() error {
 		if err := localServer.Start(dir, modelPath, visionPath(dir, modelPath), gpu, ctx); err != nil {
 			return err

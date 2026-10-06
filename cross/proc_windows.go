@@ -50,3 +50,24 @@ func windowsName() string {
 	}
 	return "Windows"
 }
+
+// この PC のドライブ (C:\ D:\ …)
+func drives() []string {
+	var list []string
+	mask, err := windows.GetLogicalDrives()
+	if err != nil {
+		return []string{`C:\`}
+	}
+	for i := 0; i < 26; i++ {
+		if mask&(1<<i) == 0 {
+			continue
+		}
+		root := string(rune('A'+i)) + `:\`
+		// CD などの入れ替えられるドライブやネットワークドライブも含める (中身がないものは除く)
+		if t := windows.GetDriveType(windows.StringToUTF16Ptr(root)); t == windows.DRIVE_NO_ROOT_DIR || t == windows.DRIVE_UNKNOWN {
+			continue
+		}
+		list = append(list, root)
+	}
+	return list
+}

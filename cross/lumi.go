@@ -299,6 +299,8 @@ func (l *Lumi) submit(text string) {
 		l.installWhisperCmd()
 	case "/install-vision":
 		l.installVisionCmd()
+	case "/commands":
+		l.commandsFile()
 	case "/attach":
 		l.attachCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/detach":
@@ -340,7 +342,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", ""}, {"/cls", ""}, {"/exit", ""},
 }
@@ -700,7 +702,7 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 				mood = "happy"
 			}
 			l.emit("flash", map[string]any{"expr": mood, "seconds": 2})
-			report.WriteString(result + "\n")
+			report.WriteString(l.fitOutput(result) + "\n")
 		}
 		if !l.cancelled() {
 			turn = Turn{Text: report.String(), Images: images}
@@ -714,6 +716,19 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 		l.write("\n", "dim")
 	}
 	l.setBusy(false)
+}
+
+// ローカルAIはコンテキストが小さいので、コマンドの出力を短くしてから渡す
+const localOutputLimit = 4000
+
+func (l *Lumi) fitOutput(out string) string {
+	if strings.ToLower(l.s.Get("provider", "offline")) != "local" {
+		return out
+	}
+	if r := []rune(out); len(r) > localOutputLimit {
+		return string(r[:localOutputLimit]) + "\n" + T("run.truncated")
+	}
+	return out
 }
 
 // 日本語は 2 文字分の幅として、見た目の幅で右を埋める

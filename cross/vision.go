@@ -43,7 +43,7 @@ func visionPath(base, modelPath string) string {
 
 // ローカルAIのコンテキストの長さ (トークン)
 func localContext(s *Settings) int {
-	return max(8192, s.GetInt("max_tokens", 0)+4096)
+	return max(12288, s.GetInt("max_tokens", 0)+4096)
 }
 
 // 今の AI に画像を見せられるか。だめなら理由

@@ -188,7 +188,7 @@
   "history.restored": "(Continuing the last conversation. /cls starts fresh)",
   "history.none": "No conversation history yet.",
   "history.howto": "Show more with /history <count>. Clear with /cls",
-  "update.available": "A new version %s is available. Type /update to open the download page.",
+  "update.available": "A new version %s is available. Update with /update.",
   "hotkey.failed": "Couldn't register the shortcut %s: %s",
   "clip.label": "Clipboard",
   "clip.off": "(Reading the clipboard is turned off)",
@@ -198,7 +198,7 @@
   "cmd.memory": "List what I remember (delete / clear)",
   "cmd.reminders": "List reminders (cancel / clear)",
   "cmd.history": "Conversation history",
-  "cmd.update": "Open the download page",
+  "cmd.update": "Update to the new version (download, replace and restart)",
   "set.hotkey": "Shortcut to show/hide (off to disable)",
   "set.clipboard": "Read the clipboard (ask = confirm every time)",
   "set.keep_history": "Continue the conversation after a restart",
@@ -288,5 +288,13 @@
   "cmd.words": "Open your voice vocabulary (words.txt). Names and jargon get recognized better (with Whisper)",
   "words.template": "# Voice vocabulary\n# Write words you often say (names, folder names, jargon) one per line, and Whisper will transcribe them better.\n# Lines starting with # are ignored. Too many words can hurt; about 30 is a good limit.\n# Examples:\n# Hotakacchi\n# PowerShell\n",
   "words.opened": "Opened your voice vocabulary: %s\nWrite one word per line and save; it applies from the next time you speak.",
-  "words.needWhisper": "The vocabulary is used when transcribing with Whisper. Install it with /install-whisper."
+  "words.needWhisper": "The vocabulary is used when transcribing with Whisper. Install it with /install-whisper.",
+  "update.checkFailed": "Couldn't check for a new version: %s",
+  "update.latest": "You have the latest version (%s).",
+  "update.manual": "A new version %s is available. It can't be updated automatically for this installation, so the download page will open: %s",
+  "update.ask": "Update from %s to %s? Lumi will close and restart after the update. [y/N] ",
+  "update.downloading": "Downloading %s",
+  "update.installing": "Installing %s. Lumi will close and restart shortly.",
+  "update.failed": "Couldn't update: %s",
+  "update.notWritable": "Can't write to %s, so it can't be updated. Please reinstall from the download page"
 }

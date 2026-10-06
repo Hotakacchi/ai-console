@@ -21,3 +21,8 @@ func killTree(cmd *exec.Cmd) {
 		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 	}
 }
+
+// ルミが終わっても動き続けるように (更新のときに使う)
+func detach(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+}

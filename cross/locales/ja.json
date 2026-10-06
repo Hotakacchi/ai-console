@@ -188,7 +188,7 @@
   "history.restored": "（前回の会話の続きです。/cls で新しく始めます）",
   "history.none": "まだ会話の履歴はありません。",
   "history.howto": "もっと見るには /history <件数>。消すには /cls",
-  "update.available": "新しいバージョン %s があります。/update でダウンロードページを開きます。",
+  "update.available": "新しい版 %s が出ています。/update で更新できます。",
   "hotkey.failed": "ショートカットキー %s を登録できませんでした: %s",
   "clip.label": "クリップボード",
   "clip.off": "(クリップボードの読み取りはオフになっています)",
@@ -198,7 +198,7 @@
   "cmd.memory": "覚えていることの一覧 (delete / clear)",
   "cmd.reminders": "リマインダーの一覧 (cancel / clear)",
   "cmd.history": "会話の履歴",
-  "cmd.update": "ダウンロードページを開く",
+  "cmd.update": "新しい版に更新する (ダウンロードして入れ替え、起動し直す)",
   "set.hotkey": "呼び出しのショートカットキー (off で無効)",
   "set.clipboard": "クリップボードを読むか (ask は毎回確認)",
   "set.keep_history": "再起動しても会話の続きから話す",
@@ -288,5 +288,13 @@
   "cmd.words": "音声の単語帳 (words.txt) を開く。名前や専門用語を書くと聞き取りやすくなる (Whisper 使用時)",
   "words.template": "# 音声の単語帳\n# よく話す言葉 (人の名前・フォルダ名・専門用語など) を 1 行に 1 つ書くと、Whisper が書き起こしやすくなります。\n# # で始まる行は無視されます。多すぎると逆に間違えやすくなるので、30 個くらいまでがおすすめです。\n# 例:\n# ほたかっち\n# 春日部つむぎ\n# PowerShell\n",
   "words.opened": "音声の単語帳を開きました: %s\n1 行に 1 語ずつ書いて保存すると、次に話しかけたときから効きます。",
-  "words.needWhisper": "単語帳は Whisper で書き起こすときに使われます。/install-whisper で入れてください。"
+  "words.needWhisper": "単語帳は Whisper で書き起こすときに使われます。/install-whisper で入れてください。",
+  "update.checkFailed": "新しい版を確かめられませんでした: %s",
+  "update.latest": "今の版 (%s) が最新です。",
+  "update.manual": "新しい版 %s が出ています。この入れ方では自動で更新できないので、ダウンロードのページを開きます: %s",
+  "update.ask": "%s から %s に更新しますか？ ルミは一度終了して、更新後に起動し直します。[y/N] ",
+  "update.downloading": "%s をダウンロード中",
+  "update.installing": "%s に入れ替えます。ルミは一度終了して、すぐに起動し直します。",
+  "update.failed": "更新できませんでした: %s",
+  "update.notWritable": "%s に書き込めないので更新できません。ダウンロードのページから入れ直してください"
 }

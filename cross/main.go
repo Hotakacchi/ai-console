@@ -68,6 +68,7 @@ func main() {
 		EnableFileDrop:   true, // ファイルを落として読ませる
 	})
 	lumi.win = win
+	cleanupOldExe()
 	win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
 		go lumi.attachFiles(e.Context().DroppedFiles())
 	})

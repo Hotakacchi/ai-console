@@ -255,7 +255,7 @@ func (l *Lumi) submit(text string) {
 	case "/history":
 		l.historyCommand(parts[1:])
 	case "/update":
-		openURL(releasesURL)
+		l.updateCommand()
 	case "/mute":
 		l.muted = !l.muted
 		l.updateTitle()

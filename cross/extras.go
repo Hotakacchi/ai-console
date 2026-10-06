@@ -3,44 +3,14 @@ package main
 // 小さな機能: 新しいバージョンのお知らせ、呼び出し用のショートカットキー、クリップボード、見た目の設定。
 
 import (
-	"encoding/json"
-	"net/http"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 )
 
-const releasesURL = "https://github.com/Hotakacchi/ai-console/releases/latest"
 
 // ---- 新しいバージョンのお知らせ ----
-
-// GitHub の最新リリースを調べ、今より新しければ知らせる (update_check が on のとき)
-func (l *Lumi) checkUpdate() {
-	if !l.s.On("update_check", "on") {
-		return
-	}
-	go func() {
-		req, _ := http.NewRequest("GET", "https://api.github.com/repos/Hotakacchi/ai-console/releases/latest", nil)
-		req.Header.Set("User-Agent", "Lumi/"+version)
-		req.Header.Set("Accept", "application/vnd.github+json")
-		res, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
-		if err != nil {
-			return
-		}
-		defer res.Body.Close()
-		var r struct {
-			Tag string `json:"tag_name"`
-		}
-		if json.NewDecoder(res.Body).Decode(&r) != nil || r.Tag == "" {
-			return
-		}
-		if newerVersion(strings.TrimPrefix(r.Tag, "v"), version) {
-			l.write(T("update.available", r.Tag)+"\n\n", "yellow")
-		}
-	}()
-}
 
 // a が b より新しいか ("1.2.0" と "1.10.0" も数として比べる。-beta などは同じ番号なら古いとみなす)
 func newerVersion(a, b string) bool {

@@ -405,6 +405,8 @@ function termMain() {
   });
   on("voiceStart", d => voice.start(d, msgs));
   on("voiceStop", () => voice.stop());
+  // Whisper に見せる単語帳 (呼びかけのたびに Go から最新のものが届く)
+  on("voiceVocab", v => { voice.vocab = v || ""; });
   // テスト用: マイクの代わりに音声ファイルを聞かせる
   on("voiceTest", async d => { await voice.start(d, msgs, false); await voice.feedFile(d.file); });
   on("speak", d => speak(d.id, d.text));

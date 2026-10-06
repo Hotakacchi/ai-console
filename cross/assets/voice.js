@@ -143,7 +143,7 @@ export class Voice {
     const id = this.callId = (this.callId || 0) + 1;
     return new Promise((resolve, reject) => {
       this.waiting.set(id, { resolve, reject });
-      this.worker.postMessage({ id, type, model: this.whisper, audio, lang: this.lang });
+      this.worker.postMessage({ id, type, model: this.whisper, audio, lang: this.lang, prompt: this.vocab || "" });
     });
   }
 

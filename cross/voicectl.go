@@ -125,6 +125,10 @@ func (l *Lumi) voiceState(state, message string) {
 
 // 呼びかけを聞き取った。ウィンドウが隠れていれば右下から顔を出す
 func (l *Lumi) voiceWoke() {
+	// 書き起こしの前に、最新の単語帳を渡しておく (ファイルを書き換えてもすぐ効くように)
+	if l.s.Get("stt", "vosk") == "whisper" {
+		l.emit("voiceVocab", l.voiceVocab())
+	}
 	if l.s.Get("voice_debug", "off") == "on" {
 		l.write(fmt.Sprintf("  [voice] woke (window visible: %v)\n", l.win.IsVisible()), "dim")
 	}

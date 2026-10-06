@@ -284,5 +284,9 @@
   "shell.off": "Shell mode is off.",
   "shell.failed": "Couldn't run the command: %s",
   "shell.tooMany": "(More than %d lines; the rest isn't shown)",
-  "help.shell": "Prefix a line with ! to run it as a command (e.g. !ipconfig). /shell for shell mode."
+  "help.shell": "Prefix a line with ! to run it as a command (e.g. !ipconfig). /shell for shell mode.",
+  "cmd.words": "Open your voice vocabulary (words.txt). Names and jargon get recognized better (with Whisper)",
+  "words.template": "# Voice vocabulary\n# Write words you often say (names, folder names, jargon) one per line, and Whisper will transcribe them better.\n# Lines starting with # are ignored. Too many words can hurt; about 30 is a good limit.\n# Examples:\n# Hotakacchi\n# PowerShell\n",
+  "words.opened": "Opened your voice vocabulary: %s\nWrite one word per line and save; it applies from the next time you speak.",
+  "words.needWhisper": "The vocabulary is used when transcribing with Whisper. Install it with /install-whisper."
 }

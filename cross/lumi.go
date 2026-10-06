@@ -303,6 +303,8 @@ func (l *Lumi) submit(text string) {
 		l.installVisionCmd()
 	case "/commands":
 		l.commandsFile()
+	case "/words":
+		l.wordsFile()
 	case "/shell":
 		l.toggleShell()
 	case "/attach":
@@ -347,7 +349,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/shell", ""},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", ""},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", ""}, {"/cls", ""}, {"/exit", ""},
 }

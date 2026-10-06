@@ -5,6 +5,7 @@ package main
 import (
 	"image"
 	"image/draw"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -51,9 +52,13 @@ func TestVVInstallAndSynthesize(t *testing.T) {
 
 // Whisper (base) を実際に入れる確認: go test -tags manual -run Whisper -timeout 60m
 func TestWhisperInstall(t *testing.T) {
+	model := "whisper-base"
+	if m := os.Getenv("WHISPER_MODEL"); m != "" {
+		model = m
+	}
 	base := dataDir()
 	last := -1
-	err := installWhisper(base, "whisper-base", func(step string, r float64) {
+	err := installWhisper(base, model, func(step string, r float64) {
 		if p := int(r * 100); p/10 != last/10 {
 			t.Logf("%3d%% %s", p, step)
 			last = p
@@ -62,7 +67,7 @@ func TestWhisperInstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !whisperInstalled(base, "whisper-base") {
+	if !whisperInstalled(base, model) {
 		t.Fatal("not installed")
 	}
 }

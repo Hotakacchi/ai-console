@@ -41,6 +41,7 @@ func settingsTemplate(provider string) string {
   "hotkey": "CmdOrCtrl+Alt+L",
   "update_check": "on",
   "weather_location": "",
+  "phone": "off",
   "keep_history": "on",
   "search_url": "",
   "voice_input": "on",

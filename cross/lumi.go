@@ -71,6 +71,9 @@ func (l *Lumi) emit(name string, data any) {
 	if l.win != nil {
 		l.win.EmitEvent(name, data)
 	}
+	if phone.running() {
+		phone.publish(name, data) // スマホでも見られるように
+	}
 }
 
 func (l *Lumi) write(text, color string) { l.emit("write", map[string]any{"text": text, "color": color}) }
@@ -148,6 +151,7 @@ func (l *Lumi) reload(announce bool) {
 	l.sendAppearance()
 	l.applyStartup()
 	l.applyHotkey()
+	l.applyPhone(false)
 	l.restoreHistory(false) // AI を作り直したので、前の会話をもう一度渡す
 	l.warmupLocal()
 }
@@ -181,6 +185,7 @@ func (l *Lumi) ready() {
 	}
 	l.restoreHistory(true)
 	l.applyHotkey()
+	l.applyPhone(false)
 	l.checkUpdate()
 	l.startOnce.Do(func() {
 		go l.runReminders()
@@ -314,6 +319,8 @@ func (l *Lumi) submit(text string) {
 		l.wordsFile()
 	case "/shell":
 		l.toggleShell()
+	case "/phone":
+		l.phoneCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/routines", "/routine":
 		l.routinesCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/attach":
@@ -358,7 +365,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", ""}, {"/routines", "cmd.routines.args"},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", ""}, {"/routines", "cmd.routines.args"}, {"/phone", "cmd.phone.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", ""}, {"/cls", ""}, {"/exit", ""},
 }
@@ -396,6 +403,8 @@ var settingKeys = []settingKey{
 	{"keep_history", "on,off"},
 	{"update_check", "on,off"},
 	{"weather_location", ""},
+	{"phone", "off,on"},
+	{"phone_port", "#int:1024:65535"},
 	{"face_color", ""},
 	{"face_size", "#int:20:100"},
 	{"font_size", "#int:10:28"},
@@ -1025,6 +1034,7 @@ func (l *Lumi) webTool(r toolRequest) string {
 
 func (l *Lumi) quit() {
 	voicevox.Stop()
+	phone.stop()
 	l.interrupt()
 	localServer.Stop()
 	l.app.Quit()

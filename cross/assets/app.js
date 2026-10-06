@@ -392,6 +392,25 @@ function termMain() {
   on("ask", q => { askPrompt = q; buffer = ""; thinking = false; voice.confirming(true); render(); keys.focus(); });
   on("i18n", m => { msgs = m; });
   on("prompt", p => { PROMPT = p || NORMAL_PROMPT; render(); });
+  // QR コードなどの画像を、ログの中に出す
+  on("image", src => {
+    const img = document.createElement("img");
+    img.src = src;
+    img.className = "logimg";
+    current.appendChild(img);
+    current = newLine();
+    placeInput();
+    log.scrollTop = log.scrollHeight;
+  });
+  // スマホで確認に答えたとき (答えは Go に届いているので、表示だけ整える)
+  on("askAnswered", a => {
+    if (askPrompt === null) return;
+    write(askPrompt, "yellow");
+    write(a + "  📱\n", "white");
+    askPrompt = null; buffer = "";
+    voice.confirming(false);
+    render();
+  });
   // --script で流し込まれた行を、打ち込んだのと同じように表示する
   on("echo", text => { write(PROMPT, "fg"); write(text + "\n", "white"); if (!text.startsWith("/")) lastWasVoice = false; });
   on("admin", on => { admin = on; recolor(); });

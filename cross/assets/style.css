@@ -65,3 +65,6 @@ body.peek { background: transparent; }
 
 /* ファイルを窓の上に持ってきたとき */
 #term.file-drop-target-active { outline: 2px dashed #61d6d6; outline-offset: -6px; }
+
+/* ログの中の画像 (スマホ用の QR コードなど) */
+.logimg { display: block; width: 192px; height: 192px; margin: 6px 0; image-rendering: pixelated; border: 8px solid #fff; }

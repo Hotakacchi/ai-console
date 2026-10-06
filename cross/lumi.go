@@ -21,7 +21,7 @@ import (
 )
 
 // ビルド時に -ldflags "-X main.version=..." で上書きされる
-var version = "1.2.0"
+var version = "1.3.0"
 
 type Lumi struct {
 	app   *application.App

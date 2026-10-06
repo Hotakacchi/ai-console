@@ -307,7 +307,8 @@ function termMain() {
       render();
       emit("voiceTimeout");
     },
-    confirm(yes) { if (askPrompt !== null) answerAsk(yes ? "y" : "n", yes ? "y" : "n", msgs["voice.mark"]); },
+    // answer: y / a / n
+    confirm(answer) { if (askPrompt !== null) answerAsk(answer, answer, msgs["voice.mark"]); },
     state(state, message) { emit("voiceState", { state, message: message || "" }); },
     debug(text) { emit("voiceDebug", text); },
     whisperError(message) { emit("voiceWhisperError", message); },

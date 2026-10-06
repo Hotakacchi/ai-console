@@ -118,6 +118,7 @@ func TList(key string) []string {
 // 画面に渡すための、今の言語の文言をまとめたもの
 func clientMessages() map[string]string {
 	keys := []string{"voice.wakeWord", "voice.wakeAliases", "voice.yes", "voice.no", "voice.listening",
+		"voice.letterY", "voice.letterA", "voice.letterN",
 		"voice.cmd.mute", "voice.cmd.cls", "voice.cmd.mic", "voice.cmd.exit", "voice.mark"}
 	m := map[string]string{"lang": currentLang()}
 	for _, k := range keys {

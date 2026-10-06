@@ -266,5 +266,8 @@
   "attach.imageBlock": "[Attached image: %s]",
   "prompt.pcExample": "Example: for \"%s\" → Let me check. <run>%s</run>",
   "prompt.pcAskDisk": "check the free disk space",
-  "prompt.pcAskFolder": "open my Downloads folder"
+  "prompt.pcAskFolder": "open my Downloads folder",
+  "voice.letterY": "y,why,wye",
+  "voice.letterA": "a,ay,eh",
+  "voice.letterN": "n,en,no"
 }

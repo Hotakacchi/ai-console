@@ -7,6 +7,7 @@
 
 const FOLLOW_UP_MS = 6000;
 const WAKE_MIN_CONF = 0.5;
+const LETTER_MIN_CONF = 0.3;
 const KEEP_SEC = 30;            // 書き起こし直すために覚えておく音の長さ
 const WHISPER_TIMEOUT_MS = 20000;
 
@@ -47,6 +48,9 @@ export class Voice {
     this.aliases = [...new Set(phrases.map(p => this.norm(p)))].sort((a, b) => b.length - a.length);
     this.yes = raw("voice.yes").map(s => this.norm(s));
     this.no = raw("voice.no").map(s => this.norm(s));
+    // y / a / n をアルファベットの読みで答える (「ワイ」など。発言全体がその読みのときだけ)
+    this.letters = { y: raw("voice.letterY"), a: raw("voice.letterA"), n: raw("voice.letterN") };
+    for (const k in this.letters) this.letters[k] = this.letters[k].map(s => this.norm(s));
     try {
       if (!window.Vosk) await loadScript("/voice/vosk.js");
       const loaded = await window.Vosk.createModel(model);
@@ -63,6 +67,15 @@ export class Voice {
       this.wake.setWords(true);
       this.wake.on("result", m => this.onWake(m.result));
       this.wake.on("error", m => this.h.debug && this.h.debug("(wake error) " + JSON.stringify(m)));
+      // 確認の答え用は、アルファベットの読み (「ワイ」「エー」「エヌ」など) だけを聞き分ける
+      // (短い音は書き起こしでは「あ」などになりやすいので、決まった言葉の中から選ばせる)
+      const letterWords = [...new Set(Object.values(this.letters).flat())];
+      if (letterWords.length) {
+        this.letter = new this.model.KaldiRecognizer(rate, JSON.stringify([...letterWords, "[unk]"]));
+        this.letter.setWords(true);
+        this.letter.on("result", m => this.onLetter(m.result));
+        this.letter.on("error", m => this.h.debug && this.h.debug("(letter error) " + JSON.stringify(m)));
+      }
       this.free.on("error", m => this.h.debug && this.h.debug("(free error) " + JSON.stringify(m)));
       if (withMic) await this.openMic(stale);
       if (stale()) return;   // 新しい start / stop がこの分を片付けている
@@ -81,6 +94,7 @@ export class Voice {
     if (this.paused || this.mode === "off") return;
     this.free.acceptWaveformFloat(data.slice(), rate);
     this.wake.acceptWaveformFloat(data.slice(), rate);
+    if (this.letter && this.mode === "confirm") this.letter.acceptWaveformFloat(data.slice(), rate);
     if (this.whisper) {
       // 認識に渡した音を時刻つきで覚えておく (Vosk の単語の時刻は、渡した音の通算の秒)
       this.chunks.push({ t0: this.fedSec, rate, data: data.slice() });
@@ -191,7 +205,7 @@ export class Voice {
     if (this.stream) this.stream.getTracks().forEach(t => t.stop());
     if (this.node) this.node.disconnect();
     if (this.ctx) this.ctx.close().catch(() => {});
-    for (const r of [this.free, this.wake]) if (r) try { r.remove(); } catch {}
+    for (const r of [this.free, this.wake, this.letter]) if (r) try { r.remove(); } catch {}
     if (this.worker) {
       this.worker.terminate();
       for (const w of this.waiting.values()) w.reject(new Error("stopped"));
@@ -199,7 +213,7 @@ export class Voice {
     this.worker = this.waiting = null;
     this.chunks = [];
     if (this.model) try { this.model.terminate(); } catch {}
-    this.stream = this.node = this.ctx = this.free = this.wake = this.model = null;
+    this.stream = this.node = this.ctx = this.free = this.wake = this.letter = this.model = null;
     this.wakeEnd = this.pending = null;
     if (was) this.h.state("stopped");
   }
@@ -301,6 +315,18 @@ export class Voice {
 
   text(words) { return this.join(words).replace(/^[\s、,。.!！?？]+/, ""); }
 
+  // 確認の答え用の認識の結果: 発言全体がアルファベットの読み 1 つのときだけ答えにする
+  onLetter(result) {
+    if (this.mode !== "confirm") return;
+    const words = result.result || [];
+    // 決まった言葉の中から選ぶので、確からしさは低めでも受け付ける (それ以外の言葉は [unk] になる)
+    if (words.length !== 1 || words[0].word === "[unk]" || words[0].conf < LETTER_MIN_CONF) return;
+    if (this.h.debug) this.h.debug("(letter) " + words[0].word);
+    const w = this.norm(words[0].word);
+    const letter = Object.keys(this.letters).find(k => this.letters[k].includes(w));
+    if (letter) this.h.confirm(letter);
+  }
+
   // 書き起こし用の認識の結果
   onFree(result) {
     const t = this.norm(result.text);
@@ -308,8 +334,11 @@ export class Voice {
     if (!t || this.mode === "off") return;
     if (this.h.debug) this.h.debug(t);
     if (this.mode === "confirm") {
-      if (this.yes.some(w => t.includes(w))) this.h.confirm(true);
-      else if (this.no.some(w => t.includes(w))) this.h.confirm(false);
+      const bare = t.replace(/[\s、,。.!！?？]/g, "");
+      const letter = Object.keys(this.letters).find(k => this.letters[k].includes(bare));
+      if (letter) this.h.confirm(letter);
+      else if (this.yes.some(w => t.includes(w))) this.h.confirm("y");
+      else if (this.no.some(w => t.includes(w))) this.h.confirm("n");
       return;
     }
     const fromPartial = this.partialWake;

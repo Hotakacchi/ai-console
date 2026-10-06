@@ -142,7 +142,7 @@
   "run.exitCode": "終了コード %d",
   "voice.wakeWord": "ルミ",
   "voice.wakeAliases": "ルミ,るみ,留美,ルミちゃん,ルミさん",
-  "voice.yes": "実行,お願い,はい,オッケー",
+  "voice.yes": "実行,お願い,はい,オッケー,イエス",
   "voice.no": "やめ,いいえ,キャンセル,ストップ",
   "voice.listening": "（聞いています…）",
   "voice.installed": "音声入力の準備ができました。",
@@ -266,5 +266,8 @@
   "attach.imageBlock": "[添付の画像: %s]",
   "prompt.pcExample": "例: 「%s」と頼まれたら → 調べますね。<run>%s</run>",
   "prompt.pcAskDisk": "ディスクの空き容量を調べて",
-  "prompt.pcAskFolder": "ダウンロードフォルダを開いて"
+  "prompt.pcAskFolder": "ダウンロードフォルダを開いて",
+  "voice.letterY": "ワイ,わい",
+  "voice.letterA": "エー,エイ",
+  "voice.letterN": "エヌ,えぬ,ノー,のー"
 }

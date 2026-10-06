@@ -38,3 +38,15 @@ func afterStart(cmd *exec.Cmd) {
 		windows.CloseHandle(p)
 	}
 }
+
+// "Windows 11" / "Windows 10" など (11 もバージョンは 10.0 のままなので、ビルド番号 22000 以上で見分ける)
+func windowsName() string {
+	v := windows.RtlGetVersion()
+	switch {
+	case v.MajorVersion == 10 && v.BuildNumber >= 22000:
+		return "Windows 11"
+	case v.MajorVersion == 10:
+		return "Windows 10"
+	}
+	return "Windows"
+}

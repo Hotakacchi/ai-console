@@ -196,7 +196,11 @@ func (s *Settings) SystemPrompt() string {
 		p = custom + "\n" + T("prompt.language")
 	}
 	if s.PcControl() {
+		// 小さなモデルでも迷わないよう、この OS で使える具体例を添える
+		disk, folder := pcExamples()
 		p += "\n\n" + T("prompt.pc", osName(), shellName())
+		p += "\n" + T("prompt.pcExample", T("prompt.pcAskDisk"), disk)
+		p += "\n" + T("prompt.pcExample", T("prompt.pcAskFolder"), folder)
 	}
 	if s.WebSearch() {
 		p += "\n\n" + T("prompt.web")
@@ -229,11 +233,22 @@ func (s *Settings) APIKey(defaultEnv string) string {
 func osName() string {
 	switch runtime.GOOS {
 	case "windows":
-		return "Windows"
+		return windowsName()
 	case "darwin":
 		return "Mac"
 	}
 	return "Linux"
+}
+
+// 「ディスクの空き容量」「ダウンロードフォルダを開く」の、この OS でのコマンド
+func pcExamples() (disk, folder string) {
+	switch runtime.GOOS {
+	case "windows":
+		return "Get-PSDrive C", `Start-Process "$env:USERPROFILE\Downloads"`
+	case "darwin":
+		return "df -h /", "open ~/Downloads"
+	}
+	return "df -h /", "xdg-open ~/Downloads"
 }
 
 func shellName() string {

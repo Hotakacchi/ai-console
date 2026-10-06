@@ -184,6 +184,7 @@ func (l *Lumi) updateCommand() {
 		last := -1
 		cancel := l.cancelChan()
 		err = download(a, file, func(n int64) {
+			l.setActivity("download", float64(n)/float64(max(1, a.Size)))
 			if pct := int(n * 100 / max(1, a.Size)); pct/20 != last/20 {
 				l.write(fmt.Sprintf("  [%3d%%] %s\n", pct, T("update.downloading", r.Tag)), "dim")
 				last = pct
@@ -196,6 +197,7 @@ func (l *Lumi) updateCommand() {
 				return false
 			}
 		}, nil)
+		l.setActivity("", 0)
 		if err != nil {
 			os.RemoveAll(dir)
 			if err == errCancelled {

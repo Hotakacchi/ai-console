@@ -343,6 +343,7 @@ func (l *Lumi) attachFiles(paths []string) {
 		l.mu.Lock()
 		l.pending = append(l.pending, a)
 		l.mu.Unlock()
+		l.fx("eat", 1.8) // もぐもぐ
 		switch {
 		case a.Image != nil:
 			l.write("  "+T("attach.addedImage", a.Name)+"\n", "cyan")

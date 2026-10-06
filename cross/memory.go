@@ -124,6 +124,7 @@ func (m *memoryStore) prompt() string {
 func (l *Lumi) memoryTag(r toolRequest) {
 	if r.Kind == "remember" {
 		if memories.add(r.Command) {
+			l.fx("bulb", 1.8) // ピカッ
 			l.write("  "+T("memory.added", r.Command)+"\n", "dim")
 		}
 		return

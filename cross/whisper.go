@@ -134,7 +134,9 @@ func (l *Lumi) installWhisperCmd() {
 	go func() {
 		defer l.setBusy(false)
 		lastPct := -1
+		defer l.setActivity("", 0)
 		err := installWhisper(dataDir(), model, func(step string, ratio float64) {
+			l.setActivity("download", ratio) // 口がプログレスバーになる
 			if pct := int(ratio * 100); pct/10 != lastPct/10 {
 				l.write(fmt.Sprintf("  [%3d%%] %s\n", pct, step), "dim")
 				lastPct = pct

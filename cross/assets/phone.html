@@ -101,6 +101,8 @@ function connect() {
       case "thinking": if (d) face.expression = "think"; else if (face.expression === "think") face.expression = "normal"; break;
       case "face": face.expression = d; break;
       case "running": face.setRunning(!!d.on, d.cmd || ""); break;
+      case "fx": face.effect(d.name, d.seconds); break;
+      case "activity": face.setActivity(d ? d.name : null, d ? d.progress || 0 : 0); break;
       case "shellMode": face.shell = !!d; face.lastState = ""; break;
       case "flash": face.flash(d.expr, d.seconds); break;
       case "ask":

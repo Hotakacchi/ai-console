@@ -182,7 +182,7 @@ func (l *Lumi) announce(text string) {
 		l.peek.pop(text)
 		popped = true
 	}
-	l.emit("flash", map[string]any{"expr": "happy", "seconds": 3})
+	l.fx("bell", 3) // ベルが揺れる
 	l.write("\n", "fg")
 	l.speak(text)
 	l.write("\n\n", "fg")

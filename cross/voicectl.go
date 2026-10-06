@@ -80,7 +80,9 @@ func (l *Lumi) installVoice() {
 	l.write(T("voice.installStart", float64(voiceDownloadSize(lang))/1e6)+"\n", "dim")
 	go func() {
 		lastPct := -1
+		defer l.setActivity("", 0)
 		err := installVoice(dataDir(), lang, func(step string, ratio float64) {
+			l.setActivity("download", ratio) // 口がプログレスバーになる
 			if pct := int(ratio * 100); pct/10 != lastPct/10 {
 				l.write(fmt.Sprintf("  [%3d%%] %s\n", pct, step), "dim")
 				lastPct = pct

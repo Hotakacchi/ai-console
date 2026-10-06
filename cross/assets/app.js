@@ -67,6 +67,7 @@ function termMain() {
   const face = new Face(palette(base, true));
   const recolor = () => { face.c = palette(admin ? adminColor(base) : base, true); face.lastState = ""; };
   animate(document.getElementById("face"), face);
+  face.effect("boot", 2.6);   // 起動の演出
 
   // ---- 出力 ----
   let current = newLine();
@@ -394,6 +395,13 @@ function termMain() {
   on("prompt", p => { PROMPT = p || NORMAL_PROMPT; render(); });
   // コマンドの実行中とシェルモードは、顔の見た目を変える
   on("running", d => face.setRunning(!!d.on, d.cmd || ""));
+  on("fx", d => face.effect(d.name, d.seconds));
+  on("activity", d => face.setActivity(d ? d.name : null, d ? d.progress || 0 : 0));
+  // 目がマウスを追いかける
+  term.addEventListener("mousemove", e => {
+    const r = document.getElementById("face").getBoundingClientRect();
+    face.lookAt((e.clientX - r.left - r.width / 2) / (r.width / 2), (e.clientY - r.top - r.height / 2) / (r.height / 2));
+  });
   on("shellMode", on => { face.shell = !!on; face.lastState = ""; });
   // QR コードなどの画像を、ログの中に出す
   on("image", src => {

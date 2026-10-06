@@ -11,11 +11,11 @@ func TestWeather(t *testing.T) {
 		setLanguage(lang)
 		for _, loc := range []string{"", "Tokyo"} {
 			l := &Lumi{s: &Settings{vals: map[string]any{"weather_location": loc}}}
-			w, err := l.weather()
+			w, kind, err := l.weather()
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Logf("%s %q: %s", lang, loc, w)
+			t.Logf("%s %q: %s (%s)", lang, loc, w, kind)
 		}
 	}
 }

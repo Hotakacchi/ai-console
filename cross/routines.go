@@ -137,9 +137,11 @@ func (l *Lumi) runRoutine(r routine) {
 		}
 		switch st.Kind {
 		case "weather":
-			w, err := l.weather()
+			w, kind, err := l.weather()
 			if err != nil {
 				w = T("routine.weatherFailed", err.Error())
+			} else if kind != "" {
+				l.fx(kind, 12) // 晴れならサングラス、雨なら傘
 			}
 			info = append(info, w)
 		case "reminders":
@@ -206,9 +208,10 @@ func todaysReminders() string {
 
 // ---- 天気 (wttr.in、API キー不要) ----
 
-func (l *Lumi) weather() (string, error) {
+// 天気の文と、顔の演出の種類 (sun / rain / snow / cloud)
+func (l *Lumi) weather() (string, string, error) {
 	if !l.s.WebSearch() {
-		return "", fmt.Errorf("%s", T("routine.webOff"))
+		return "", "", fmt.Errorf("%s", T("routine.webOff"))
 	}
 	loc := strings.TrimSpace(l.s.Get("weather_location", "")) // 空なら、つないでいる場所から自動で
 	lang := currentLang()
@@ -217,11 +220,11 @@ func (l *Lumi) weather() (string, error) {
 	req.Header.Set("User-Agent", "curl/8 (Lumi)")
 	res, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return "", fmt.Errorf("HTTP %d", res.StatusCode)
+		return "", "", fmt.Errorf("HTTP %d", res.StatusCode)
 	}
 	var w struct {
 		Current []map[string]any `json:"current_condition"`
@@ -237,7 +240,7 @@ func (l *Lumi) weather() (string, error) {
 		} `json:"weather"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&w); err != nil || len(w.Current) == 0 || len(w.Weather) == 0 {
-		return "", fmt.Errorf("%s", T("routine.weatherBad"))
+		return "", "", fmt.Errorf("%s", T("routine.weatherBad"))
 	}
 	c := w.Current[0]
 	desc := ""
@@ -258,7 +261,7 @@ func (l *Lumi) weather() (string, error) {
 		fmt.Sscan(h.Rain, &n)
 		rain = max(rain, n)
 	}
-	return T("routine.weather", loc, strings.TrimSpace(desc), str(c, "temp_C"), w.Weather[0].Max, w.Weather[0].Min, rain), nil
+	return T("routine.weather", loc, strings.TrimSpace(desc), str(c, "temp_C"), w.Weather[0].Max, w.Weather[0].Min, rain), weatherKind(str(c, "weatherCode")), nil
 }
 
 // ---- 時刻で動くルーティン ----
@@ -327,4 +330,19 @@ func (l *Lumi) routinesCommand(arg string) {
 	b.WriteString("\n  " + T("routine.howto", p))
 	openFile(p)
 	l.info(b.String())
+}
+
+// wttr.in の天気の番号を、顔の演出の種類にする
+func weatherKind(code string) string {
+	switch code {
+	case "113":
+		return "sun"
+	case "116", "119", "122", "143", "248", "260":
+		return "cloud"
+	case "179", "182", "185", "227", "230", "317", "320", "323", "326", "329", "332", "335", "338", "350", "362", "365", "368", "371", "374", "377", "392", "395":
+		return "snow"
+	case "":
+		return ""
+	}
+	return "rain" // それ以外は雨・雷・霧雨など
 }

@@ -78,7 +78,24 @@ func (l *Lumi) emit(name string, data any) {
 
 func (l *Lumi) write(text, color string) { l.emit("write", map[string]any{"text": text, "color": color}) }
 func (l *Lumi) info(text string)         { l.write(text+"\n\n", "dim") }
-func (l *Lumi) errorText(text string)    { l.write(text+"\n\n", "red") }
+func (l *Lumi) errorText(text string) {
+	l.write(text+"\n\n", "red")
+	l.fx("glitch", 1.2) // エラーのときは顔が乱れる
+}
+
+// 顔のしばらくだけの演出 (face.js の effect)
+func (l *Lumi) fx(name string, seconds float64) {
+	l.emit("fx", map[string]any{"name": name, "seconds": seconds})
+}
+
+// 顔の、終わるまで続く様子 (search / download、"" で終わり)
+func (l *Lumi) setActivity(name string, progress float64) {
+	if name == "" {
+		l.emit("activity", nil)
+		return
+	}
+	l.emit("activity", map[string]any{"name": name, "progress": progress})
+}
 func (l *Lumi) face(expr string)         { l.emit("face", expr) }
 
 func (l *Lumi) isBusy() bool {
@@ -539,7 +556,9 @@ func (l *Lumi) installLocal() {
 	go func() {
 		defer l.setBusy(false)
 		lastStep, lastPct := "", -1
+		defer l.setActivity("", 0)
 		err := installLocal(dataDir(), func(step string, ratio float64) {
+			l.setActivity("download", ratio) // 口がプログレスバーになる
 			pct := int(ratio * 100)
 			if step == lastStep && pct/5 == lastPct/5 {
 				return
@@ -729,7 +748,13 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 			if ok && !strings.Contains(result, "Exception") {
 				mood = "happy"
 			}
-			l.emit("flash", map[string]any{"expr": mood, "seconds": 2})
+			if ok && mood == "sad" {
+				l.emit("flash", map[string]any{"expr": mood, "seconds": 2})
+			} else if !ok {
+				l.fx("glitch", 1.2) // 失敗したコマンド
+			} else {
+				l.emit("flash", map[string]any{"expr": mood, "seconds": 2})
+			}
 			report.WriteString(l.fitOutput(result) + "\n")
 		}
 		if !l.cancelled() {
@@ -981,6 +1006,8 @@ func (l *Lumi) webTool(r toolRequest) string {
 	if mode == "off" {
 		return head + T("web.off") + "\n"
 	}
+	l.setActivity("search", 0) // 虫眼鏡が動く
+	defer l.setActivity("", 0)
 	if search {
 		l.write(T("web.searching", r.Command)+"\n", "cyan")
 	} else {
@@ -1035,6 +1062,11 @@ func (l *Lumi) webTool(r toolRequest) string {
 // ---- 終了 ----
 
 func (l *Lumi) quit() {
+	// ブラウン管のように消える演出を見せてから終わる
+	if l.win != nil && l.win.IsVisible() {
+		l.fx("off", 0.9)
+		time.Sleep(750 * time.Millisecond)
+	}
 	voicevox.Stop()
 	phone.stop()
 	l.interrupt()

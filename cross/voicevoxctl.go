@@ -18,7 +18,9 @@ func (l *Lumi) installVoicevoxCmd() {
 	go func() {
 		defer l.setBusy(false)
 		lastPct := -1
+		defer l.setActivity("", 0)
 		err := installVoicevox(dataDir(), func(step string, ratio float64) {
+			l.setActivity("download", ratio) // 口がプログレスバーになる
 			if pct := int(ratio * 100); pct/5 != lastPct/5 {
 				l.write(fmt.Sprintf("  [%3d%%] %s\n", pct, step), "dim")
 				lastPct = pct

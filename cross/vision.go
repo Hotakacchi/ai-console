@@ -76,7 +76,9 @@ func (l *Lumi) installVisionCmd() {
 	go func() {
 		defer l.setBusy(false)
 		lastPct := -1
+		defer l.setActivity("", 0)
 		err := download(visionAsset, filepath.Join(modelsDir(dir), visionFile), func(n int64) {
+			l.setActivity("download", float64(n)/float64(visionAsset.Size))
 			if pct := int(float64(n) / float64(visionAsset.Size) * 100); pct/10 != lastPct/10 {
 				l.write(fmt.Sprintf("  [%3d%%] %s\n", pct, T("vision.downloading")), "dim")
 				lastPct = pct
@@ -120,6 +122,7 @@ func (l *Lumi) screenTool() ([]byte, string) {
 		}
 	}
 	img, err := l.captureScreen()
+	l.fx("shutter", 0.5) // カシャッ
 	if err != nil {
 		l.errorText(T("screen.failed", err.Error()))
 		return nil, T("screen.failed", err.Error())

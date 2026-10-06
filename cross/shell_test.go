@@ -10,6 +10,13 @@ import (
 	"time"
 )
 
+// 同じフォルダか (C:\Users\RUNNER~1 のような短い名前でも)
+func sameDir(a, b string) bool {
+	sa, err1 := os.Stat(a)
+	sb, err2 := os.Stat(b)
+	return err1 == nil && err2 == nil && os.SameFile(sa, sb)
+}
+
 func runLines(t *testing.T, command, dir string) ([]string, string) {
 	t.Helper()
 	var lines []string
@@ -24,23 +31,24 @@ func TestRunShell(t *testing.T) {
 	dir := t.TempDir()
 	os.Mkdir(filepath.Join(dir, "sub"), 0o755)
 
-	// 日本語の出力 (PowerShell の文字と、古いコマンドの Shift_JIS の出力)
-	cmd := "echo こんにちは"
+	// 日本語の出力と、ふつうのコマンド (cmd.exe) の出力
+	// (古いコマンドの日本語は OS の言語しだいなので、ここでは英数字で確かめる)
+	cmd := "echo こんにちは; echo bye"
 	if runtime.GOOS == "windows" {
-		cmd = "Write-Output 'こんにちは'; cmd /c echo さようなら"
+		cmd = "Write-Output 'こんにちは'; cmd /c echo bye"
 	}
 	lines, newDir := runLines(t, cmd, dir)
 	got := strings.Join(lines, "|")
-	if !strings.Contains(got, "こんにちは") || (runtime.GOOS == "windows" && !strings.Contains(got, "さようなら")) {
+	if !strings.Contains(got, "こんにちは") || !strings.Contains(got, "bye") {
 		t.Errorf("output %q", got)
 	}
-	if !strings.EqualFold(filepath.Clean(newDir), filepath.Clean(dir)) {
+	if !sameDir(newDir, dir) {
 		t.Errorf("dir %q, want %q", newDir, dir)
 	}
 
 	// cd した場所が返る
 	_, newDir = runLines(t, "cd sub", dir)
-	if !strings.EqualFold(newDir, filepath.Join(dir, "sub")) {
+	if !sameDir(newDir, filepath.Join(dir, "sub")) {
 		t.Errorf("after cd: %q", newDir)
 	}
 

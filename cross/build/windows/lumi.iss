@@ -1,5 +1,7 @@
 ; ルミの Windows インストーラー (Inno Setup 6)
-; 管理者権限なしで %LOCALAPPDATA%\Programs\Lumi に入れる。新しい版で実行すれば上書き更新になる。
+; 最初に「自分だけ (管理者権限なし、%LOCALAPPDATA%\Programs\Lumi)」か
+; 「すべてのユーザー (管理者権限が必要、Program Files\Lumi)」かを選ぶ。新しい版で実行すれば上書き更新になる。
+; 設定とダウンロードしたものは、どちらでもユーザーごとの %LOCALAPPDATA%\Lumi に置かれる。
 ; ビルド: iscc /DAppVersion=1.0.0 /DSourceExe=..\..\lumi.exe lumi.iss
 
 #ifndef AppVersion
@@ -16,11 +18,14 @@ AppVerName=Lumi {#AppVersion}
 AppVersion={#AppVersion}
 AppPublisher=Hotakacchi
 AppPublisherURL=https://github.com/Hotakacchi/ai-console
-DefaultDirName={localappdata}\Programs\Lumi
+; {autopf} は、自分だけなら %LOCALAPPDATA%\Programs、すべてのユーザーなら Program Files になる
+DefaultDirName={autopf}\Lumi
 DefaultGroupName=Lumi
 DisableProgramGroupPage=yes
 DisableDirPage=yes
 PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog commandline
+UsedUserAreasWarning=no
 OutputBaseFilename=LumiSetup
 OutputDir=..\..\dist
 SetupIconFile=..\..\assets\icon.ico
@@ -61,8 +66,8 @@ Type: files; Name: "{app}\uninstall.exe"
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Uninstall\Lumi"; ValueType: none; Flags: deletekey
 
 [Icons]
-Name: "{userprograms}\Lumi"; Filename: "{app}\lumi.exe"
-Name: "{userdesktop}\Lumi"; Filename: "{app}\lumi.exe"; Tasks: desktopicon
+Name: "{autoprograms}\Lumi"; Filename: "{app}\lumi.exe"
+Name: "{autodesktop}\Lumi"; Filename: "{app}\lumi.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\lumi.exe"; Parameters: "--install-local"; Description: "{cm:Launch}"; Flags: postinstall nowait skipifsilent; Tasks: localai
@@ -78,6 +83,7 @@ begin
   if CurUninstallStep = usPostUninstall then
     if MsgBox(CustomMessage('DeleteData'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
     begin
+      // (すべてのユーザーに入れた場合、消えるのはアンインストールした人の分だけ)
       DelTree(ExpandConstant('{localappdata}\Lumi'), True, True, True);
       DelTree(ExpandConstant('{app}'), True, True, True);
     end;

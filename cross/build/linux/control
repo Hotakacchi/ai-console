@@ -1,0 +1,12 @@
+Package: lumi
+Version: @VERSION@
+Section: utils
+Priority: optional
+Architecture: @ARCH@
+Maintainer: Hotakacchi <https://github.com/Hotakacchi/ai-console>
+Depends: libgtk-4-1, libwebkitgtk-6.0-4, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good
+Recommends: gstreamer1.0-pipewire | gstreamer1.0-pulseaudio, speech-dispatcher
+Homepage: https://github.com/Hotakacchi/ai-console
+Description: Console-style assistant with a face
+ Lumi is a terminal-like assistant with an animated face that talks back.
+ It can run a local AI, search the web and, with your permission, operate the PC.

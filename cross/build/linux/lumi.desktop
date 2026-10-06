@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Lumi
+Name[ja]=ルミ
+Comment=A console-style assistant with a face
+Comment[ja]=顔のあるコンソール風アシスタント
+Exec=lumi
+Icon=lumi
+Terminal=false
+Categories=Utility;
+StartupWMClass=lumi

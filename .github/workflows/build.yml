@@ -1,0 +1,166 @@
+# ルミ (cross/ の Go 版) を Windows / macOS / Linux 向けにビルドする。
+# v で始まるタグを push したときは、できたものを GitHub のリリースに載せる。
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths: ["cross/**", ".github/workflows/build.yml"]
+    tags: ["v*"]
+  pull_request:
+    paths: ["cross/**", ".github/workflows/build.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: cross
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        # タグがあればタグから、なければソースの version から
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$(sed -n 's/^var version = "\(.*\)"/\1/p' lumi.go)" >> "$GITHUB_OUTPUT"
+          fi
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cross/go.mod
+          cache-dependency-path: cross/go.sum
+      - name: アイコンとバージョン情報を exe に埋め込む
+        shell: bash
+        run: |
+          go run github.com/tc-hib/go-winres@v0.3.3 simply --arch amd64 --icon assets/icon.ico --manifest gui \
+            --product-name Lumi --file-description Lumi --original-filename lumi.exe \
+            --product-version "$VERSION" --file-version "$VERSION" --copyright "Hotakacchi (MIT License)"
+      - name: ビルド
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+        run: go build -tags production -ldflags "-s -w -H windowsgui -X main.version=$VERSION" -o lumi.exe .
+      - name: インストーラーを作る
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Qp "/DAppVersion=$env:VERSION" "/DSourceExe=..\..\lumi.exe" build\windows\lumi.iss
+          Copy-Item lumi.exe dist\lumi-windows-amd64.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            cross/dist/LumiSetup.exe
+            cross/dist/lumi-windows-amd64.exe
+
+  macos:
+    needs: version
+    runs-on: macos-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cross/go.mod
+          cache-dependency-path: cross/go.sum
+      - name: ビルド (Apple Silicon と Intel をまとめる)
+        run: |
+          flags="-s -w -X main.version=$VERSION"
+          CGO_ENABLED=1 GOARCH=arm64 CC="clang -arch arm64" go build -tags production -ldflags "$flags" -o lumi-arm64 .
+          CGO_ENABLED=1 GOARCH=amd64 CC="clang -arch x86_64" go build -tags production -ldflags "$flags" -o lumi-amd64 .
+          lipo -create -output lumi lumi-arm64 lumi-amd64
+      - name: Lumi.app と dmg を作る
+        run: |
+          mkdir -p dist icon.iconset Lumi.app/Contents/MacOS Lumi.app/Contents/Resources
+          for s in 16 32 128 256 512; do
+            sips -z $s $s assets/icon.png --out icon.iconset/icon_${s}x${s}.png >/dev/null
+            sips -z $((s*2)) $((s*2)) assets/icon.png --out icon.iconset/icon_${s}x${s}@2x.png >/dev/null
+          done
+          iconutil -c icns icon.iconset -o Lumi.app/Contents/Resources/icon.icns
+          sed "s/@VERSION@/$VERSION/g" build/darwin/Info.plist > Lumi.app/Contents/Info.plist
+          cp lumi Lumi.app/Contents/MacOS/lumi
+          codesign --force --deep --sign - Lumi.app   # 署名なし (アドホック署名)
+          mkdir dmg && cp -R Lumi.app dmg/ && ln -s /Applications dmg/Applications
+          hdiutil create -volname Lumi -srcfolder dmg -ov -format UDZO dist/Lumi.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: cross/dist/Lumi.dmg
+
+  linux:
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cross/go.mod
+          cache-dependency-path: cross/go.sum
+      - name: 必要なライブラリ
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+      - name: ビルド
+        env:
+          CGO_ENABLED: "1"
+        run: go build -tags production -ldflags "-s -w -X main.version=$VERSION" -o lumi .
+      - name: .deb と .tar.gz を作る
+        run: |
+          mkdir -p dist
+          root=pkg
+          install -Dm755 lumi $root/usr/bin/lumi
+          install -Dm644 build/linux/lumi.desktop $root/usr/share/applications/lumi.desktop
+          install -Dm644 assets/icon.png $root/usr/share/icons/hicolor/256x256/apps/lumi.png
+          mkdir -p $root/DEBIAN
+          sed -e "s/@VERSION@/$VERSION/" -e "s/@ARCH@/${{ matrix.arch }}/" build/linux/control > $root/DEBIAN/control
+          dpkg-deb --build --root-owner-group $root dist/lumi_${VERSION}_${{ matrix.arch }}.deb
+          mkdir lumi-linux && cp lumi build/linux/lumi.desktop lumi-linux/ && cp assets/icon.png lumi-linux/lumi.png
+          tar czf dist/lumi-linux-${{ matrix.arch }}.tar.gz lumi-linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: cross/dist/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [version, windows, macos, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: リリースに載せる
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --title "Lumi $GITHUB_REF_NAME" --generate-notes

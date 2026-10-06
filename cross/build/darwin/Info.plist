@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>Lumi</string>
+  <key>CFBundleDisplayName</key><string>Lumi</string>
+  <key>CFBundleIdentifier</key><string>io.github.hotakacchi.lumi</string>
+  <key>CFBundleExecutable</key><string>lumi</string>
+  <key>CFBundleIconFile</key><string>icon</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>@VERSION@</string>
+  <key>CFBundleVersion</key><string>@VERSION@</string>
+  <key>LSMinimumSystemVersion</key><string>11.0</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>CFBundleDevelopmentRegion</key><string>ja</string>
+  <key>CFBundleLocalizations</key><array><string>ja</string><string>en</string></array>
+  <!-- 「ルミ」と呼びかけて話しかけるためにマイクを使う (音声はこの Mac の中だけで処理する) -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>「ルミ」と呼びかけて声で話しかけるためにマイクを使います。音声はこの Mac の中だけで処理されます。 / Lumi uses the microphone so you can talk to it by voice. Audio is processed only on this Mac.</string>
+</dict>
+</plist>

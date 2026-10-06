@@ -19,7 +19,8 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-const version = "1.0.0"
+// ビルド時に -ldflags "-X main.version=..." で上書きされる
+var version = "1.0.0"
 
 type Lumi struct {
 	app   *application.App

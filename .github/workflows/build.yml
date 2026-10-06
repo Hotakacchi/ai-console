@@ -161,6 +161,9 @@ jobs:
       run:
         working-directory: .
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: release-notes
       - uses: actions/download-artifact@v4
         with:
           path: out
@@ -168,4 +171,10 @@ jobs:
       - name: リリースに載せる
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --title "Lumi $GITHUB_REF_NAME" --generate-notes
+        # release-notes/<タグ>.md があればそれを説明にする (なければ自動の変更一覧)
+        run: |
+          notes=(--generate-notes)
+          if [ -f "release-notes/$GITHUB_REF_NAME.md" ]; then
+            notes=(--notes-file "release-notes/$GITHUB_REF_NAME.md")
+          fi
+          gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --title "Lumi $GITHUB_REF_NAME" "${notes[@]}"

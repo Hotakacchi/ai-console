@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/net/html/charset"
@@ -163,10 +164,36 @@ func isPrivateHost(host string) bool {
 	return false
 }
 
+// checkHosts なら、実際につなぐ IP アドレスでも PC 内・家庭内でないか確かめる
+// (名前解決の結果を途中で変えて、確認をすり抜けられないように)
+func publicOnlyTransport(checkHosts bool) http.RoundTripper {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	if !checkHosts {
+		return t
+	}
+	dialer := &net.Dialer{
+		Timeout: 10 * time.Second,
+		Control: func(network, address string, _ syscall.RawConn) error {
+			host, _, err := net.SplitHostPort(address)
+			if err != nil {
+				return err
+			}
+			if ip := net.ParseIP(host); ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+				return errors.New(T("web.privateRedirect"))
+			}
+			return nil
+		},
+	}
+	t.DialContext = dialer.DialContext
+	t.Proxy = nil // プロキシ経由だと、つなぐ先がプロキシになって確かめられない
+	return t
+}
+
 // GET (form が nil) か POST。checkHosts なら転送先が PC 内・家庭内でないか 1 回ずつ確かめる
 func fetchRaw(target string, form url.Values, checkHosts bool) (string, error) {
 	client := &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout:   15 * time.Second,
+		Transport: publicOnlyTransport(checkHosts),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
 				return errors.New(T("web.tooManyRedirects"))

@@ -31,6 +31,9 @@ export class Voice {
   // msgs: 画面に渡された今の言語の文言 (voice.wakeAliases など)
   async start({ lang, model, wake }, msgs, withMic = true) {
     this.stop();
+    // 読み込み中に別の start / stop が来たら、この start は途中でやめる
+    const gen = this.gen = (this.gen || 0) + 1;
+    const stale = () => gen !== this.gen;
     this.lang = lang;
     const raw = key => (msgs[key] || "").split(",").map(s => s.trim()).filter(Boolean);
     const phrases = [...new Set([wake, ...raw("voice.wakeAliases")].filter(Boolean))];
@@ -39,7 +42,9 @@ export class Voice {
     this.no = raw("voice.no").map(s => this.norm(s));
     try {
       if (!window.Vosk) await loadScript("/voice/vosk.js");
-      this.model = await window.Vosk.createModel(model);
+      const loaded = await window.Vosk.createModel(model);
+      if (stale()) { loaded.terminate(); return; }
+      this.model = loaded;
       this.ctx = new AudioContext();
       const rate = this.ctx.sampleRate;
       this.free = new this.model.KaldiRecognizer(rate);
@@ -52,11 +57,13 @@ export class Voice {
       this.wake.on("result", m => this.onWake(m.result));
       this.wake.on("error", m => this.h.debug && this.h.debug("(wake error) " + JSON.stringify(m)));
       this.free.on("error", m => this.h.debug && this.h.debug("(free error) " + JSON.stringify(m)));
-      if (withMic) await this.openMic();
+      if (withMic) await this.openMic(stale);
+      if (stale()) return;   // 新しい start / stop がこの分を片付けている
       this.mode = "wake";
       this.timer = setInterval(() => this.tick(), 200);
       this.h.state("ready");
     } catch (e) {
+      if (stale()) return;
       this.stop();
       this.h.state("error", e && e.message ? e.message : String(e));
     }
@@ -69,10 +76,12 @@ export class Voice {
     this.wake.acceptWaveformFloat(data.slice(), rate);
   }
 
-  async openMic() {
-    this.stream = await navigator.mediaDevices.getUserMedia({
+  async openMic(stale) {
+    const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
     });
+    if (stale()) { stream.getTracks().forEach(t => t.stop()); return; }
+    this.stream = stream;
     const src = this.ctx.createMediaStreamSource(this.stream);
     this.node = this.ctx.createScriptProcessor(4096, 1, 1);
     this.node.onaudioprocess = e => this.feed(e.inputBuffer.getChannelData(0), e.inputBuffer.sampleRate);
@@ -81,6 +90,7 @@ export class Voice {
   }
 
   stop() {
+    this.gen = (this.gen || 0) + 1;   // 読み込み中の start があれば無効にする
     const was = this.mode !== "off";
     this.mode = "off";
     clearInterval(this.timer);

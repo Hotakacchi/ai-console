@@ -73,9 +73,6 @@ Name: "{autodesktop}\Lumi"; Filename: "{app}\lumi.exe"; Tasks: desktopicon
 Filename: "{app}\lumi.exe"; Parameters: "--install-local"; Description: "{cm:Launch}"; Flags: postinstall nowait skipifsilent; Tasks: localai
 Filename: "{app}\lumi.exe"; Description: "{cm:Launch}"; Flags: postinstall nowait skipifsilent; Tasks: not localai
 
-[UninstallRun]
-Filename: "{cmd}"; Parameters: "/c taskkill /f /im llama-server.exe"; Flags: runhidden; RunOnceId: "StopLocalAI"
-
 [Code]
 // アンインストールのとき、設定とダウンロードしたものも消すか聞く
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

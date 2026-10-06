@@ -64,6 +64,12 @@ func (l *Lumi) info(text string)         { l.write(text+"\n\n", "dim") }
 func (l *Lumi) errorText(text string)    { l.write(text+"\n\n", "red") }
 func (l *Lumi) face(expr string)         { l.emit("face", expr) }
 
+func (l *Lumi) isBusy() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.busy
+}
+
 func (l *Lumi) setBusy(b bool) {
 	l.mu.Lock()
 	l.busy = b

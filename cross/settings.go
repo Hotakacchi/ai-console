@@ -154,6 +154,10 @@ func (s *Settings) On(key, fallback string) bool {
 
 // 1 項目を書き換えて保存する (項目の並びはそのまま)
 func (s *Settings) Set(key string, value any) error {
+	// 読めなかった (壊れた) ファイルを、読めた分だけで上書きしてしまわないようにする
+	if s.Err != nil {
+		return s.Err
+	}
 	if _, ok := s.vals[key]; !ok {
 		s.keys = append(s.keys, key)
 	}

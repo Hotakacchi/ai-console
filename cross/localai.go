@@ -318,35 +318,106 @@ func writeFile(path string, r io.Reader, mode fs.FileMode) error {
 
 // ---------------- llama-server を 1 つだけ動かす ----------------
 
-type llamaServer struct {
-	mu       sync.Mutex
+// 動いている llama-server 1 つ分
+type serverProc struct {
 	cmd      *exec.Cmd
 	args     string
 	endpoint string
 	apiKey   string
+	ready    chan struct{} // 使えるようになった (か、失敗した) ら閉じる
+	exited   chan struct{} // プロセスが終わったら閉じる
+	err      error
+}
+
+func (p *serverProc) wait() error { <-p.ready; return p.err }
+
+func (p *serverProc) alive() bool {
+	select {
+	case <-p.exited:
+		return false
+	default:
+		return true
+	}
+}
+
+// モデルの読み込みが終わると /health が 200 を返すので、それまで待つ
+func (p *serverProc) watch() {
+	defer close(p.ready)
+	deadline := time.Now().Add(5 * time.Minute)
+	client := &http.Client{Timeout: 2 * time.Second}
+	for {
+		select {
+		case <-p.exited:
+			p.err = errors.New(T("local.startFailed"))
+			return
+		default:
+		}
+		if res, err := client.Get(p.endpoint + "/health"); err == nil {
+			res.Body.Close()
+			if res.StatusCode == 200 {
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			p.cmd.Process.Kill()
+			p.err = errors.New(T("local.timeout"))
+			return
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+// 待っている間はロックを持たないので、読み込み中でも Stop (終了) がすぐ効く
+type llamaServer struct {
+	mu sync.Mutex
+	p  *serverProc
 }
 
 var localServer = &llamaServer{}
 
-func (s *llamaServer) Endpoint() string { s.mu.Lock(); defer s.mu.Unlock(); return s.endpoint }
-func (s *llamaServer) APIKey() string   { s.mu.Lock(); defer s.mu.Unlock(); return s.apiKey }
+func (s *llamaServer) Endpoint() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.p == nil {
+		return ""
+	}
+	return s.p.endpoint
+}
+
+func (s *llamaServer) APIKey() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.p == nil {
+		return ""
+	}
+	return s.p.apiKey
+}
 
 func (s *llamaServer) Start(base, modelPath string, gpu bool, context int) error {
+	p, err := s.spawn(base, modelPath, gpu, context)
+	if err != nil {
+		return err
+	}
+	return p.wait()
+}
+
+// 同じ設定で動いていればそれを、なければ新しく起動したものを返す (起動を待たない)
+func (s *llamaServer) spawn(base, modelPath string, gpu bool, context int) (*serverProc, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	exe := serverExe(base)
 	if _, err := os.Stat(modelPath); exe == "" || err != nil {
-		return errors.New(T("local.notInstalled"))
+		return nil, errors.New(T("local.notInstalled"))
 	}
 	key := fmt.Sprintf("%s|%v|%d", modelPath, gpu, context)
-	if s.cmd != nil && s.cmd.ProcessState == nil && s.args == key {
-		return nil
+	if s.p != nil && s.p.args == key && s.p.alive() {
+		return s.p, nil
 	}
 	s.stopLocked()
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	port := l.Addr().(*net.TCPAddr).Port
 	l.Close()
@@ -374,37 +445,27 @@ func (s *llamaServer) Start(base, modelPath string, gpu bool, context int) error
 	hideWindow(cmd)
 	killWithParent(cmd)
 	if err := cmd.Start(); err != nil {
-		return err
+		if logFile != nil {
+			logFile.Close()
+		}
+		return nil, err
 	}
 	afterStart(cmd)
-	s.cmd, s.args = cmd, key
-	s.endpoint = fmt.Sprintf("http://127.0.0.1:%d", port)
-	s.apiKey = apiKey
-	exited := make(chan struct{})
-	go func() { cmd.Wait(); logFile.Close(); close(exited) }()
-
-	// モデルの読み込みが終わると /health が 200 を返す
-	deadline := time.Now().Add(5 * time.Minute)
-	for {
-		select {
-		case <-exited:
-			s.cmd = nil
-			return errors.New(T("local.startFailed"))
-		default:
-		}
-		res, err := (&http.Client{Timeout: 2 * time.Second}).Get(s.endpoint + "/health")
-		if err == nil {
-			res.Body.Close()
-			if res.StatusCode == 200 {
-				return nil
-			}
-		}
-		if time.Now().After(deadline) {
-			s.stopLocked()
-			return errors.New(T("local.timeout"))
-		}
-		time.Sleep(500 * time.Millisecond)
+	p := &serverProc{
+		cmd: cmd, args: key, apiKey: apiKey,
+		endpoint: fmt.Sprintf("http://127.0.0.1:%d", port),
+		ready:    make(chan struct{}), exited: make(chan struct{}),
 	}
+	go func() {
+		cmd.Wait()
+		if logFile != nil {
+			logFile.Close()
+		}
+		close(p.exited)
+	}()
+	go p.watch()
+	s.p = p
+	return p, nil
 }
 
 func (s *llamaServer) Stop() {
@@ -414,9 +475,8 @@ func (s *llamaServer) Stop() {
 }
 
 func (s *llamaServer) stopLocked() {
-	if s.cmd != nil && s.cmd.Process != nil {
-		s.cmd.Process.Kill()
+	if s.p != nil && s.p.cmd.Process != nil {
+		s.p.cmd.Process.Kill()
 	}
-	s.cmd = nil
-	s.args = ""
+	s.p = nil
 }

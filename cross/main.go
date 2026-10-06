@@ -89,7 +89,12 @@ func main() {
 		tray.SetTooltip(T("app.title"))
 		menu := application.NewMenu()
 		menu.Add(T("tray.show")).OnClick(func(*application.Context) { lumi.show() })
-		menu.Add(T("tray.mic")).OnClick(func(*application.Context) { lumi.submit("/mic") })
+		menu.Add(T("tray.mic")).OnClick(func(*application.Context) {
+			// 返事やダウンロードの最中は、画面からの入力と同じく受け付けない
+			if !lumi.isBusy() {
+				lumi.submit("/mic")
+			}
+		})
 		menu.Add(T("tray.peekDemo")).OnClick(func(*application.Context) { lumi.demoPeek() })
 		menu.AddSeparator()
 		menu.Add(T("tray.quit")).OnClick(func(*application.Context) { lumi.quit() })

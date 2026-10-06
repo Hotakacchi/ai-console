@@ -51,6 +51,11 @@ jobs:
           go run github.com/tc-hib/go-winres@v0.3.3 simply --arch amd64 --icon assets/icon.ico --manifest gui \
             --product-name Lumi --file-description Lumi --original-filename lumi.exe \
             --product-version "$VERSION" --file-version "$VERSION" --copyright "Hotakacchi (MIT License)"
+      - name: テスト
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+        run: go vet ./... && go test ./...
       - name: ビルド
         shell: bash
         env:

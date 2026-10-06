@@ -199,7 +199,11 @@ func (p *anthropicProvider) Reply(text string, onText func(string)) {
 		err := postStream(ctx, p.endpoint, headers, body, func(ev map[string]any) error {
 			switch str(ev, "type") {
 			case "content_block_start":
-				blocks = append(blocks, obj(ev, "content_block"))
+				b := obj(ev, "content_block")
+				if b == nil {
+					b = map[string]any{} // 想定外の形でも後の書き込みで落ちないように
+				}
+				blocks = append(blocks, b)
 			case "content_block_delta":
 				if len(blocks) == 0 {
 					return nil
@@ -480,7 +484,7 @@ func (offlineProvider) Reply(text string, onText func(string)) {
 		for _, w := range TList(key) {
 			w = strings.ToLower(w)
 			if isASCII(w) {
-				if regexp.MustCompile(`\b` + regexp.QuoteMeta(w) + `\b`).MatchString(lower) {
+				if containsWord(lower, w) {
 					return true
 				}
 			} else if strings.Contains(lower, w) {
@@ -508,6 +512,25 @@ func (offlineProvider) Reply(text string, onText func(string)) {
 		onText(T("offline.thanks"))
 	default:
 		onText(T("offline.default"))
+	}
+}
+
+// s の中に w が、前後が英数字でない形で入っているか ("hi" は "this" に一致しない)
+func containsWord(s, w string) bool {
+	isWordByte := func(b byte) bool {
+		return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9' || b == '_'
+	}
+	for start := 0; ; {
+		i := strings.Index(s[start:], w)
+		if i < 0 {
+			return false
+		}
+		i += start
+		end := i + len(w)
+		if (i == 0 || !isWordByte(s[i-1])) && (end == len(s) || !isWordByte(s[end])) {
+			return true
+		}
+		start = i + 1
 	}
 }
 

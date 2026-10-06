@@ -206,5 +206,18 @@
   "set.face_color": "顔の色 (cyan / green / pink / amber / purple / white か #rrggbb)",
   "set.face_size": "顔の大きさ (20〜100 %)",
   "set.font_size": "文字の大きさ (10〜28)",
-  "set.font": "フォント (空なら既定)"
+  "set.font": "フォント (空なら既定)",
+  "cmd.install-voicevox": "より自然な声 (VOICEVOX、約330MB) を入れる",
+  "set.tts": "読み上げ (system は OS の声、voicevox はより自然な声)",
+  "set.voicevox_voice": "VOICEVOX の声の番号 (/voices で一覧、-1 で既定)",
+  "voicevox.noBuild": "この環境用の VOICEVOX はありません",
+  "voicevox.notInstalled": "VOICEVOX が入っていません。/install-voicevox で入れられます",
+  "voicevox.startFailed": "VOICEVOX の起動に失敗しました。詳しくは voicevox/engine.log を見てください",
+  "voicevox.downloading": "VOICEVOX をダウンロード中",
+  "voicevox.installStart": "VOICEVOX (約330MB) をダウンロードします。Ctrl+C で中断できます（次回は続きから再開します）。",
+  "voicevox.installed": "VOICEVOX を入れました。起動しています…",
+  "voicevox.ready": "これからは VOICEVOX の声で話します。/voices で声を選べます。",
+  "voicevox.credit": "（音声: VOICEVOX:%s %s）",
+  "voicevox.error": "VOICEVOX の声を使えませんでした (OS の声で話します): %s",
+  "voicevox.howto": "変えるには /set voicevox_voice <番号>。キャラクターごとの利用規約は https://voicevox.hiroshiba.jp/ を見てください"
 }

@@ -48,6 +48,8 @@ func settingsTemplate(provider string) string {
   "system_prompt": "",
   "voice": "",
   "voice_rate": 1,
+  "tts": "system",
+  "voicevox_voice": -1,
   "background": "on",
   "startup": "off"
 }

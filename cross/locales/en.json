@@ -206,5 +206,18 @@
   "set.face_color": "Face color (cyan / green / pink / amber / purple / white or #rrggbb)",
   "set.face_size": "Face size (20-100 %)",
   "set.font_size": "Text size (10-28)",
-  "set.font": "Font (empty = default)"
+  "set.font": "Font (empty = default)",
+  "cmd.install-voicevox": "Install a more natural voice (VOICEVOX, about 330 MB; Japanese)",
+  "set.tts": "Speech engine (system = OS voices, voicevox = more natural Japanese voices)",
+  "set.voicevox_voice": "VOICEVOX voice number (see /voices, -1 = default)",
+  "voicevox.noBuild": "There's no VOICEVOX build for this platform",
+  "voicevox.notInstalled": "VOICEVOX isn't installed. Install it with /install-voicevox",
+  "voicevox.startFailed": "VOICEVOX failed to start. See voicevox/engine.log for details",
+  "voicevox.downloading": "Downloading VOICEVOX",
+  "voicevox.installStart": "Downloading VOICEVOX (about 330 MB). Press Ctrl+C to stop (it resumes next time).",
+  "voicevox.installed": "VOICEVOX is installed. Starting it...",
+  "voicevox.ready": "I'll speak with the VOICEVOX voice from now on. Pick a voice with /voices.",
+  "voicevox.credit": "(Voice: VOICEVOX:%s %s)",
+  "voicevox.error": "Couldn't use the VOICEVOX voice (using the OS voice): %s",
+  "voicevox.howto": "Change with /set voicevox_voice <number>. See https://voicevox.hiroshiba.jp/ for each character's terms"
 }

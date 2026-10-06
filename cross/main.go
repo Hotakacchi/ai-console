@@ -164,6 +164,7 @@ func main() {
 		log.Fatal(err)
 	}
 	localServer.Stop()
+	voicevox.Stop()
 }
 
 func asString(v any) string {

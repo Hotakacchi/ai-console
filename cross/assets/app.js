@@ -319,7 +319,53 @@ function termMain() {
     voice.paused = talking || performance.now() < quietUntil || (busy && askPrompt === null);
   }, 100);
 
+  // VOICEVOX の声 (WAV) を鳴らし、時刻表どおりに口を動かし、文字を出す
+  let audioCtx = null;
+  async function speakAudio(id, text, wavB64, keys) {
+    face.speaking = true;
+    const s = { id, finished: false, shown: 0 };
+    speaking = s;
+    const reveal = upTo => {
+      upTo = Math.min(upTo, text.length);
+      if (upTo > s.shown) { write(text.slice(s.shown, upTo), "fg"); s.shown = upTo; }
+    };
+    let src = null, timer = null;
+    const finish = stopped => {
+      if (s.finished) return;
+      s.finished = true;
+      clearInterval(timer);
+      if (src) try { src.stop(); } catch {}
+      if (!stopped) reveal(text.length);
+      face.speaking = false;
+      if (speaking === s) speaking = null;
+      emit("spoken", id);
+    };
+    s.stop = () => finish(true);
+    try {
+      audioCtx = audioCtx || new AudioContext();
+      const bytes = Uint8Array.from(atob(wavB64), c => c.charCodeAt(0));
+      const buffer = await audioCtx.decodeAudioData(bytes.buffer);
+      if (s.finished) return;
+      src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(audioCtx.destination);
+      const start = audioCtx.currentTime;
+      src.onended = () => finish(false);
+      src.start();
+      timer = setInterval(() => {
+        const t = audioCtx.currentTime - start;
+        let open = 0;
+        for (const k of keys || []) { if (k.t <= t) open = k.open; else break; }
+        face.mouth(open);
+        reveal(Math.floor(text.length * Math.min(1, t / buffer.duration)));
+      }, 30);
+    } catch (e) {
+      finish(false);
+    }
+  }
+
   // ---- Go からのイベント ----
+  on("speakAudio", d => speakAudio(d.id, d.text, d.wav, d.keys));
   on("write", d => write(d.text, d.color));
   on("clear", () => clear());
   on("busy", b => {

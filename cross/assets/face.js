@@ -27,6 +27,12 @@ export class Face {
     if (v >= 0 && v < VISEME_OPEN.length) this.target = VISEME_OPEN[v];
   }
 
+  // 口の開き具合を直接決める (VOICEVOX の音の時刻表から)
+  mouth(open) {
+    this.lastViseme = performance.now();
+    this.target = open;
+  }
+
   // キー入力などがあったとき (目線を入力行に向け、眠っていたら起きる)
   poke(typing) {
     this.lastActivity = performance.now();

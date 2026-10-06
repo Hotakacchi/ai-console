@@ -6,6 +6,7 @@ package main
 //   Go → 画面: write / clear / busy / thinking / face / flash / ask / speak / commands / voices
 
 import (
+	"encoding/base64"
 	"fmt"
 	"math"
 	"os/exec"
@@ -46,7 +47,9 @@ type Lumi struct {
 
 	onLanguageChanged func() // トレイのメニューなど、言語で変わるものを作り直す
 
-	startOnce sync.Once       // リマインダーの見張りは 1 回だけ始める
+	startOnce     sync.Once // リマインダーの見張りは 1 回だけ始める
+	creditedStyle int       // VOICEVOX のクレジットを出した声
+	ttsErrorShown bool
 	replyText strings.Builder // 今の返事で喋った文 (履歴に残す)
 }
 
@@ -282,7 +285,13 @@ func (l *Lumi) submit(text string) {
 		}
 		l.setCommand(arg(1), value, len(parts) > 2)
 	case "/voices":
-		l.emit("listVoices", nil)
+		if l.s.Get("tts", "system") == "voicevox" {
+			l.listVoicevox()
+		} else {
+			l.emit("listVoices", nil)
+		}
+	case "/install-voicevox":
+		l.installVoicevoxCmd()
 	case "/peek":
 		l.demoPeek()
 	case "/help":
@@ -309,7 +318,7 @@ func (c command) help() string { return T("cmd." + strings.TrimPrefix(c.name, "/
 
 var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
-	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""},
+	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", ""}, {"/cls", ""}, {"/exit", ""},
 }
@@ -335,6 +344,8 @@ var settingKeys = []settingKey{
 	{"system_prompt", ""},
 	{"voice", ""},
 	{"voice_rate", "#int:-10:10"},
+	{"tts", "system,voicevox"},
+	{"voicevox_voice", "#int:-1:10000"},
 	{"background", "on,off"},
 	{"startup", "on,off"},
 	{"hotkey", ""},
@@ -739,8 +750,14 @@ func (l *Lumi) speak(sentence string) {
 	l.speakID++
 	id := l.speakID
 	l.mu.Unlock()
-	l.emit("thinking", false)
-	l.emit("speak", map[string]any{"id": id, "text": text})
+	// VOICEVOX が使えればその声で (口の動きの時刻表つき)、だめなら画面側の音声合成で
+	if wav, keys, ok := l.voicevoxSpeech(text); ok {
+		l.emit("thinking", false)
+		l.emit("speakAudio", map[string]any{"id": id, "text": text, "wav": base64.StdEncoding.EncodeToString(wav), "keys": keys})
+	} else {
+		l.emit("thinking", false)
+		l.emit("speak", map[string]any{"id": id, "text": text})
+	}
 	timeout := time.After(time.Duration(len([]rune(text)))*400*time.Millisecond + 10*time.Second)
 	for {
 		select {
@@ -753,6 +770,37 @@ func (l *Lumi) speak(sentence string) {
 		case <-timeout:
 			return
 		}
+	}
+}
+
+// tts が voicevox なら、その声で文を WAV にする (ミュート中・失敗したときは ok=false)
+func (l *Lumi) voicevoxSpeech(text string) ([]byte, []mouthKey, bool) {
+	if l.muted || l.s.Get("tts", "system") != "voicevox" {
+		return nil, nil, false
+	}
+	if err := voicevox.Start(dataDir()); err != nil {
+		l.reportTTSError(err)
+		return nil, nil, false
+	}
+	style := voicevox.pickStyle(l.s.GetInt("voicevox_voice", -1))
+	wav, keys, err := voicevox.Synthesize(text, style, l.s.GetInt("voice_rate", 1))
+	if err != nil {
+		l.reportTTSError(err)
+		return nil, nil, false
+	}
+	// 利用規約により、使っている声のクレジットを出す (声が変わったときに 1 回)
+	if style != l.creditedStyle {
+		name, styleName := voicevox.styleName(style)
+		l.write("  "+T("voicevox.credit", name, styleName)+"\n", "dim")
+		l.creditedStyle = style
+	}
+	return wav, keys, true
+}
+
+func (l *Lumi) reportTTSError(err error) {
+	if !l.ttsErrorShown {
+		l.ttsErrorShown = true
+		l.errorText(T("voicevox.error", err.Error()))
 	}
 }
 
@@ -871,6 +919,7 @@ func (l *Lumi) webTool(r toolRequest) string {
 // ---- 終了 ----
 
 func (l *Lumi) quit() {
+	voicevox.Stop()
 	l.interrupt()
 	localServer.Stop()
 	l.app.Quit()

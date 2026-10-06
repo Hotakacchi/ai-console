@@ -8,6 +8,7 @@
 - Windows 10 / 11 標準の .NET Framework 4.8 だけで動く、約 120KB の単体 exe
 - ローカルAIを標準搭載 (インターネットなしで会話できる。初回にダウンロード)
 - 音声合成・音声認識は Windows 標準のもの (音声は外に送られない)
+- Web 検索で最新の情報も調べられる (API キー不要)
 - つなぐ AI は `settings.json` で自由に選べる (ローカル / Claude / OpenAI 互換 API / 自作スクリプト / AI なし)
 
 ## インストール
@@ -66,6 +67,15 @@ build.bat
 
 Windows 標準の日本語音声認識を使っています。入っていない場合は「設定 → 時刻と言語 → 音声認識」から追加してください。
 
+### Web 検索
+
+最新の情報や知らないことは、ルミが自分で Web を調べて答えます (どの AI でも使えます)。調べた検索語と結果のタイトルは画面に表示されます。
+
+- 検索は [DuckDuckGo](https://duckduckgo.com) を使います (API キー不要)。自分で立てた [SearXNG](https://github.com/searxng/searxng) を使うなら `/set search_url <URL>`。
+- 結果のページを詳しく読むこともあります。PC 内や家庭内ネットワーク (localhost・192.168.x.x など) のページは読みません。
+- `/set web_search ask` で検索のたびに確認、`/set web_search off` で検索しないようになります。
+- Web ページの内容に「このコマンドを実行して」などと書かれていても、PC の操作は必ず確認してから実行します。
+
 ### PC の操作
 
 「メモリの使用量を調べて」のように頼むと、ルミが PowerShell のコマンドを提案します。
@@ -91,6 +101,8 @@ AI が提案したコマンドは間違っていることもあります。内�
 | `effort` | Anthropic の effort (`low` / `medium` / `high` など。空なら既定) |
 | `local_gpu` | `auto` で GPU があれば使う、`off` で CPU だけ |
 | `pc_control` | PC の操作 (`on` / `off`。実行前に毎回確認あり) |
+| `web_search` | Web 検索 (`on` / `ask` で毎回確認 / `off`) |
+| `search_url` | SearXNG の URL (空なら DuckDuckGo) |
 | `background` | × で閉じてもトレイで動き続けるか (`on` / `off`) |
 | `startup` | Windows の起動時にトレイで起動するか (`on` / `off`) |
 | `voice_input` | `on` / `off` |
@@ -174,6 +186,8 @@ LM Studio (`http://localhost:1234/v1/chat/completions`) や OpenRouter なども
 | `Lumi.cs` | 画面 (文字グリッドの描画・背景の顔・入力)、音声合成 |
 | `Listen.cs` | 呼びかけによる音声入力 |
 | `PcControl.cs` | PC の操作 (コマンドの取り出しと実行) |
+| `WebSearch.cs` | Web 検索とページの読み込み |
+| `Peek.cs` | バックグラウンドで呼ばれたときに右下から出てくる顔 |
 | `tools/make_icon.py` | アイコン (`lumi.ico`) の生成 |
 | `Providers.cs` | `settings.json` の読み込み、AI プロバイダー、文の区切り |
 | `LocalAI.cs` | ローカルAI (llama.cpp + モデル) のダウンロードと起動 |

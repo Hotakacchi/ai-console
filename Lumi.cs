@@ -11,6 +11,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Speech.Synthesis;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -23,6 +24,7 @@ static class Pal
     public static readonly Color Dim = Color.FromArgb(118, 118, 118);
     public static readonly Color Red = Color.FromArgb(231, 72, 86);
     public static readonly Color Yellow = Color.FromArgb(249, 241, 165);
+    public static readonly Color Cyan = Color.FromArgb(58, 150, 221);
     public static readonly Color BGreen = Color.FromArgb(22, 198, 12);
 
     // 背景の顔 (文字の邪魔にならない暗さ)
@@ -1111,6 +1113,8 @@ class MainForm : Form
         new[] { "effort", "Anthropic の effort", ",low,medium,high,xhigh,max" },
         new[] { "local_gpu", "ローカルAIで GPU を使うか", "auto,off" },
         new[] { "pc_control", "PC の操作 (毎回確認あり)", "on,off" },
+        new[] { "web_search", "Web 検索 (ask は毎回確認)", "on,ask,off" },
+        new[] { "search_url", "SearXNG の URL (空なら DuckDuckGo)", "" },
         new[] { "voice_input", "音声入力", "on,off" },
         new[] { "wake_word", "呼びかけの言葉", "" },
         new[] { "wake_confidence", "呼びかけの聞き取りの厳しさ (0〜1)", "#num:0:1" },
@@ -1273,24 +1277,29 @@ class MainForm : Form
     void Respond(string userText)
     {
         string message = userText;
+        bool declined = false;   // 一度断られたら、この返事の間はもうコマンドを聞かない
         for (int round = 0; round < MaxCommandRounds && message != null && !cancel; round++)
         {
             var requests = ReplyOnce(message);
             message = null;
-            if (requests.Count == 0 || cancel || !settings.PcControl) break;
+            if (declined) requests.RemoveAll(r => r.Kind == "run");
+            if (requests.Count == 0 || cancel) break;
 
-            // 1 つずつ必ず確認してから実行し、結果をまとめて AI に返す
-            var report = new StringBuilder("[コマンドの実行結果]\n");
+            // 1 つずつ処理して (コマンドは必ず確認してから実行)、結果をまとめて AI に返す
+            var report = new StringBuilder("[ツールの結果]\n");
             foreach (var r in requests)
             {
                 if (cancel) break;
+                if (r.Kind == "search" || r.Kind == "fetch") { report.Append(WebTool(r)); continue; }
+                if (!settings.PcControl) { report.Append("\n$ " + r.Command + "\n(PC の操作はオフになっています)\n"); continue; }
                 report.Append("\n$ " + r.Command + (r.Admin ? "  (管理者)" : "") + "\n");
                 string answer = Confirm(r);
                 bool asAdmin = r.Admin || answer == "a";
                 if (answer != "y" && answer != "a")
                 {
                     term.Write("実行しませんでした。\n", Pal.Dim);
-                    report.Append("(ユーザーが実行を許可しませんでした)\n");
+                    report.Append("(ユーザーが実行を許可しませんでした。別のコマンドは提案せず、言葉だけで答えてください)\n");
+                    declined = true;
                     continue;
                 }
                 term.Thinking = true;
@@ -1367,6 +1376,43 @@ class MainForm : Form
         if (l != null) l.EndConfirm();
         if (r.Admin && answer == "a") answer = "y";
         return answer;
+    }
+
+    // Web 検索 / ページの読み込みをして、AI に返す結果の文章を作る
+    string WebTool(RunRequest r)
+    {
+        bool search = r.Kind == "search";
+        string head = "\n[" + (search ? "Web検索" : "ページ") + "] " + r.Command + "\n";
+        string mode = settings.Get("web_search", "on").ToLowerInvariant();
+        if (mode == "off") return head + "(Web 検索はオフになっています)\n";
+
+        term.Face.Speaking = false;
+        term.Write((search ? "検索: " : "ページを読む: ") + r.Command + "\n", Pal.Cyan);
+        if (mode == "ask")
+        {
+            string answer = null;
+            var done = new ManualResetEvent(false);
+            term.Ask(search ? "検索しますか？ [y/N] " : "読みますか？ [y/N] ", a => { answer = a.ToLowerInvariant(); done.Set(); });
+            var l = listener;
+            if (l != null) l.BeginConfirm();
+            done.WaitOne();
+            if (l != null) l.EndConfirm();
+            if (answer != "y" && answer != "a") { term.Write("やめました。\n", Pal.Dim); return head + "(ユーザーが許可しませんでした)\n"; }
+        }
+
+        term.Thinking = true;
+        term.Face.Expression = "think";
+        string result;
+        try { result = search ? WebSearch.Search(r.Command, settings.Get("search_url", "")) : WebSearch.Fetch(r.Command); }
+        catch (Exception e) { result = "(読み込めませんでした: " + e.Message + ")"; }
+
+        // 画面には要点だけ (検索ならタイトル、ページなら先頭数行) を出す
+        var lines = result.Split('\n');
+        var shown = search ? lines.Where(x => Regex.IsMatch(x, "^\\d+\\. ")).ToArray() : lines.Take(3).ToArray();
+        if (shown.Length == 0) shown = lines.Take(1).ToArray();
+        foreach (string x in shown) term.Write("  " + (x.Length > 90 ? x.Substring(0, 90) + "…" : x) + "\n", Pal.Dim);
+        term.Write("\n", Pal.Fg);
+        return head + result + "\n";
     }
 
     void ShowOutput(string result)

@@ -310,6 +310,7 @@ function termMain() {
     confirm(yes) { if (askPrompt !== null) answerAsk(yes ? "y" : "n", yes ? "y" : "n", msgs["voice.mark"]); },
     state(state, message) { emit("voiceState", { state, message: message || "" }); },
     debug(text) { emit("voiceDebug", text); },
+    whisperError(message) { emit("voiceWhisperError", message); },
   });
   // 喋っている間・考えている間は聞かない。喋り終わった直後も自分の声の残りを拾わないよう少し待つ
   let quietUntil = 0;

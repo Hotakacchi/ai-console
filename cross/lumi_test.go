@@ -160,3 +160,23 @@ func TestLocaleKeysMatch(t *testing.T) {
 		}
 	}
 }
+
+func TestWhisperFiles(t *testing.T) {
+	for _, model := range []string{"whisper-base", "whisper-small"} {
+		files := whisperNeeded(model)
+		if len(files) != 14 {
+			t.Errorf("%s: %d files", model, len(files))
+		}
+		seen := map[string]bool{}
+		for _, f := range files {
+			p := whisperLocal("/x", f)
+			if seen[p] || len(f.asset.SHA256) != 64 || f.asset.Size <= 0 {
+				t.Errorf("%s: bad entry %s", model, f.path)
+			}
+			seen[p] = true
+		}
+	}
+	if err := installWhisper(t.TempDir(), "whisper-huge", func(string, float64) {}, func() bool { return true }); err == nil {
+		t.Error("unknown model accepted")
+	}
+}

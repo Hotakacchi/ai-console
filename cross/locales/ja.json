@@ -219,5 +219,12 @@
   "voicevox.ready": "これからは VOICEVOX の声で話します。/voices で声を選べます。",
   "voicevox.credit": "（音声: VOICEVOX:%s %s）",
   "voicevox.error": "VOICEVOX の声を使えませんでした (OS の声で話します): %s",
-  "voicevox.howto": "変えるには /set voicevox_voice <番号>。キャラクターごとの利用規約は https://voicevox.hiroshiba.jp/ を見てください"
+  "voicevox.howto": "変えるには /set voicevox_voice <番号>。キャラクターごとの利用規約は https://voicevox.hiroshiba.jp/ を見てください",
+  "cmd.install-whisper": "より正確な音声認識 (Whisper) を入れる",
+  "set.stt": "話しかけた内容の書き起こし (vosk は軽い、whisper はより正確)",
+  "set.whisper_model": "Whisper のモデル (base は約110MB、small は約280MB でより正確)",
+  "whisper.installStart": "Whisper (%s、約%.0fMB) をダウンロードします。Ctrl+C で中断できます（次回は続きから再開します）。",
+  "whisper.installed": "Whisper を入れました。これからは話しかけた内容を Whisper で書き起こします。",
+  "whisper.installHint": "Whisper が入っていないので Vosk で書き起こします。/install-whisper で入れられます (約%.0fMB)。",
+  "whisper.error": "Whisper で書き起こせませんでした (Vosk の結果を使います): %s"
 }

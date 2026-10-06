@@ -30,11 +30,20 @@ func (l *Lumi) applyVoice(announce bool) {
 		l.emit("voiceStop", nil)
 		return
 	}
-	l.emit("voiceStart", map[string]any{
+	start := map[string]any{
 		"lang":  lang,
 		"model": "/voice/" + lang + "/model.tar.gz",
 		"wake":  l.s.WakeWord(),
-	})
+	}
+	if l.s.Get("stt", "vosk") == "whisper" {
+		model := whisperModel(l.s)
+		if whisperInstalled(dataDir(), model) {
+			start["whisper"] = whisperClientModel(model)
+		} else if announce {
+			l.write(T("whisper.installHint", float64(whisperSize(model))/1e6)+"\n\n", "yellow")
+		}
+	}
+	l.emit("voiceStart", start)
 }
 
 // /mic: その場で音声入力をオン/オフする (入っていなければダウンロードしてから始める)

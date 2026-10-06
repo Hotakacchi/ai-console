@@ -45,6 +45,8 @@ func settingsTemplate(provider string) string {
   "voice_input": "on",
   "wake_word": "",
   "wake_confidence": 0.6,
+  "stt": "vosk",
+  "whisper_model": "base",
   "system_prompt": "",
   "voice": "",
   "voice_rate": 1,

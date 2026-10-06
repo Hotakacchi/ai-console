@@ -219,5 +219,12 @@
   "voicevox.ready": "I'll speak with the VOICEVOX voice from now on. Pick a voice with /voices.",
   "voicevox.credit": "(Voice: VOICEVOX:%s %s)",
   "voicevox.error": "Couldn't use the VOICEVOX voice (using the OS voice): %s",
-  "voicevox.howto": "Change with /set voicevox_voice <number>. See https://voicevox.hiroshiba.jp/ for each character's terms"
+  "voicevox.howto": "Change with /set voicevox_voice <number>. See https://voicevox.hiroshiba.jp/ for each character's terms",
+  "cmd.install-whisper": "Install more accurate speech recognition (Whisper)",
+  "set.stt": "Transcription of what you say (vosk = light, whisper = more accurate)",
+  "set.whisper_model": "Whisper model (base is about 110 MB; small is about 280 MB and more accurate)",
+  "whisper.installStart": "Downloading Whisper (%s, about %.0f MB). Press Ctrl+C to stop (it resumes next time).",
+  "whisper.installed": "Whisper is installed. What you say will now be transcribed with Whisper.",
+  "whisper.installHint": "Whisper isn't installed, so Vosk will transcribe. Install it with /install-whisper (about %.0f MB).",
+  "whisper.error": "Whisper couldn't transcribe (using the Vosk result): %s"
 }

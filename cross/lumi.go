@@ -50,6 +50,7 @@ type Lumi struct {
 	startOnce     sync.Once // リマインダーの見張りは 1 回だけ始める
 	creditedStyle int       // VOICEVOX のクレジットを出した声
 	ttsErrorShown bool
+	whisperErrorShown bool
 	replyText strings.Builder // 今の返事で喋った文 (履歴に残す)
 }
 
@@ -123,7 +124,7 @@ func (l *Lumi) loadSettings() {
 func (l *Lumi) wakeWord() string { return l.s.WakeWord() }
 
 func (l *Lumi) voiceKey() string {
-	return currentLang() + "|" + l.s.WakeWord() + "|" + l.s.Get("voice_input", "on")
+	return currentLang() + "|" + l.s.WakeWord() + "|" + l.s.Get("voice_input", "on") + "|" + l.s.Get("stt", "vosk") + "|" + l.s.Get("whisper_model", "base")
 }
 
 func (l *Lumi) reload(announce bool) {
@@ -292,6 +293,8 @@ func (l *Lumi) submit(text string) {
 		}
 	case "/install-voicevox":
 		l.installVoicevoxCmd()
+	case "/install-whisper":
+		l.installWhisperCmd()
 	case "/peek":
 		l.demoPeek()
 	case "/help":
@@ -319,6 +322,7 @@ func (c command) help() string { return T("cmd." + strings.TrimPrefix(c.name, "/
 var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
+	{"/install-whisper", ""},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", ""}, {"/cls", ""}, {"/exit", ""},
 }
@@ -341,6 +345,8 @@ var settingKeys = []settingKey{
 	{"voice_input", "on,off"},
 	{"wake_word", ""},
 	{"voice_debug", "off,on"},
+	{"stt", "vosk,whisper"},
+	{"whisper_model", "base,small"},
 	{"system_prompt", ""},
 	{"voice", ""},
 	{"voice_rate", "#int:-10:10"},

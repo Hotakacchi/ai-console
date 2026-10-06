@@ -135,6 +135,13 @@ func withVoiceFiles(next http.Handler) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
+		// OS の設定に左右されないように、モジュールと wasm の種類はここで決める
+		switch path.Ext(rel) {
+		case ".mjs", ".js":
+			w.Header().Set("Content-Type", "text/javascript")
+		case ".wasm":
+			w.Header().Set("Content-Type", "application/wasm")
+		}
 		http.ServeFile(w, r, filepath.Join(voiceDir(dataDir()), filepath.FromSlash(rel)))
 	})
 }

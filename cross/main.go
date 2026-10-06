@@ -142,6 +142,13 @@ func main() {
 		lumi.voiceState(asString(m["state"]), asString(m["message"]))
 	})
 	app.Event.On("voiceWoke", func(*application.CustomEvent) { lumi.voiceWoke() })
+	app.Event.On("voiceWhisperError", func(e *application.CustomEvent) {
+		// Whisper が使えなかった (Vosk の結果で続ける)。何度も出さないように最初の 1 回だけ
+		if !lumi.whisperErrorShown {
+			lumi.whisperErrorShown = true
+			lumi.errorText(T("whisper.error", asString(e.Data)))
+		}
+	})
 	app.Event.On("voiceDebug", func(e *application.CustomEvent) {
 		// 聞き取った文をそのまま出す (呼びかけがうまく反応しないときの調整用)
 		if lumi.s.Get("voice_debug", "off") == "on" {

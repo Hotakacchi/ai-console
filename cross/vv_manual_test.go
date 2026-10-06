@@ -39,3 +39,21 @@ func TestVVInstallAndSynthesize(t *testing.T) {
 	}
 	t.Logf("wav %d bytes, %d mouth keys, last at %.2fs", len(wav), len(keys), keys[len(keys)-1].T)
 }
+
+// Whisper (base) を実際に入れる確認: go test -tags manual -run Whisper -timeout 60m
+func TestWhisperInstall(t *testing.T) {
+	base := dataDir()
+	last := -1
+	err := installWhisper(base, "whisper-base", func(step string, r float64) {
+		if p := int(r * 100); p/10 != last/10 {
+			t.Logf("%3d%% %s", p, step)
+			last = p
+		}
+	}, func() bool { return false })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !whisperInstalled(base, "whisper-base") {
+		t.Fatal("not installed")
+	}
+}

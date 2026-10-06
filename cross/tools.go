@@ -102,8 +102,9 @@ const (
 	maxOutput      = 4000
 )
 
-// OS のシェルでコマンドを実行し、出力と成功したかを返す。admin なら OS の管理者確認を通す
-func runCommand(command string, admin bool, cancel <-chan struct{}) (string, bool) {
+// OS のシェルでコマンドを実行し、出力と成功したかを返す。admin なら OS の管理者確認を通す。
+// 管理者として動き始めたら (確認で許可されたら) onElevated を 1 回呼ぶ
+func runCommand(command string, admin bool, cancel <-chan struct{}, onElevated func()) (string, bool) {
 	ctx, stop := context.WithTimeout(context.Background(), commandTimeout)
 	defer stop()
 	go func() {
@@ -114,15 +115,26 @@ func runCommand(command string, admin bool, cancel <-chan struct{}) (string, boo
 		}
 	}()
 
+	// 管理者として動く側が最初にこのファイルを作る (許可された合図)
+	// (自分で作ったフォルダの中に置くので、管理者が作ったファイルでも後で消せる)
+	marker := ""
+	if admin {
+		if dir, err := os.MkdirTemp("", "lumi_admin_"); err == nil {
+			marker = filepath.Join(dir, "elevated")
+			defer os.RemoveAll(dir)
+		}
+	}
+	touch := "touch '" + strings.ReplaceAll(marker, "'", `'\''`) + "'; "
+
 	var cmd *exec.Cmd
 	var outFile string
 	switch runtime.GOOS {
 	case "windows":
-		cmd, outFile = windowsCommand(ctx, command, admin)
+		cmd, outFile = windowsCommand(ctx, command, admin, marker)
 	case "darwin":
 		if admin {
 			// macOS の管理者パスワードの確認画面が出る
-			script := `do shell script "` + appleScriptEscape(command) + ` 2>&1" with administrator privileges`
+			script := `do shell script "` + appleScriptEscape(touch+command) + ` 2>&1" with administrator privileges`
 			cmd = exec.CommandContext(ctx, "osascript", "-e", script)
 		} else {
 			cmd = exec.CommandContext(ctx, "/bin/zsh", "-c", command)
@@ -132,7 +144,7 @@ func runCommand(command string, admin bool, cancel <-chan struct{}) (string, boo
 			if _, err := exec.LookPath("pkexec"); err != nil {
 				return T("run.noPkexec"), false
 			}
-			cmd = exec.CommandContext(ctx, "pkexec", "/bin/bash", "-c", command) // 認証画面が出る
+			cmd = exec.CommandContext(ctx, "pkexec", "/bin/bash", "-c", touch+command) // 認証画面が出る
 		} else {
 			cmd = exec.CommandContext(ctx, "/bin/bash", "-c", command)
 		}
@@ -141,7 +153,25 @@ func runCommand(command string, admin bool, cancel <-chan struct{}) (string, boo
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
+
+	done := make(chan struct{})
+	if marker != "" && onElevated != nil {
+		go func() {
+			for {
+				select {
+				case <-done:
+					return
+				case <-time.After(150 * time.Millisecond):
+					if _, err := os.Stat(marker); err == nil {
+						onElevated()
+						return
+					}
+				}
+			}
+		}()
+	}
 	err := cmd.Run()
+	close(done)
 
 	out := buf.String()
 	if outFile != "" {
@@ -176,9 +206,13 @@ func runCommand(command string, admin bool, cancel <-chan struct{}) (string, boo
 }
 
 // PowerShell で実行する。出力は UTF-8 で一時ファイルに書かせる (管理者として動かした PowerShell の出力は直接受け取れないため)
-func windowsCommand(ctx context.Context, command string, admin bool) (*exec.Cmd, string) {
+func windowsCommand(ctx context.Context, command string, admin bool, marker string) (*exec.Cmd, string) {
 	out := filepath.Join(os.TempDir(), fmt.Sprintf("lumi_run_%d.txt", time.Now().UnixNano()))
-	inner := "$ErrorActionPreference = 'Continue'\n" +
+	inner := ""
+	if marker != "" {
+		inner = "New-Item -ItemType File -Force -Path '" + strings.ReplaceAll(marker, "'", "''") + "' | Out-Null\n"
+	}
+	inner += "$ErrorActionPreference = 'Continue'\n" +
 		"$o = & { " + command + "\n} 2>&1 | Out-String -Width 200\n" +
 		"[IO.File]::WriteAllText('" + strings.ReplaceAll(out, "'", "''") + "', $o, (New-Object Text.UTF8Encoding $false))\n"
 	script := inner

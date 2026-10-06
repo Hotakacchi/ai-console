@@ -36,7 +36,10 @@ function termMain() {
   const keys = document.getElementById("keys");
   term.hidden = false;
 
-  const face = new Face({ line: "#223e42", fill: "#284e54", cheek: "#461e3c", bg: "#0c0c0c" });
+  // 管理者権限で動いている間は、顔をオレンジ系にする
+  const NORMAL = { line: "#223e42", fill: "#284e54", cheek: "#461e3c", bg: "#0c0c0c" };
+  const ADMIN = { line: "#4e3214", fill: "#6a4418", cheek: "#5a1e2a", bg: "#0c0c0c" };
+  const face = new Face(NORMAL);
   animate(document.getElementById("face"), face);
 
   // ---- 出力 ----
@@ -307,6 +310,7 @@ function termMain() {
   on("flash", d => face.flash(d.expr, d.seconds));
   on("ask", q => { askPrompt = q; buffer = ""; thinking = false; voice.confirming(true); render(); keys.focus(); });
   on("i18n", m => { msgs = m; });
+  on("admin", on => { face.c = on ? ADMIN : NORMAL; face.lastState = ""; });   // lastState を消して描き直させる
   on("voiceStart", d => voice.start(d, msgs));
   on("voiceStop", () => voice.stop());
   // テスト用: マイクの代わりに音声ファイルを聞かせる
@@ -333,8 +337,15 @@ function peekMain() {
   const peek = document.getElementById("peek"), bubble = document.getElementById("bubble");
   const textEl = document.getElementById("peekText");
   peek.hidden = false;
-  const face = new Face({ line: "#61d6d6", fill: "#61d6d6", cheek: "#e7488c", bg: "#0c0c0c" }, 0.9);
+  const NORMAL = { line: "#61d6d6", fill: "#61d6d6", cheek: "#e7488c", bg: "#0c0c0c" };
+  const ADMIN = { line: "#ffa94d", fill: "#ffa94d", cheek: "#e7488c", bg: "#0c0c0c" };
+  const face = new Face(NORMAL, 0.9);
   animate(document.getElementById("peekFace"), face);
+  on("admin", on => {
+    face.c = on ? ADMIN : NORMAL;
+    face.lastState = "";
+    bubble.style.borderColor = face.c.line;
+  });
 
   let doneTimer = null;
   on("peek", d => {

@@ -15,6 +15,9 @@ func hideWindow(cmd *exec.Cmd) {
 
 func killWithParent(cmd *exec.Cmd) {}
 
+// ルミ自体が管理者として (昇格して) 動いているか
+func isElevated() bool { return windows.GetCurrentProcessToken().IsElevated() }
+
 var job windows.Handle
 
 // Job オブジェクトに入れておき、ルミが落ちても llama-server が残らないようにする

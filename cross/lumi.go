@@ -32,6 +32,7 @@ type Lumi struct {
 	muted bool
 
 	installLocalOnStart bool // --install-local: 起動したらローカルAIをダウンロードする
+	elevated            bool // ルミ自体が管理者 (root) として動いている
 
 	micOn     bool // 音声入力をこのセッションで使うか (--no-mic や /mic で切り替え)
 	listening bool // 画面側で聞き取りが動いているか
@@ -46,7 +47,7 @@ type Lumi struct {
 }
 
 func newLumi(app *application.App, muted, noMic bool) *Lumi {
-	l := &Lumi{app: app, muted: muted, micOn: !noMic, answers: make(chan string, 1), spoken: make(chan int, 8)}
+	l := &Lumi{app: app, muted: muted, micOn: !noMic, elevated: isElevated(), answers: make(chan string, 1), spoken: make(chan int, 8)}
 	l.loadSettings()
 	return l
 }
@@ -87,6 +88,9 @@ func (l *Lumi) updateTitle() {
 	}
 	if l.listening {
 		voice += " | mic"
+	}
+	if l.elevated {
+		voice += " | admin"
 	}
 	l.win.SetTitle(T("app.title") + "  —  " + l.ai.Label() + " | " + voice)
 }
@@ -151,6 +155,7 @@ func (l *Lumi) ready() {
 	}
 	l.emit("commands", names)
 	l.emit("i18n", clientMessages())
+	l.emit("admin", l.elevated)
 	l.sendVoiceSettings()
 	l.write("Lumi Assistant [Version "+version+"]\n", "fg")
 	l.write(T("welcome.hint")+"\n\n", "dim")
@@ -558,7 +563,9 @@ func (l *Lumi) respond(userText string) {
 			}
 			l.emit("thinking", true)
 			l.face("think")
-			result, ok := runCommand(r.Command, r.Admin || answer == "a", l.cancelChan())
+			// 管理者として動き始めたら、終わるまで顔の色を変える
+			result, ok := runCommand(r.Command, r.Admin || answer == "a", l.cancelChan(), func() { l.emit("admin", true) })
+			l.emit("admin", l.elevated)
 			l.showOutput(result)
 			mood := "sad"
 			if ok && !strings.Contains(result, "Exception") {

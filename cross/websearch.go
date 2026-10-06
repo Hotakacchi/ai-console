@@ -157,11 +157,20 @@ func isPrivateHost(host string) bool {
 		return false
 	}
 	for _, ip := range ips {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+		if blockedIP(ip) {
 			return true
 		}
 	}
 	return false
+}
+
+// 100.64.0.0/10 は回線事業者や Tailscale などの VPN が使う、外からは届かない範囲
+var _, sharedNet, _ = net.ParseCIDR("100.64.0.0/10")
+
+// PC 内・家庭内・VPN 内など、Web 検索でつないではいけないアドレス
+func blockedIP(ip net.IP) bool {
+	return ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast() || ip.IsUnspecified() || sharedNet.Contains(ip)
 }
 
 // checkHosts なら、実際につなぐ IP アドレスでも PC 内・家庭内でないか確かめる
@@ -178,7 +187,7 @@ func publicOnlyTransport(checkHosts bool) http.RoundTripper {
 			if err != nil {
 				return err
 			}
-			if ip := net.ParseIP(host); ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+			if blockedIP(net.ParseIP(host)) {
 				return errors.New(T("web.privateRedirect"))
 			}
 			return nil

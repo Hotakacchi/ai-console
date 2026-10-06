@@ -164,7 +164,10 @@ func runCommand(command string, admin bool, cancel <-chan struct{}, onElevated f
 			defer os.RemoveAll(dir)
 		}
 	}
-	touch := "touch '" + strings.ReplaceAll(marker, "'", `'\''`) + "'; "
+	touch := ""
+	if marker != "" {
+		touch = "touch '" + strings.ReplaceAll(marker, "'", `'\''`) + "'; "
+	}
 
 	var cmd *exec.Cmd
 	var outFile string

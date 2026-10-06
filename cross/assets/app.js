@@ -330,11 +330,12 @@ function termMain() {
       upTo = Math.min(upTo, text.length);
       if (upTo > s.shown) { write(text.slice(s.shown, upTo), "fg"); s.shown = upTo; }
     };
-    let src = null, timer = null;
+    let src = null, timer = null, guard = null;
     const finish = stopped => {
       if (s.finished) return;
       s.finished = true;
       clearInterval(timer);
+      clearTimeout(guard);
       if (src) try { src.stop(); } catch {}
       if (!stopped) reveal(text.length);
       face.speaking = false;
@@ -344,6 +345,8 @@ function termMain() {
     s.stop = () => finish(true);
     try {
       audioCtx = audioCtx || new AudioContext();
+      // 止まった状態で作られることがある (そのままだと音が出ず、終わりも来ない)
+      if (audioCtx.state === "suspended") await Promise.race([audioCtx.resume(), new Promise(r => setTimeout(r, 1000))]);
       const bytes = Uint8Array.from(atob(wavB64), c => c.charCodeAt(0));
       const buffer = await audioCtx.decodeAudioData(bytes.buffer);
       if (s.finished) return;
@@ -353,6 +356,8 @@ function termMain() {
       const start = audioCtx.currentTime;
       src.onended = () => finish(false);
       src.start();
+      // 音が進まなくても、長さぶん待ったら終わりにする
+      guard = setTimeout(() => finish(false), (buffer.duration + 3) * 1000);
       timer = setInterval(() => {
         const t = audioCtx.currentTime - start;
         let open = 0;

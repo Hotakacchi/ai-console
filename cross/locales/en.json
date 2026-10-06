@@ -165,7 +165,7 @@
   "voice.installStart": "Downloading the speech model (about %.0f MB).",
   "set.voice_debug": "Show what voice input heard (for tuning the wake word)",
   "prompt.face": "You can change your facial expression to match your feelings. Before a sentence, write one of <face>happy</face> (glad, fun), <face>sad</face> (troubled, sorry, disappointed), <face>surprised</face>, or <face>think</face>. Use at most one or two per reply.",
-  "prompt.remind": "It is now %s. When the user asks you to remind them (\"in 5 minutes\", \"at 3 pm\"), write <remind in=\"seconds\">what to say</remind> or <remind at=\"YYYY-MM-DD HH:MM\">what to say</remind> (at=\"HH:MM\" is fine for today). Make the message one short sentence to read aloud at that time.",
+  "prompt.remind": "The [ ] at the start of each user message is the current date and time. When the user asks you to remind them (\"in 5 minutes\", \"at 3 pm\"), write <remind in=\"seconds\">what to say</remind> or <remind at=\"YYYY-MM-DD HH:MM\">what to say</remind> (at=\"HH:MM\" is fine for today). Make the message one short sentence to read aloud at that time.",
   "prompt.memory": "When the user tells you about themselves (name, likes, plans) or asks you to remember something, write <remember>what to remember</remember> briefly. When asked to forget, write <forget>keyword</forget>. Use what you remember naturally in conversation.",
   "prompt.memoryEmpty": "(Nothing remembered yet)",
   "prompt.memoryList": "What you remember about the user:",

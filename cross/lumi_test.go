@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -178,5 +179,17 @@ func TestWhisperFiles(t *testing.T) {
 	}
 	if err := installWhisper(t.TempDir(), "whisper-huge", func(string, float64) {}, func() bool { return true }); err == nil {
 		t.Error("unknown model accepted")
+	}
+}
+
+func TestBlockedIP(t *testing.T) {
+	for ip, want := range map[string]bool{
+		"127.0.0.1": true, "10.1.2.3": true, "192.168.0.1": true, "169.254.1.1": true,
+		"100.100.1.1": true, "::1": true, "::ffff:127.0.0.1": true, "fd00::1": true, "0.0.0.0": true,
+		"8.8.8.8": false, "100.128.0.1": false, "2001:4860:4860::8888": false,
+	} {
+		if got := blockedIP(net.ParseIP(ip)); got != want {
+			t.Errorf("%s: %v", ip, got)
+		}
 	}
 }

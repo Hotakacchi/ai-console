@@ -239,6 +239,7 @@ type voicevoxServer struct {
 	cmd      *exec.Cmd
 	endpoint string
 	ready    chan struct{}
+	exited   chan struct{}
 	err      error
 	speakers []vvSpeaker
 }
@@ -256,7 +257,7 @@ var voicevox = &voicevoxServer{}
 // 起動して使えるようになるまで待つ (起動済みならすぐ返る)
 func (v *voicevoxServer) Start(base string) error {
 	v.mu.Lock()
-	if v.cmd != nil && v.cmd.ProcessState == nil {
+	if v.cmd != nil && !isClosed(v.exited) {
 		ready := v.ready
 		v.mu.Unlock()
 		<-ready
@@ -275,20 +276,30 @@ func (v *voicevoxServer) Start(base string) error {
 	l.Close()
 	cmd := exec.Command(voicevoxExe(base), "--host", "127.0.0.1", "--port", fmt.Sprint(port))
 	cmd.Dir = voicevoxDir(base)
-	if log, err := os.Create(filepath.Join(voicevoxDir(base), "engine.log")); err == nil {
+	log, _ := os.Create(filepath.Join(voicevoxDir(base), "engine.log"))
+	if log != nil {
 		cmd.Stdout, cmd.Stderr = log, log
 	}
 	hideWindow(cmd)
 	killWithParent(cmd)
 	if err := cmd.Start(); err != nil {
+		if log != nil {
+			log.Close()
+		}
 		v.mu.Unlock()
 		return err
 	}
 	afterStart(cmd)
-	v.cmd, v.endpoint, v.ready, v.err = cmd, fmt.Sprintf("http://127.0.0.1:%d", port), make(chan struct{}), nil
-	ready := v.ready
 	exited := make(chan struct{})
-	go func() { cmd.Wait(); close(exited) }()
+	v.cmd, v.endpoint, v.ready, v.exited, v.err = cmd, fmt.Sprintf("http://127.0.0.1:%d", port), make(chan struct{}), exited, nil
+	ready := v.ready
+	go func() {
+		cmd.Wait()
+		if log != nil {
+			log.Close()
+		}
+		close(exited)
+	}()
 	go func() {
 		defer close(ready)
 		deadline := time.Now().Add(3 * time.Minute)
@@ -322,6 +333,15 @@ func (v *voicevoxServer) Start(base string) error {
 	v.mu.Unlock()
 	<-ready
 	return v.err
+}
+
+func isClosed(c chan struct{}) bool {
+	select {
+	case <-c:
+		return true
+	default:
+		return false
+	}
 }
 
 func (v *voicevoxServer) Stop() {

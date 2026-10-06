@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // AI への指示文 (キャラクター・PC 操作・Web 検索) は locales の prompt.* にある
@@ -205,9 +204,8 @@ func (s *Settings) SystemPrompt() string {
 		p += "\n\n" + T("prompt.clipboard")
 	}
 	// 表情・リマインダー (今の時刻つき)・記憶
-	now := time.Now()
 	p += "\n\n" + T("prompt.face")
-	p += "\n\n" + T("prompt.remind", now.Format("2006-01-02 15:04 (Mon)"))
+	p += "\n\n" + T("prompt.remind")
 	p += "\n\n" + T("prompt.memory") + "\n" + memories.prompt()
 	return p
 }

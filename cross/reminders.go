@@ -166,10 +166,10 @@ func (l *Lumi) runReminders() {
 
 // 返事の途中でなければ (待ってから) 知らせる。隠れていれば右下から顔を出す
 func (l *Lumi) announce(text string) {
-	for i := 0; i < 120 && l.isBusy(); i++ {
+	// 返事が終わるまで待つ (待つ間に別の返事が始まっても重ならないよう、begin で確かめる)
+	for !l.begin() {
 		time.Sleep(500 * time.Millisecond)
 	}
-	l.setBusy(true)
 	defer l.setBusy(false)
 	popped := false
 	if !l.win.IsVisible() {

@@ -55,7 +55,7 @@ type Lumi struct {
 }
 
 func newLumi(app *application.App, muted, noMic bool) *Lumi {
-	l := &Lumi{app: app, muted: muted, micOn: !noMic, elevated: isElevated(), answers: make(chan string, 1), spoken: make(chan int, 8)}
+	l := &Lumi{app: app, muted: muted, micOn: !noMic, elevated: isElevated(), creditedStyle: -1, answers: make(chan string, 1), spoken: make(chan int, 8)}
 	memories.load()
 	reminders.load()
 	l.loadSettings()
@@ -557,24 +557,42 @@ func (l *Lumi) cancelled() bool {
 }
 
 func (l *Lumi) startReply(text string) {
+	if l.begin() {
+		go l.respond(text)
+	}
+}
+
+// 忙しくなければ忙しい状態にして、新しい中断用の印を作る (できたら true)
+func (l *Lumi) begin() bool {
 	l.mu.Lock()
 	if l.busy {
 		l.mu.Unlock()
-		return
+		return false
 	}
 	l.cancel = make(chan struct{})
 	l.mu.Unlock()
 	l.setBusy(true)
-	go l.respond(text)
+	return true
 }
 
 const maxToolRounds = 5
 
 func (l *Lumi) respond(userText string) {
-	appendHistory("user", userText)
+	keep := l.s.On("keep_history", "on")
+	if keep {
+		appendHistory("user", userText)
+	}
 	l.replyText.Reset()
-	defer func() { appendHistory("assistant", l.replyText.String()) }()
+	defer func() {
+		if keep {
+			appendHistory("assistant", l.replyText.String())
+		}
+	}()
+	// 今の日時は発言の先頭に付ける (指示文に入れると毎分変わり、ローカルAIが前の会話を読み直すことになる)
 	message := userText
+	if _, offline := l.ai.(offlineProvider); !offline {
+		message = "[" + time.Now().Format("2006-01-02 15:04 (Mon)") + "] " + userText
+	}
 	declined := false // 一度断られたら、この返事の間はもうコマンドを聞かない
 	for round := 0; round < maxToolRounds && message != "" && !l.cancelled(); round++ {
 		requests := l.replyOnce(message)

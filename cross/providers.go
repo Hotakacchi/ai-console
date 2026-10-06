@@ -1,0 +1,558 @@
+package main
+
+// AI プロバイダー (返事の取得先)。新しいものを足すときは Provider を実装して newProvider に登録する。
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+)
+
+type Provider interface {
+	Label() string
+	// 返事を断片ごとに onText に渡す (呼び出し側のゴルーチンで実行される)
+	Reply(text string, onText func(string))
+	// 返事の取得を途中で打ち切る
+	Abort()
+	// 会話履歴を消す
+	Clear()
+}
+
+type Message = map[string]any
+
+func newProvider(s *Settings) Provider {
+	switch strings.ToLower(s.Get("provider", "offline")) {
+	case "anthropic":
+		return newAnthropic(s)
+	case "openai":
+		return newOpenAI(s)
+	case "local":
+		return newLocal(s)
+	case "command":
+		return &commandProvider{s: s}
+	}
+	return offlineProvider{}
+}
+
+// ---------------- HTTP + Server-Sent Events の土台 ----------------
+
+type httpBase struct {
+	s       *Settings
+	history []Message
+	mu      sync.Mutex
+	cancel  context.CancelFunc
+	aborted bool
+}
+
+func (h *httpBase) Clear() { h.history = nil }
+
+func (h *httpBase) Abort() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.aborted = true
+	if h.cancel != nil {
+		h.cancel()
+	}
+}
+
+// send が返した assistant の content を履歴に足す (nil なら今回の発言ごと取り消す)
+func (h *httpBase) reply(text string, onText func(string), send func(ctx context.Context) (any, error)) {
+	h.history = append(h.history, Message{"role": "user", "content": text})
+	ctx, cancel := context.WithCancel(context.Background())
+	h.mu.Lock()
+	h.aborted = false
+	h.cancel = cancel
+	h.mu.Unlock()
+	defer cancel()
+
+	content, err := send(ctx)
+	if err != nil || content == nil {
+		h.history = h.history[:len(h.history)-1]
+		if err != nil && !h.aborted {
+			onText("ごめんなさい、AIにつながりませんでした。（" + err.Error() + "）")
+		}
+		return
+	}
+	h.history = append(h.history, Message{"role": "assistant", "content": content})
+}
+
+// POST して、SSE の data 行ごとに onEvent を呼ぶ
+func postStream(ctx context.Context, url string, headers map[string]string, body any, onEvent func(map[string]any) error) error {
+	data, _ := json.Marshal(body)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	res, err := (&http.Client{Timeout: 10 * time.Minute}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode >= 300 {
+		b, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
+		var e struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		json.Unmarshal(b, &e)
+		return fmt.Errorf("HTTP %d %s", res.StatusCode, e.Error.Message)
+	}
+	sc := bufio.NewScanner(res.Body)
+	sc.Buffer(make([]byte, 1<<20), 1<<24)
+	for sc.Scan() {
+		line := sc.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		payload := strings.TrimSpace(line[5:])
+		if payload == "[DONE]" {
+			break
+		}
+		var ev map[string]any
+		if json.Unmarshal([]byte(payload), &ev) == nil {
+			if err := onEvent(ev); err != nil {
+				return err
+			}
+		}
+	}
+	return sc.Err()
+}
+
+func str(m map[string]any, k string) string {
+	if v, ok := m[k]; ok && v != nil {
+		return fmt.Sprint(v)
+	}
+	return ""
+}
+
+func obj(m map[string]any, k string) map[string]any {
+	v, _ := m[k].(map[string]any)
+	return v
+}
+
+// ---------------- Anthropic (Claude) ----------------
+
+type anthropicProvider struct {
+	httpBase
+	model, key, endpoint string
+}
+
+func newAnthropic(s *Settings) *anthropicProvider {
+	return &anthropicProvider{
+		httpBase: httpBase{s: s},
+		model:    s.Get("model", "claude-opus-5-5"),
+		key:      s.APIKey("ANTHROPIC_API_KEY"),
+		endpoint: s.Get("endpoint", "https://api.anthropic.com/v1/messages"),
+	}
+}
+
+func (p *anthropicProvider) Label() string { return "anthropic: " + p.model }
+
+func (p *anthropicProvider) Reply(text string, onText func(string)) {
+	p.reply(text, onText, func(ctx context.Context) (any, error) {
+		if p.key == "" {
+			return nil, errors.New("APIキーの環境変数が設定されていません")
+		}
+		body := map[string]any{
+			"model":      p.model,
+			"max_tokens": p.s.GetInt("max_tokens", 64000),
+			"system":     p.s.SystemPrompt(),
+			"messages":   p.history,
+			"stream":     true,
+		}
+		effort := p.s.Get("effort", "")
+		if effort == "" && p.model == "claude-opus-5-5" {
+			effort = "low"
+		}
+		if effort != "" {
+			body["output_config"] = map[string]any{"effort": effort}
+		}
+		headers := map[string]string{"x-api-key": p.key, "anthropic-version": "2023-06-01"}
+		// 安全フィルターで断られたとき、サーバー側で別モデルに切り替えて答えさせる (対応モデルのみ)
+		switch p.model {
+		case "claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5":
+			headers["anthropic-beta"] = "server-side-fallback-2026-07-01"
+			body["fallbacks"] = "default"
+		}
+
+		// thinking ブロックも含めて content を組み立て直し、そのまま履歴に返す
+		var blocks []map[string]any
+		stop := ""
+		err := postStream(ctx, p.endpoint, headers, body, func(ev map[string]any) error {
+			switch str(ev, "type") {
+			case "content_block_start":
+				blocks = append(blocks, obj(ev, "content_block"))
+			case "content_block_delta":
+				if len(blocks) == 0 {
+					return nil
+				}
+				b, d := blocks[len(blocks)-1], obj(ev, "delta")
+				switch str(d, "type") {
+				case "text_delta":
+					b["text"] = str(b, "text") + str(d, "text")
+					onText(str(d, "text"))
+				case "thinking_delta":
+					b["thinking"] = str(b, "thinking") + str(d, "thinking")
+				case "signature_delta":
+					b["signature"] = str(d, "signature")
+				}
+			case "message_delta":
+				stop = str(obj(ev, "delta"), "stop_reason")
+			case "error":
+				return errors.New(str(obj(ev, "error"), "message"))
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if stop == "refusal" {
+			onText("ごめんなさい、その内容にはお答えできません。")
+			return nil, nil
+		}
+		return blocks, nil
+	})
+}
+
+// ---------------- OpenAI 互換 (OpenAI / Ollama / LM Studio / OpenRouter など) ----------------
+
+type openAIProvider struct {
+	httpBase
+	model, key, endpoint string
+	addOptions           func(map[string]any)
+	before               func() error // 送る直前の準備 (ローカルAIの起動など)
+	label                string
+}
+
+func newOpenAI(s *Settings) *openAIProvider {
+	p := &openAIProvider{
+		httpBase: httpBase{s: s},
+		model:    s.Get("model", ""),
+		key:      s.APIKey(""),
+		endpoint: s.Get("endpoint", "https://api.openai.com/v1/chat/completions"),
+	}
+	p.label = "openai: " + p.model
+	return p
+}
+
+func (p *openAIProvider) Label() string { return p.label }
+
+func (p *openAIProvider) Reply(text string, onText func(string)) {
+	p.reply(text, onText, func(ctx context.Context) (any, error) {
+		if p.before != nil {
+			if err := p.before(); err != nil {
+				return nil, err
+			}
+		}
+		messages := append([]Message{{"role": "system", "content": p.s.SystemPrompt()}}, p.history...)
+		body := map[string]any{"model": p.model, "messages": messages, "stream": true}
+		if n := p.s.GetInt("max_tokens", 0); n > 0 {
+			body["max_tokens"] = n
+		}
+		if p.addOptions != nil {
+			p.addOptions(body)
+		}
+		headers := map[string]string{}
+		if p.key != "" {
+			headers["Authorization"] = "Bearer " + p.key
+		}
+		var out strings.Builder
+		err := postStream(ctx, p.endpoint, headers, body, func(ev map[string]any) error {
+			choices, _ := ev["choices"].([]any)
+			if len(choices) == 0 {
+				return nil
+			}
+			c, _ := choices[0].(map[string]any)
+			piece := str(obj(c, "delta"), "content")
+			if piece != "" {
+				out.WriteString(piece)
+				onText(piece)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return out.String(), nil
+	})
+}
+
+// ---------------- ローカル (llama.cpp + 標準モデル) ----------------
+
+func newLocal(s *Settings) Provider {
+	dir := dataDir()
+	modelPath := localModelPath(dir, s.Get("model", ""))
+	gpu := strings.ToLower(s.Get("local_gpu", "auto")) != "off"
+	p := newOpenAI(s)
+	p.model = strings.TrimSuffix(filepath.Base(modelPath), filepath.Ext(modelPath))
+	p.label = "local: " + p.model
+	p.before = func() error {
+		ctx := s.GetInt("max_tokens", 0) + 4096
+		if ctx < 8192 {
+			ctx = 8192
+		}
+		if err := localServer.Start(dir, modelPath, gpu, ctx); err != nil {
+			return err
+		}
+		p.endpoint = localServer.Endpoint() + "/v1/chat/completions"
+		p.key = localServer.APIKey()
+		return nil
+	}
+	p.addOptions = func(body map[string]any) {
+		// Qwen3.5 は既定で考えてから答えるので、会話用に考える過程を切る。サンプリングはモデル推奨値
+		body["chat_template_kwargs"] = map[string]any{"enable_thinking": false}
+		body["temperature"] = 0.7
+		body["top_p"] = 0.8
+		body["top_k"] = 20
+		body["presence_penalty"] = 1.5
+	}
+	return &thinkFiltered{p}
+}
+
+// <think>...</think> が混ざっても読み上げないようにする
+type thinkFiltered struct{ *openAIProvider }
+
+var thinkRe = regexp.MustCompile(`(?s)<think>.*?</think>`)
+
+func (t *thinkFiltered) Reply(text string, onText func(string)) {
+	var pending strings.Builder
+	inside := false
+	t.openAIProvider.Reply(text, func(chunk string) {
+		pending.WriteString(chunk)
+		s := pending.String()
+		var out strings.Builder
+		for {
+			tag := "<think>"
+			if inside {
+				tag = "</think>"
+			}
+			if i := strings.Index(s, tag); i >= 0 {
+				if !inside {
+					out.WriteString(s[:i])
+				}
+				s = s[i+len(tag):]
+				inside = !inside
+				continue
+			}
+			keep := 0
+			for k := min(len(tag)-1, len(s)); k > 0; k-- {
+				if strings.HasPrefix(tag, s[len(s)-k:]) {
+					keep = k
+					break
+				}
+			}
+			if !inside {
+				out.WriteString(s[:len(s)-keep])
+			}
+			s = s[len(s)-keep:]
+			break
+		}
+		pending.Reset()
+		pending.WriteString(s)
+		if out.Len() > 0 {
+			onText(out.String())
+		}
+	})
+	if !inside && pending.Len() > 0 {
+		onText(pending.String())
+	}
+	// 履歴に残す返事からも考える過程を除く
+	if n := len(t.history); n > 0 {
+		if c, ok := t.history[n-1]["content"].(string); ok {
+			t.history[n-1]["content"] = strings.TrimSpace(thinkRe.ReplaceAllString(c, ""))
+		}
+	}
+}
+
+// ---------------- 外部コマンド (自作スクリプトなど) ----------------
+// 発言ごとにコマンドを起動し、stdin に {"system": ..., "messages": [...]} の JSON を渡す。stdout が返事になる。
+
+type commandProvider struct {
+	s       *Settings
+	history []Message
+	mu      sync.Mutex
+	cmd     *exec.Cmd
+	aborted bool
+}
+
+func (c *commandProvider) Label() string { return "command: " + c.s.Get("command", "") }
+func (c *commandProvider) Clear()        { c.history = nil }
+
+func (c *commandProvider) Abort() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.aborted = true
+	if c.cmd != nil && c.cmd.Process != nil {
+		c.cmd.Process.Kill()
+	}
+}
+
+func (c *commandProvider) Reply(text string, onText func(string)) {
+	command := c.s.Get("command", "")
+	if command == "" {
+		onText("settings.json の command が空です。")
+		return
+	}
+	c.history = append(c.history, Message{"role": "user", "content": text})
+	cmd := shellCommand(command)
+	cmd.Dir = dataDir()
+	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8")
+	payload, _ := json.Marshal(map[string]any{"system": c.s.SystemPrompt(), "messages": c.history})
+	cmd.Stdin = bytes.NewReader(payload)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, _ := cmd.StdoutPipe()
+	hideWindow(cmd)
+	c.mu.Lock()
+	c.aborted = false
+	c.cmd = cmd
+	c.mu.Unlock()
+
+	var reply strings.Builder
+	if err := cmd.Start(); err != nil {
+		onText("コマンドを実行できませんでした。（" + err.Error() + "）")
+		c.history = c.history[:len(c.history)-1]
+		return
+	}
+	buf := make([]byte, 1024)
+	for {
+		n, err := out.Read(buf)
+		if n > 0 {
+			piece := strings.ReplaceAll(string(buf[:n]), "\r", "")
+			reply.WriteString(piece)
+			onText(piece)
+		}
+		if err != nil {
+			break
+		}
+	}
+	err := cmd.Wait()
+	if err != nil && !c.aborted && strings.TrimSpace(reply.String()) == "" {
+		lines := strings.Split(strings.TrimSpace(stderr.String()), "\n")
+		onText("コマンドがエラーで終了しました。（" + strings.TrimSpace(lines[len(lines)-1]) + "）")
+	}
+	if r := strings.TrimSpace(reply.String()); r != "" && !c.aborted {
+		c.history = append(c.history, Message{"role": "assistant", "content": r})
+	} else {
+		c.history = c.history[:len(c.history)-1]
+	}
+}
+
+// OS ごとのシェルでコマンドを動かす
+func shellCommand(command string) *exec.Cmd {
+	if runtime.GOOS == "windows" {
+		return exec.Command("cmd.exe", "/d", "/s", "/c", command)
+	}
+	return exec.Command("/bin/sh", "-c", command)
+}
+
+// ---------------- オフライン (AI なし) ----------------
+
+type offlineProvider struct{}
+
+func (offlineProvider) Label() string { return "offline" }
+func (offlineProvider) Abort()        {}
+func (offlineProvider) Clear()        {}
+
+func (offlineProvider) Reply(text string, onText func(string)) {
+	now := time.Now()
+	has := func(words ...string) bool {
+		for _, w := range words {
+			if strings.Contains(text, w) {
+				return true
+			}
+		}
+		return false
+	}
+	switch {
+	case has("何時", "時間", "時刻"):
+		onText(fmt.Sprintf("いまは%d時%d分です。", now.Hour(), now.Minute()))
+	case has("何日", "日付", "今日", "曜日"):
+		wd := []string{"日", "月", "火", "水", "木", "金", "土"}[now.Weekday()]
+		onText(fmt.Sprintf("今日は%d月%d日、%s曜日です。", int(now.Month()), now.Day(), wd))
+	case has("こんにちは", "こんばんは", "おはよう", "はじめまして", "やあ"):
+		onText("こんにちは！ルミです。今日もよろしくお願いします。")
+	case has("名前", "だれ", "誰"):
+		onText("わたしはルミ。暗い画面でほのかに光っているアシスタントです。")
+	case has("ありがと"):
+		onText("どういたしまして！")
+	default:
+		onText("いまはAIにつながっていないので、時間や日付くらいしか分かりません。/set provider local などでAIを設定すると、もっとお話しできますよ。")
+	}
+}
+
+// ---------------- 文の区切り ----------------
+
+type sentenceSplitter struct{ buf strings.Builder }
+
+const sentenceEnds = "。！？!?\n"
+const sentenceClosers = "」』）)\"'"
+
+// 断片を足し、区切れた文を返す (文末の直後の閉じかっこは同じ文に含める)
+func (sp *sentenceSplitter) Push(chunk string) []string {
+	sp.buf.WriteString(chunk)
+	var out []string
+	for {
+		s := []rune(sp.buf.String())
+		i := -1
+		for k, r := range s {
+			if strings.ContainsRune(sentenceEnds, r) {
+				i = k
+				break
+			}
+		}
+		if i < 0 {
+			if len(s) > 60 {
+				if c := strings.LastIndex(string(s), "、"); c >= 0 {
+					head := string(s)[:c+len("、")]
+					out = append(out, head)
+					rest := string(s)[len(head):]
+					sp.buf.Reset()
+					sp.buf.WriteString(rest)
+				}
+			}
+			return out
+		}
+		for i+1 < len(s) && strings.ContainsRune(sentenceEnds+sentenceClosers, s[i+1]) {
+			i++
+		}
+		if i == len(s)-1 && s[i] != '\n' {
+			return out // 閉じかっこが次の断片で来るかもしれないので待つ (最後は Flush で出る)
+		}
+		out = append(out, string(s[:i+1]))
+		sp.buf.Reset()
+		sp.buf.WriteString(string(s[i+1:]))
+	}
+}
+
+func (sp *sentenceSplitter) Flush() string {
+	s := sp.buf.String()
+	sp.buf.Reset()
+	return s
+}
+
+var urlRe = regexp.MustCompile(`https?://\S+`)
+var markRe = regexp.MustCompile("[*#`_>|\\[\\]]")
+
+// 読み上げに向かない URL や記号を取る
+func cleanForSpeech(s string) string {
+	return strings.TrimSpace(markRe.ReplaceAllString(urlRe.ReplaceAllString(s, ""), ""))
+}

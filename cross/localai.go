@@ -1,0 +1,422 @@
+package main
+
+// ローカルAI (llama.cpp の llama-server + GGUF モデル) のダウンロードと起動。
+// 取得元はバージョンを固定し、SHA-256 で中身を確かめる。
+
+import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"net"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+)
+
+type asset struct {
+	URL    string
+	Size   int64
+	SHA256 string
+}
+
+const llamaBase = "https://github.com/ggml-org/llama.cpp/releases/download/b11433/"
+
+// OS と CPU ごとの llama.cpp (GPU があれば使える Vulkan / Metal 版)
+var llamaAssets = map[string]asset{
+	"windows/amd64": {llamaBase + "llama-b11433-bin-win-vulkan-x64.zip", 33337778, "021001e2b7a60aab1d23b301edb2f076e8a5136d8d29686d0d95341342088714"},
+	"windows/arm64": {llamaBase + "llama-b11433-bin-win-vulkan-arm64.zip", 25879207, "73ebd3d4d4f6dfa2ea3e46ac01038fca9916f98575abfba2ae7f6b0b9ba880df"},
+	"darwin/arm64":  {llamaBase + "llama-b11433-bin-macos-arm64.tar.gz", 11971372, "5e7b2383009facb31404f308cdb9edd1fb15131330801408fb582bd05e188f97"},
+	"darwin/amd64":  {llamaBase + "llama-b11433-bin-macos-x64.tar.gz", 11487490, "caaadcff99ce696bbb6a1ef6f7c0050250fe60d8448464ee7c90878cde3a5370"},
+	"linux/amd64":   {llamaBase + "llama-b11433-bin-ubuntu-vulkan-x64.tar.gz", 31636263, "1243a90945de3644f86bc98b588c9f7664c8528cf925b184671df060e8334d1f"},
+	"linux/arm64":   {llamaBase + "llama-b11433-bin-ubuntu-vulkan-arm64.tar.gz", 24845697, "ca6b5a7256b6517fa27a939eaf164784d4fe2475a9954ee5f268ba23e3a33727"},
+}
+
+const (
+	modelName = "Qwen3.5-4B"
+	modelFile = "Qwen3.5-4B-Q4_K_M.gguf"
+)
+
+var modelAsset = asset{
+	"https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf",
+	2740937888,
+	"00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+}
+
+func llamaAsset() (asset, bool) {
+	a, ok := llamaAssets[runtime.GOOS+"/"+runtime.GOARCH]
+	return a, ok
+}
+
+func localTotalSize() int64 {
+	a, _ := llamaAsset()
+	return a.Size + modelAsset.Size
+}
+
+func localDir(base string) string  { return filepath.Join(base, "local") }
+func llamaDir(base string) string  { return filepath.Join(localDir(base), "llama") }
+func modelsDir(base string) string { return filepath.Join(localDir(base), "models") }
+
+// model が空なら標準モデル、ファイル名だけなら models フォルダ内として扱う
+func localModelPath(base, model string) string {
+	if model == "" {
+		model = modelFile
+	}
+	if filepath.IsAbs(model) {
+		return model
+	}
+	return filepath.Join(modelsDir(base), model)
+}
+
+func serverExe(base string) string {
+	name := "llama-server"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	found := ""
+	filepath.WalkDir(llamaDir(base), func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && d.Name() == name {
+			found = p
+			return fs.SkipAll
+		}
+		return nil
+	})
+	return found
+}
+
+func localInstalled(base string) bool {
+	_, err := os.Stat(localModelPath(base, ""))
+	return serverExe(base) != "" && err == nil
+}
+
+var errCancelled = errors.New("中断しました")
+
+// llama.cpp と標準モデルをダウンロードする。progress(説明, 0〜1)
+func installLocal(base string, progress func(string, float64), cancelled func() bool) error {
+	la, ok := llamaAsset()
+	if !ok {
+		return fmt.Errorf("この環境 (%s/%s) 用のローカルAIはありません", runtime.GOOS, runtime.GOARCH)
+	}
+	total := float64(la.Size + modelAsset.Size)
+	os.MkdirAll(modelsDir(base), 0o755)
+
+	if serverExe(base) == "" {
+		archive := filepath.Join(localDir(base), filepath.Base(la.URL))
+		err := download(la, archive, func(done int64) {
+			progress("AIエンジン (llama.cpp) をダウンロード中", float64(done)/total)
+		}, cancelled, nil)
+		if err != nil {
+			return err
+		}
+		progress("AIエンジンを展開中", float64(la.Size)/total)
+		os.RemoveAll(llamaDir(base))
+		if err := extract(archive, llamaDir(base)); err != nil {
+			return err
+		}
+		os.Remove(archive)
+	}
+
+	model := localModelPath(base, "")
+	if _, err := os.Stat(model); err != nil {
+		err := download(modelAsset, model, func(done int64) {
+			progress("AIモデル ("+modelName+") をダウンロード中", float64(la.Size+done)/total)
+		}, cancelled, func() { progress("AIモデルを検証中", 1) })
+		if err != nil {
+			return err
+		}
+	}
+	progress("完了", 1)
+	return nil
+}
+
+// 途中で止まっても .part から再開できるダウンロード。最後にサイズと SHA-256 を確かめる
+func download(a asset, dest string, progress func(int64), cancelled func() bool, verifying func()) error {
+	part := dest + ".part"
+	var have int64
+	if st, err := os.Stat(part); err == nil {
+		have = st.Size()
+	}
+	if have > a.Size {
+		os.Remove(part)
+		have = 0
+	}
+	if have < a.Size {
+		req, _ := http.NewRequest("GET", a.URL, nil)
+		req.Header.Set("User-Agent", "Lumi")
+		if have > 0 {
+			req.Header.Set("Range", fmt.Sprintf("bytes=%d-", have))
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+		if res.StatusCode >= 300 {
+			return fmt.Errorf("ダウンロードに失敗しました (HTTP %d)", res.StatusCode)
+		}
+		flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND
+		if have > 0 && res.StatusCode != http.StatusPartialContent {
+			have = 0 // 再開できないサーバーなら最初から
+		}
+		if have == 0 {
+			flags = os.O_CREATE | os.O_WRONLY | os.O_TRUNC
+		}
+		f, err := os.OpenFile(part, flags, 0o644)
+		if err != nil {
+			return err
+		}
+		buf := make([]byte, 1<<20)
+		last := time.Time{}
+		for {
+			if cancelled() {
+				f.Close()
+				return errCancelled
+			}
+			n, rerr := res.Body.Read(buf)
+			if n > 0 {
+				if _, err := f.Write(buf[:n]); err != nil {
+					f.Close()
+					return err
+				}
+				have += int64(n)
+				if time.Since(last) > 200*time.Millisecond {
+					progress(have)
+					last = time.Now()
+				}
+			}
+			if rerr == io.EOF {
+				break
+			}
+			if rerr != nil {
+				f.Close()
+				return rerr
+			}
+		}
+		f.Close()
+	}
+
+	if verifying != nil {
+		verifying()
+	}
+	sum, err := fileSHA256(part)
+	if st, _ := os.Stat(part); err != nil || st.Size() != a.Size || sum != a.SHA256 {
+		os.Remove(part)
+		return fmt.Errorf("%s の中身が正しくありません。もう一度試してください", filepath.Base(dest))
+	}
+	os.Remove(dest)
+	return os.Rename(part, dest)
+}
+
+func fileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// zip / tar.gz を展開する (展開先の外に出るパスは無視する)
+func extract(archive, dest string) error {
+	safe := func(name string) (string, bool) {
+		p := filepath.Join(dest, name)
+		return p, strings.HasPrefix(p, filepath.Clean(dest)+string(os.PathSeparator))
+	}
+	if strings.HasSuffix(archive, ".zip") {
+		zr, err := zip.OpenReader(archive)
+		if err != nil {
+			return err
+		}
+		defer zr.Close()
+		for _, f := range zr.File {
+			p, ok := safe(f.Name)
+			if !ok || f.FileInfo().IsDir() {
+				continue
+			}
+			os.MkdirAll(filepath.Dir(p), 0o755)
+			rc, err := f.Open()
+			if err != nil {
+				return err
+			}
+			err = writeFile(p, rc, f.Mode())
+			rc.Close()
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	file, err := os.Open(archive)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	gz, err := gzip.NewReader(file)
+	if err != nil {
+		return err
+	}
+	tr := tar.NewReader(gz)
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		p, ok := safe(h.Name)
+		if !ok {
+			continue
+		}
+		switch h.Typeflag {
+		case tar.TypeDir:
+			os.MkdirAll(p, 0o755)
+		case tar.TypeReg:
+			os.MkdirAll(filepath.Dir(p), 0o755)
+			if err := writeFile(p, tr, fs.FileMode(h.Mode)); err != nil {
+				return err
+			}
+		case tar.TypeSymlink:
+			// ライブラリの別名 (libfoo.so -> libfoo.so.1) は展開先の中を指すものだけ作る
+			if target, ok := safe(filepath.Join(filepath.Dir(h.Name), h.Linkname)); ok {
+				os.MkdirAll(filepath.Dir(p), 0o755)
+				os.Symlink(filepath.Base(target), p)
+			}
+		}
+	}
+}
+
+func writeFile(path string, r io.Reader, mode fs.FileMode) error {
+	if mode&0o111 == 0 {
+		mode = 0o644
+	} else {
+		mode = 0o755
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(f, r)
+	f.Close()
+	return err
+}
+
+// ---------------- llama-server を 1 つだけ動かす ----------------
+
+type llamaServer struct {
+	mu       sync.Mutex
+	cmd      *exec.Cmd
+	args     string
+	endpoint string
+	apiKey   string
+}
+
+var localServer = &llamaServer{}
+
+func (s *llamaServer) Endpoint() string { s.mu.Lock(); defer s.mu.Unlock(); return s.endpoint }
+func (s *llamaServer) APIKey() string   { s.mu.Lock(); defer s.mu.Unlock(); return s.apiKey }
+
+func (s *llamaServer) Start(base, modelPath string, gpu bool, context int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	exe := serverExe(base)
+	if _, err := os.Stat(modelPath); exe == "" || err != nil {
+		return errors.New("ローカルAIが入っていません。/install-local と入力するとダウンロードします")
+	}
+	key := fmt.Sprintf("%s|%v|%d", modelPath, gpu, context)
+	if s.cmd != nil && s.cmd.ProcessState == nil && s.args == key {
+		return nil
+	}
+	s.stopLocked()
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return err
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close()
+
+	// 同じ PC のほかのアプリから勝手に使われないよう、起動ごとにランダムな鍵をかける
+	b := make([]byte, 16)
+	rand.Read(b)
+	apiKey := hex.EncodeToString(b)
+	ngl := "0"
+	if gpu {
+		ngl = "99"
+	}
+	// -np 1: 会話は 1 つだけなので、コンテキストを丸ごと 1 つの会話に使う
+	cmd := exec.Command(exe, "-m", modelPath, "--host", "127.0.0.1", "--port", fmt.Sprint(port),
+		"-c", fmt.Sprint(context), "-np", "1", "-ngl", ngl, "--api-key", apiKey)
+	cmd.Dir = filepath.Dir(exe)
+	libEnv := map[string]string{"linux": "LD_LIBRARY_PATH", "darwin": "DYLD_LIBRARY_PATH"}[runtime.GOOS]
+	cmd.Env = os.Environ()
+	if libEnv != "" {
+		cmd.Env = append(cmd.Env, libEnv+"="+filepath.Dir(exe))
+	}
+	logFile, _ := os.Create(filepath.Join(localDir(base), "server.log"))
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	hideWindow(cmd)
+	killWithParent(cmd)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	afterStart(cmd)
+	s.cmd, s.args = cmd, key
+	s.endpoint = fmt.Sprintf("http://127.0.0.1:%d", port)
+	s.apiKey = apiKey
+	exited := make(chan struct{})
+	go func() { cmd.Wait(); logFile.Close(); close(exited) }()
+
+	// モデルの読み込みが終わると /health が 200 を返す
+	deadline := time.Now().Add(5 * time.Minute)
+	for {
+		select {
+		case <-exited:
+			s.cmd = nil
+			return errors.New("ローカルAIの起動に失敗しました。詳しくは local/server.log を見てください")
+		default:
+		}
+		res, err := (&http.Client{Timeout: 2 * time.Second}).Get(s.endpoint + "/health")
+		if err == nil {
+			res.Body.Close()
+			if res.StatusCode == 200 {
+				return nil
+			}
+		}
+		if time.Now().After(deadline) {
+			s.stopLocked()
+			return errors.New("ローカルAIの起動がタイムアウトしました")
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+func (s *llamaServer) Stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopLocked()
+}
+
+func (s *llamaServer) stopLocked() {
+	if s.cmd != nil && s.cmd.Process != nil {
+		s.cmd.Process.Kill()
+	}
+	s.cmd = nil
+	s.args = ""
+}

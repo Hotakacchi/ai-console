@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ルミ</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <!-- メインの窓: 背景に顔、手前にコンソール -->
+  <div id="term" hidden>
+    <canvas id="face"></canvas>
+    <div id="log"></div>
+    <textarea id="keys" autocapitalize="off" autocomplete="off" spellcheck="false" aria-label="入力"></textarea>
+  </div>
+  <!-- 右下から出てくる窓 -->
+  <div id="peek" hidden>
+    <div id="bubble">
+      <canvas id="peekFace"></canvas>
+      <div id="peekText"></div>
+    </div>
+  </div>
+</body>
+</html>

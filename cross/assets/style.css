@@ -1,0 +1,64 @@
+/* Windows Terminal の標準配色 (Campbell) */
+:root {
+  --bg: #0c0c0c;
+  --fg: #cccccc;
+  --white: #f2f2f2;
+  --dim: #767676;
+  --yellow: #f9f1a5;
+  --red: #e74856;
+  --cyan: #3a96dd;
+  --bright: #61d6d6;
+  --mono: "Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", "BIZ UDGothic", "MS Gothic", "Hiragino Sans", "Noto Sans Mono CJK JP", monospace;
+}
+
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.45 var(--mono); }
+
+/* ---- メインの窓 ---- */
+#term { position: fixed; inset: 0; padding: 8px 12px; box-sizing: border-box; }
+#face { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#log {
+  position: relative; height: 100%; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+  scrollbar-width: thin; scrollbar-color: #333 transparent;
+}
+#log::-webkit-scrollbar { width: 8px; }
+#log::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+.line { min-height: 1.45em; }
+
+.fg { color: var(--fg); } .white { color: var(--white); } .dim { color: var(--dim); }
+.yellow { color: var(--yellow); } .red { color: var(--red); } .cyan { color: var(--cyan); }
+
+/* 入力行: 四角いカーソルが点滅する */
+#input .prompt { color: var(--fg); }
+#input.asking .prompt { color: var(--yellow); }
+#input .typed { color: var(--white); }
+#input .compose { color: var(--white); text-decoration: underline; }
+#input .ghost, #input .hint { color: var(--dim); }
+.cursor { display: inline-block; width: 0.6em; height: 1.2em; vertical-align: text-bottom; background: var(--fg); }
+#term.blur .cursor { background: transparent; outline: 1px solid var(--fg); outline-offset: -1px; }
+.cursor.off { visibility: hidden; }
+.spinner { color: var(--dim); }
+
+/* キー入力と日本語変換を受けるための見えない入力欄 (カーソルの位置に置く) */
+#keys {
+  position: absolute; width: 2em; height: 1.4em; padding: 0; border: 0; margin: 0;
+  opacity: 0; resize: none; overflow: hidden; font: inherit; color: transparent; background: transparent;
+}
+
+/* ---- 右下から出てくる窓 ---- */
+body.peek { background: transparent; }
+#peek { position: fixed; inset: 0; overflow: hidden; }
+#bubble {
+  position: absolute; left: 8px; right: 8px; bottom: 8px; height: calc(100% - 20px);
+  background: var(--bg); border: 2px solid var(--bright); border-radius: 22px; box-sizing: border-box;
+  transform: translateY(110%); opacity: 0; cursor: pointer;
+}
+#peekFace { position: absolute; left: 0; top: 4px; width: 100%; height: calc(100% - 40px); }
+#peekText {
+  position: absolute; left: 0; right: 0; bottom: 8px; text-align: center;
+  font: bold 15px "Yu Gothic UI", "Hiragino Sans", "Noto Sans CJK JP", sans-serif; color: var(--fg);
+}
+/* 行き過ぎてから戻る (ぴょこっ) */
+#bubble.pop { transform: translateY(0); opacity: 1; transition: transform .42s cubic-bezier(.34, 1.9, .64, 1), opacity .25s; }
+#bubble.retract { transform: translateY(110%); opacity: 0; transition: transform .3s ease-in, opacity .3s ease-in; }
+#bubble.sleepy { transform: translateY(110%); opacity: 0; transition: transform .65s ease-in .9s, opacity .65s ease-in .9s; }

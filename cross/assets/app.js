@@ -93,7 +93,9 @@ function termMain() {
   }
 
   // ---- 入力行 (今の行の最後に置く) ----
-  const PROMPT = "C:\\Lumi> ";
+  // シェルモードでは Go から送られたプロンプト (PS C:\Users\…> など) に変わる
+  const NORMAL_PROMPT = "C:\\Lumi> ";
+  let PROMPT = NORMAL_PROMPT;
   const input = document.createElement("span");
   input.id = "input";
   input.innerHTML = '<span class="prompt"></span><span class="typed"></span><span class="compose"></span>' +
@@ -389,6 +391,7 @@ function termMain() {
   on("flash", d => face.flash(d.expr, d.seconds));
   on("ask", q => { askPrompt = q; buffer = ""; thinking = false; voice.confirming(true); render(); keys.focus(); });
   on("i18n", m => { msgs = m; });
+  on("prompt", p => { PROMPT = p || NORMAL_PROMPT; render(); });
   // --script で流し込まれた行を、打ち込んだのと同じように表示する
   on("echo", text => { write(PROMPT, "fg"); write(text + "\n", "white"); if (!text.startsWith("/")) lastWasVoice = false; });
   on("admin", on => { admin = on; recolor(); });

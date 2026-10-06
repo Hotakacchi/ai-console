@@ -2,6 +2,7 @@ package main
 
 import (
 	"os/exec"
+	"strconv"
 	"syscall"
 	"unsafe"
 
@@ -70,4 +71,18 @@ func drives() []string {
 		list = append(list, root)
 	}
 	return list
+}
+
+func newGroup(cmd *exec.Cmd) {}
+
+// cmd と、そこから起動されたプロセス (ping など) をまとめて止める
+func killTree(cmd *exec.Cmd) {
+	if cmd.Process == nil {
+		return
+	}
+	kill := exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(cmd.Process.Pid))
+	hideWindow(kill)
+	if kill.Run() != nil {
+		cmd.Process.Kill()
+	}
 }

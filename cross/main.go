@@ -115,7 +115,7 @@ func main() {
 
 	// 画面からのイベント
 	app.Event.On("ready", func(*application.CustomEvent) { lumi.ready() })
-	app.Event.On("submit", func(e *application.CustomEvent) { lumi.submit(asString(e.Data)) })
+	app.Event.On("submit", func(e *application.CustomEvent) { lumi.submitTyped(asString(e.Data)) })
 	app.Event.On("answer", func(e *application.CustomEvent) {
 		select {
 		case lumi.answers <- asString(e.Data):

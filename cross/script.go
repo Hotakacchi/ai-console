@@ -33,7 +33,7 @@ func (l *Lumi) runScript(path string) {
 				time.Sleep(200 * time.Millisecond)
 			}
 			l.emit("echo", line) // 画面に打ち込んだ行として出す
-			l.submit(line)
+			l.submitTyped(line)
 			time.Sleep(300 * time.Millisecond)
 		}
 	}()

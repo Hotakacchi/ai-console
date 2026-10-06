@@ -53,6 +53,8 @@ type Lumi struct {
 	whisperErrorShown bool
 	replyText strings.Builder // 今の返事で喋った文 (履歴に残す)
 	pending   []attachment    // 次の発言に付けるファイル (ドラッグ＆ドロップ・/attach)
+	shellOn   bool            // シェルモード (打った行をそのままコマンドとして実行)
+	shellDir  string          // コマンドを実行する場所 (cd で変わる)
 }
 
 func newLumi(app *application.App, muted, noMic bool) *Lumi {
@@ -301,6 +303,8 @@ func (l *Lumi) submit(text string) {
 		l.installVisionCmd()
 	case "/commands":
 		l.commandsFile()
+	case "/shell":
+		l.toggleShell()
 	case "/attach":
 		l.attachCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/detach":
@@ -326,6 +330,7 @@ func (l *Lumi) submit(text string) {
 			b.WriteString("  " + padRight(c.name+args, 24) + c.help() + "\n")
 		}
 		b.WriteString("\n  " + T("help.wake", l.wakeWord()) + "\n  " + T("help.tab") + "\n")
+		b.WriteString("  " + T("help.shell") + "\n")
 		b.WriteString("  " + T("help.keys"))
 		l.info(b.String())
 	default:
@@ -342,7 +347,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/shell", ""},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", ""}, {"/cls", ""}, {"/exit", ""},
 }

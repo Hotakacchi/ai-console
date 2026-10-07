@@ -158,10 +158,6 @@ func runShellWith(sh shellSpec, command, dir string, cancel <-chan struct{}, onL
 	cmd := sh.command(command, dir)
 	cmd.Dir = dir
 	hideWindow(cmd)
-	if sh.Kind == "cmd" {
-		// cmd は自分のコンソールがないと UTF-8 (chcp 65001) に切り替えられないので、見えないコンソールを付ける
-		hiddenConsole(cmd)
-	}
 	newGroup(cmd)
 	pr, pw := io.Pipe()
 	cmd.Stdout, cmd.Stderr = pw, pw

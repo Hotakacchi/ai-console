@@ -19,7 +19,7 @@ import (
 )
 
 // 標準の Discord アプリの ID (Discord Developer Portal で作った「Lumi」)。空なら discord_app_id が必要
-const defaultDiscordAppID = ""
+const defaultDiscordAppID = "1557204882564583434"
 
 const (
 	discordIcon = "https://raw.githubusercontent.com/Hotakacchi/ai-console/main/lumi.png"

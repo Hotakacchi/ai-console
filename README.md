@@ -53,7 +53,7 @@
 | `/reload` | 設定ファイルを読み直す |
 | `/mute` | 読み上げのオン/オフ |
 | `/mic` | 音声入力のオン/オフ (初回は認識モデル約50MBをダウンロード) |
-| `/install-local` | ローカルAIをダウンロードする |
+| `/install-local [list\|名前]` | ローカルAIをダウンロードする。`list` でモデルの一覧 (Qwen3.5 0.8B / 2B / 4B / 9B、Phi-4 mini)、名前でそのモデルを入れて切り替える |
 | `/install-voice` | 音声認識モデルをダウンロードする |
 | `/install-voicevox` | より自然な声 (VOICEVOX、約330MB) を入れる |
 | `/install-whisper` | より正確な音声認識 (Whisper、約110MB) を入れる |

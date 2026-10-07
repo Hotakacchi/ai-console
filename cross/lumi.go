@@ -222,8 +222,8 @@ func (l *Lumi) ready() {
 	})
 	l.emit("flash", map[string]any{"expr": "happy", "seconds": 2.5})
 	// インストーラーで「ローカルAIも入れる」を選んだときは、初回にダウンロードする
-	if l.installLocalOnStart && !localInstalled(dataDir()) {
-		l.installLocal()
+	if l.installLocalOnStart && !localInstalled(dataDir(), l.s.Get("model", "")) {
+		l.installLocalCommand("")
 	} else {
 		l.warmupLocal()
 	}
@@ -236,8 +236,12 @@ func (l *Lumi) warmupLocal() {
 		return
 	}
 	dir := dataDir()
-	if !localInstalled(dir) {
-		l.write(T("local.notInstalledHint", float64(localTotalSize())/1e9)+"\n\n", "yellow")
+	if !localInstalled(dir, l.s.Get("model", "")) {
+		if m, ok := currentLocalModel(l.s); ok && m.ID != defaultLocalModelID {
+			l.write(T("local.modelNotInstalled", m.Name, m.ID)+"\n\n", "yellow")
+		} else {
+			l.write(T("local.notInstalledHint", float64(localTotalSize(defaultLocalModel()))/1e9)+"\n\n", "yellow")
+		}
 		return
 	}
 	l.write(T("local.starting")+"\n", "dim")
@@ -315,7 +319,7 @@ func (l *Lumi) submit(text string) {
 	case "/reload":
 		l.reload(true)
 	case "/install-local":
-		l.installLocal()
+		l.installLocalCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/config":
 		openFile(l.s.Path)
 		l.info(T("config.opened"))
@@ -394,7 +398,7 @@ func (c command) help() string { return T("cmd." + strings.TrimPrefix(c.name, "/
 
 var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
-	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
+	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", "cmd.install-local.args"}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
 	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
@@ -565,18 +569,19 @@ func openFile(path string) {
 
 // ---- ローカルAIのダウンロード ----
 
-func (l *Lumi) installLocal() {
+// モデル m (と、なければ llama.cpp) をダウンロードして、そのモデルに切り替える
+func (l *Lumi) installLocalModel(m localModel) {
 	l.setBusy(true)
 	cancel := make(chan struct{})
 	l.mu.Lock()
 	l.cancel = cancel
 	l.mu.Unlock()
-	l.write(T("local.installStart")+"\n", "dim")
+	l.write(T("local.installModel", m.Name, float64(m.Asset.Size)/1e9)+"\n", "dim")
 	go func() {
 		defer l.setBusy(false)
 		lastStep, lastPct := "", -1
 		defer l.setActivity("", 0)
-		err := installLocal(dataDir(), func(step string, ratio float64) {
+		err := installLocal(dataDir(), m, func(step string, ratio float64) {
 			l.setActivity("download", ratio) // 口がプログレスバーになる
 			pct := int(ratio * 100)
 			if step == lastStep && pct/5 == lastPct/5 {
@@ -598,8 +603,16 @@ func (l *Lumi) installLocal() {
 		case err != nil:
 			l.errorText(T("download.failed", err.Error()))
 		default:
-			if l.s.Get("provider", "offline") == "offline" {
-				l.s.Set("provider", "local")
+			if l.s.Err == nil {
+				if l.s.Get("provider", "offline") != "local" {
+					l.s.Set("provider", "local")
+				}
+				// 標準のモデルなら空のまま (ほかのモデルなら名前を書く)
+				if m.ID == defaultLocalModelID {
+					l.s.Set("model", "")
+				} else {
+					l.s.Set("model", m.ID)
+				}
 			}
 			l.loadSettings()
 			l.write(T("local.installed", l.ai.Label())+"\n", "dim")

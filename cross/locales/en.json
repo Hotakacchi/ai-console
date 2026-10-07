@@ -49,7 +49,7 @@
   "cmd.reload": "Reload the settings file",
   "cmd.mute": "Turn speech on/off",
   "cmd.mic": "Turn voice input on/off",
-  "cmd.install-local": "Download the local AI",
+  "cmd.install-local": "Install the local AI. list: available models; a name: install that model and switch to it (e.g. /install-local qwen3.5-9b)",
   "cmd.install-voice": "Download the speech recognition model",
   "cmd.peek": "Try the small window shown when called in the background. move: drag it to choose where it appears",
   "cmd.cls": "Clear the screen and the conversation",
@@ -382,5 +382,17 @@
   "self.command": "a custom script",
   "self.offline": "none (only fixed replies)",
   "offline.words.version": "version,which version",
-  "offline.version": "Lumi is version %s, running on %s. /update checks for a new version."
+  "offline.version": "Lumi is version %s, running on %s. /update checks for a new version.",
+  "cmd.install-local.args": "[list|name]",
+  "local.installModel": "Downloading the local AI (%s, about %.1f GB). Press Ctrl+C to stop (it resumes next time).",
+  "local.noSuchModel": "There's no model named “%s” in the list.",
+  "local.modelNotInstalled": "The local AI model %s isn't installed. Install it with /install-local %s.",
+  "local.modelInstalled": "(installed)",
+  "local.modelsHow": "Install and switch with /install-local <name>. Switch between installed ones with /set model <name> (* = current; 🖼 = can read images after /install-vision).",
+  "local.note.tiny": "Very light; for older PCs",
+  "local.note.light": "Light; for PCs with 8 GB of memory",
+  "local.note.standard": "Standard; well balanced",
+  "local.note.smart": "Smarter; a GPU or 16 GB+ of memory recommended",
+  "local.note.english": "By Microsoft; good at English",
+  "vision.notSupported": "The current local AI model can't read images (models marked 🖼 in /install-local list can)"
 }

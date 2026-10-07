@@ -44,35 +44,28 @@ var llamaAssets = map[string]asset{
 	"linux/arm64":   {llamaBase + "llama-b11433-bin-ubuntu-vulkan-arm64.tar.gz", 24845697, "ca6b5a7256b6517fa27a939eaf164784d4fe2475a9954ee5f268ba23e3a33727"},
 }
 
-const (
-	modelName = "Qwen3.5-4B"
-	modelFile = "Qwen3.5-4B-Q4_K_M.gguf"
-)
-
-var modelAsset = asset{
-	"https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf",
-	2740937888,
-	"00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
-}
-
 func llamaAsset() (asset, bool) {
 	a, ok := llamaAssets[runtime.GOOS+"/"+runtime.GOARCH]
 	return a, ok
 }
 
-func localTotalSize() int64 {
+// llama.cpp とモデル m を合わせた大きさ
+func localTotalSize(m localModel) int64 {
 	a, _ := llamaAsset()
-	return a.Size + modelAsset.Size
+	return a.Size + m.Asset.Size
 }
 
 func localDir(base string) string  { return filepath.Join(base, "local") }
 func llamaDir(base string) string  { return filepath.Join(localDir(base), "llama") }
 func modelsDir(base string) string { return filepath.Join(localDir(base), "models") }
 
-// model が空なら標準モデル、ファイル名だけなら models フォルダ内として扱う
+// model が空なら標準モデル、一覧の名前 (qwen3.5-9b など) ならそのファイル、
+// ファイル名だけなら models フォルダ内として扱う
 func localModelPath(base, model string) string {
 	if model == "" {
-		model = modelFile
+		model = defaultLocalModel().File
+	} else if m, ok := findLocalModel(model); ok {
+		model = m.File
 	}
 	if filepath.IsAbs(model) {
 		return model
@@ -96,20 +89,21 @@ func serverExe(base string) string {
 	return found
 }
 
-func localInstalled(base string) bool {
-	_, err := os.Stat(localModelPath(base, ""))
+// llama.cpp と、設定 model のモデル (空なら標準) が入っているか
+func localInstalled(base, model string) bool {
+	_, err := os.Stat(localModelPath(base, model))
 	return serverExe(base) != "" && err == nil
 }
 
 var errCancelled = errors.New("cancelled")
 
-// llama.cpp と標準モデルをダウンロードする。progress(説明, 0〜1)
-func installLocal(base string, progress func(string, float64), cancelled func() bool) error {
+// llama.cpp とモデル m をダウンロードする。progress(説明, 0〜1)
+func installLocal(base string, m localModel, progress func(string, float64), cancelled func() bool) error {
 	la, ok := llamaAsset()
 	if !ok {
 		return errors.New(T("local.noBuild", runtime.GOOS+"/"+runtime.GOARCH))
 	}
-	total := float64(la.Size + modelAsset.Size)
+	total := float64(la.Size + m.Asset.Size)
 	os.MkdirAll(modelsDir(base), 0o755)
 
 	if serverExe(base) == "" {
@@ -128,10 +122,10 @@ func installLocal(base string, progress func(string, float64), cancelled func() 
 		os.Remove(archive)
 	}
 
-	model := localModelPath(base, "")
-	if _, err := os.Stat(model); err != nil {
-		err := download(modelAsset, model, func(done int64) {
-			progress(T("local.dlModel", modelName), float64(la.Size+done)/total)
+	model := filepath.Join(modelsDir(base), m.File)
+	if !m.installed(base) {
+		err := download(m.Asset, model, func(done int64) {
+			progress(T("local.dlModel", m.Name), float64(la.Size+done)/total)
 		}, cancelled, func() { progress(T("local.verifying"), 1) })
 		if err != nil {
 			return err

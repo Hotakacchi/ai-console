@@ -378,6 +378,10 @@ func newLocal(s *Settings) Provider {
 	gpu := strings.ToLower(s.Get("local_gpu", "auto")) != "off"
 	p := newOpenAI(s)
 	p.model = strings.TrimSuffix(filepath.Base(modelPath), filepath.Ext(modelPath))
+	family := ""
+	if m, ok := currentLocalModel(s); ok {
+		p.model, family = m.Name, m.Family
+	}
 	p.label = "local: " + p.model
 	ctx := localContext(s)
 	// 指示文と返事の分を残して、履歴はコンテキストに収まる分だけにする (日本語はおよそ 1 文字 1 トークン)
@@ -391,6 +395,12 @@ func newLocal(s *Settings) Provider {
 		return nil
 	}
 	p.addOptions = func(body map[string]any) {
+		if family != "qwen" && family != "" {
+			// ほかのモデルは、ふつうの値で
+			body["temperature"] = 0.7
+			body["top_p"] = 0.9
+			return
+		}
 		// Qwen3.5 は既定で考えてから答えるので、会話用に考える過程を切る。サンプリングはモデル推奨値
 		body["chat_template_kwargs"] = map[string]any{"enable_thinking": false}
 		body["temperature"] = 0.7

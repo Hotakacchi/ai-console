@@ -20,22 +20,14 @@ import (
 	"golang.org/x/image/draw"
 )
 
-// 標準モデル用の画像を読む部品
-const visionFile = "mmproj-Qwen3.5-4B-F16.gguf"
-
-var visionAsset = asset{
-	"https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/mmproj-F16.gguf",
-	672423616,
-	"cd88edcf8d031894960bb0c9c5b9b7e1fea6ebee02b9f7ce925a00d12891f864",
-}
-
-// 標準モデルを使っていて部品が入っていれば、その場所 (なければ "")
+// モデルの画像を読む部品が入っていれば、その場所 (なければ "")
 func visionPath(base, modelPath string) string {
-	if modelPath != localModelPath(base, "") {
+	m, ok := findLocalModel(modelPath)
+	if !ok || m.Vision == nil {
 		return ""
 	}
-	p := filepath.Join(modelsDir(base), visionFile)
-	if st, err := os.Stat(p); err == nil && st.Size() == visionAsset.Size {
+	p := filepath.Join(modelsDir(base), m.visionFile())
+	if st, err := os.Stat(p); err == nil && st.Size() == m.Vision.Size {
 		return p
 	}
 	return ""
@@ -53,33 +45,43 @@ func (l *Lumi) canSeeImages() (bool, string) {
 		return false, T("vision.offline")
 	case "local":
 		dir := dataDir()
+		m, ok := currentLocalModel(l.s)
+		if !ok || m.Vision == nil {
+			return false, T("vision.notSupported")
+		}
 		if visionPath(dir, localModelPath(dir, l.s.Get("model", ""))) == "" {
-			return false, T("vision.needInstall", float64(visionAsset.Size)/1e6)
+			return false, T("vision.needInstall", float64(m.Vision.Size)/1e6)
 		}
 	}
 	return true, ""
 }
 
-// /install-vision: ローカルAIに画像を読む部品を足す
+// /install-vision: 今のローカルAIのモデルに、画像を読む部品を足す
 func (l *Lumi) installVisionCmd() {
 	dir := dataDir()
-	if !localInstalled(dir) {
-		l.errorText(T("local.notInstalledHint", float64(localTotalSize())/1e9))
+	m, ok := currentLocalModel(l.s)
+	if !ok || m.Vision == nil {
+		l.errorText(T("vision.notSupported"))
 		return
 	}
+	if !localInstalled(dir, l.s.Get("model", "")) {
+		l.errorText(T("local.modelNotInstalled", m.Name, m.ID))
+		return
+	}
+	va := *m.Vision
 	l.setBusy(true)
 	cancel := make(chan struct{})
 	l.mu.Lock()
 	l.cancel = cancel
 	l.mu.Unlock()
-	l.write(T("vision.installStart", float64(visionAsset.Size)/1e6)+"\n", "dim")
+	l.write(T("vision.installStart", float64(va.Size)/1e6)+"\n", "dim")
 	go func() {
 		defer l.setBusy(false)
 		lastPct := -1
 		defer l.setActivity("", 0)
-		err := download(visionAsset, filepath.Join(modelsDir(dir), visionFile), func(n int64) {
-			l.setActivity("download", float64(n)/float64(visionAsset.Size))
-			if pct := int(float64(n) / float64(visionAsset.Size) * 100); pct/10 != lastPct/10 {
+		err := download(va, filepath.Join(modelsDir(dir), m.visionFile()), func(n int64) {
+			l.setActivity("download", float64(n)/float64(va.Size))
+			if pct := int(float64(n) / float64(va.Size) * 100); pct/10 != lastPct/10 {
 				l.write(fmt.Sprintf("  [%3d%%] %s\n", pct, T("vision.downloading")), "dim")
 				lastPct = pct
 			}

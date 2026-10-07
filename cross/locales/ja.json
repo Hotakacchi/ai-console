@@ -49,7 +49,7 @@
   "cmd.reload": "設定ファイルを読み直す",
   "cmd.mute": "読み上げのオン/オフ",
   "cmd.mic": "音声入力のオン/オフ",
-  "cmd.install-local": "ローカルAIをダウンロードする",
+  "cmd.install-local": "ローカルAIを入れる。list でモデルの一覧、名前でそのモデルを入れて切り替える (例: /install-local qwen3.5-9b)",
   "cmd.install-voice": "音声入力の認識モデルをダウンロードする",
   "cmd.peek": "バックグラウンドで呼ばれたときの小窓を試す。move で出てくる場所をドラッグで決める",
   "cmd.cls": "画面と会話をリセット",
@@ -382,5 +382,17 @@
   "self.command": "自作のスクリプト",
   "self.offline": "なし (決まった受け答えだけ)",
   "offline.words.version": "バージョン,version,何版,なんばん",
-  "offline.version": "ルミのバージョンは %s です。%s で動いています。新しい版があるかは /update で確かめられます。"
+  "offline.version": "ルミのバージョンは %s です。%s で動いています。新しい版があるかは /update で確かめられます。",
+  "cmd.install-local.args": "[list|名前]",
+  "local.installModel": "ローカルAI (%s、約%.1fGB) をダウンロードします。Ctrl+C で中断できます（次回は続きから再開します）。",
+  "local.noSuchModel": "「%s」というモデルは一覧にありません。",
+  "local.modelNotInstalled": "ローカルAIのモデル %s が入っていません。/install-local %s で入れられます。",
+  "local.modelInstalled": "(入っています)",
+  "local.modelsHow": "/install-local <名前> で入れて切り替えます。入っているものは /set model <名前> で切り替えられます (* が今のモデル、🖼 は /install-vision で画像も読めるもの)。",
+  "local.note.tiny": "とても軽い。古い PC 向け",
+  "local.note.light": "軽い。メモリ 8GB の PC 向け",
+  "local.note.standard": "標準。バランスが良い",
+  "local.note.smart": "賢い。GPU かメモリ 16GB 以上がおすすめ",
+  "local.note.english": "Microsoft 製。英語が得意",
+  "vision.notSupported": "今のローカルAIのモデルは画像を読めません (/install-local list の 🖼 が付いたモデルなら読めます)"
 }

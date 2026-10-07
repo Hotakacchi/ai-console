@@ -91,7 +91,7 @@ func LoadSettings() *Settings {
 	s := &Settings{Path: filepath.Join(dir, "settings.json"), vals: map[string]any{}}
 	if _, err := os.Stat(s.Path); os.IsNotExist(err) {
 		provider := "offline"
-		if localInstalled(dir) {
+		if localInstalled(dir, "") {
 			provider = "local"
 		}
 		os.MkdirAll(dir, 0o755)
@@ -281,8 +281,8 @@ func aiLabel(s *Settings) string {
 	model := s.Get("model", "")
 	switch strings.ToLower(s.Get("provider", "offline")) {
 	case "local":
-		if model == "" {
-			model = modelName
+		if m, ok := currentLocalModel(s); ok {
+			return T("self.local", m.Name)
 		}
 		return T("self.local", strings.TrimSuffix(filepath.Base(model), filepath.Ext(model)))
 	case "anthropic":

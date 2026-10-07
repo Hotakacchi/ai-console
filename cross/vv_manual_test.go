@@ -83,7 +83,7 @@ func TestVisionLocal(t *testing.T) {
 	t.Logf("screen %v -> jpeg %d bytes", shot.Bounds().Size(), len(encodeJPEG(shot)))
 
 	base := dataDir()
-	if err := download(visionAsset, filepath.Join(modelsDir(base), visionFile), func(int64) {}, func() bool { return false }, nil); err != nil {
+	if m := defaultLocalModel(); download(*m.Vision, filepath.Join(modelsDir(base), m.visionFile()), func(int64) {}, func() bool { return false }, nil) != nil {
 		t.Fatal(err)
 	}
 	// 文字を描いた画像を読ませる

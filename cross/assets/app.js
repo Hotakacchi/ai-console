@@ -62,6 +62,23 @@ function termMain() {
   const keys = document.getElementById("keys");
   term.hidden = false;
 
+  // ファイルを持ってきて、落とさずに窓の外へ出したときに枠が残らないように
+  // (Wails は窓の外へ出たときの dragleave を無視するので、こちらで消す)
+  {
+    const off = () => term.classList.remove("file-drop-target-active");
+    let idle = 0;
+    document.addEventListener("dragover", e => {
+      if (!e.dataTransfer?.types.includes("Files")) return;
+      clearTimeout(idle);
+      idle = setTimeout(off, 400);   // dragover が止まった = 外へ出たか、やめた
+    });
+    document.addEventListener("dragleave", e => {
+      if (e.relatedTarget) return;
+      if (e.clientX <= 0 || e.clientY <= 0 || e.clientX >= innerWidth || e.clientY >= innerHeight) off();
+    });
+    document.addEventListener("drop", () => clearTimeout(idle));
+  }
+
   // 管理者権限で動いている間は、顔をオレンジ系にする
   let base = COLORS.cyan, admin = false;
   const face = new Face(palette(base, true));

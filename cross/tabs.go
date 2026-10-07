@@ -46,6 +46,7 @@ func (l *Lumi) tabOpen(id int, kind string) {
 	termTabsMu.Unlock()
 	l.tabWrite(t, T("tab.hello", sh.Label)+"\n\n", "dim")
 	l.tabInfo(t)
+	l.tabBusy(t, false) // 画面のタブは「準備中」で始まるので、これがないとプロンプトが出ず打てない
 }
 
 func (l *Lumi) tabInfo(t *termTab) {

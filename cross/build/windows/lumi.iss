@@ -71,7 +71,8 @@ Name: "{autodesktop}\Lumi"; Filename: "{app}\lumi.exe"; Tasks: desktopicon
 
 [Run]
 ; 自動アップデート (/update) から /RELAUNCH 付きで動かされたときは、入れ終わったらルミを起動し直す
-Filename: "{app}\lumi.exe"; Flags: nowait; Check: RelaunchRequested
+; (すべてのユーザー用に管理者として入れたときも、ルミは普段のユーザーとして起動する)
+Filename: "{app}\lumi.exe"; Flags: nowait runasoriginaluser; Check: RelaunchRequested
 Filename: "{app}\lumi.exe"; Parameters: "--install-local"; Description: "{cm:Launch}"; Flags: postinstall nowait skipifsilent; Tasks: localai
 Filename: "{app}\lumi.exe"; Description: "{cm:Launch}"; Flags: postinstall nowait skipifsilent; Tasks: not localai
 

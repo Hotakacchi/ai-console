@@ -356,5 +356,13 @@
   "discord.running": "Running a command",
   "discord.searching": "Searching the web",
   "discord.downloading": "Downloading",
-  "discord.shell": "Shell mode"
+  "discord.shell": "Shell mode",
+  "cmd.auto": "Auto mode: run commands proposed by the AI without asking (also Shift+Tab; admin and risky commands still ask)",
+  "cmd.auto.args": "[on|off]",
+  "set.auto_run": "Run commands proposed by the AI without asking (admin and risky commands still ask)",
+  "auto.on": "Auto mode is on. Commands proposed by the AI run without asking. Commands that need administrator rights and risky ones (deleting, formatting, shutting down, ...) still ask. Ctrl+C to stop; /auto or Shift+Tab to turn it off.",
+  "auto.off": "Auto mode is off. Commands ask before running.",
+  "auto.running": "▶ Running automatically:",
+  "auto.risky": "This may be irreversible or risky, so it asks even in auto mode.",
+  "prompt.auto": "Auto mode is on: commands that don't need administrator rights run immediately without confirmation. Before writing a command for anything irreversible (deleting files, changing settings), ask the user in words whether they really want it."
 }

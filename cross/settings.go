@@ -35,6 +35,7 @@ func settingsTemplate(provider string) string {
   "effort": "",
   "local_gpu": "auto",
   "pc_control": "on",
+  "auto_run": "off",
   "web_search": "on",
   "clipboard": "ask",
   "screen": "ask",
@@ -208,6 +209,9 @@ func (s *Settings) SystemPrompt() string {
 		p += "\n" + T("prompt.pcBook") + "\n" + T("pcbook."+runtime.GOOS)
 		if mine := userCommands(); mine != "" {
 			p += "\n" + T("prompt.pcMine") + "\n" + mine
+		}
+		if s.Get("auto_run", "off") == "on" {
+			p += "\n" + T("prompt.auto")
 		}
 	}
 	if s.WebSearch() {

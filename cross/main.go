@@ -172,6 +172,8 @@ func main() {
 		lumi.show()
 	})
 	// /peek move でドラッグして、ダブルクリックで決めた場所を覚える
+	// Shift+Tab: 自動モードの切り替え
+	app.Event.On("toggleAuto", func(*application.CustomEvent) { lumi.autoCommand("") })
 	app.Event.On("peekMoved", func(*application.CustomEvent) { lumi.savePeekPlace() })
 
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {

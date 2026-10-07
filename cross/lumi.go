@@ -126,6 +126,9 @@ func (l *Lumi) updateTitle() {
 	if l.elevated {
 		voice += " | admin"
 	}
+	if l.autoRun() {
+		voice += " | auto"
+	}
 	l.win.SetTitle(T("app.title") + "  —  " + l.ai.Label() + " | " + voice)
 }
 
@@ -340,6 +343,8 @@ func (l *Lumi) submit(text string) {
 		l.wordsFile()
 	case "/shell":
 		l.toggleShell()
+	case "/auto":
+		l.autoCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/discord":
 		l.discordCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/phone":
@@ -388,7 +393,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", ""}, {"/routines", "cmd.routines.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", ""}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", "cmd.peek.args"}, {"/cls", ""}, {"/exit", ""},
 }
@@ -406,6 +411,7 @@ var settingKeys = []settingKey{
 	{"effort", ",low,medium,high,xhigh,max"},
 	{"local_gpu", "auto,off"},
 	{"pc_control", "on,off"},
+	{"auto_run", "off,on"},
 	{"web_search", "on,ask,off"},
 	{"search_url", ""},
 	{"voice_input", "on,off"},
@@ -738,7 +744,20 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 				admin = "  " + T("tool.adminTag")
 			}
 			report.WriteString("\n$ " + r.Command + admin + "\n")
-			answer := l.confirm(r)
+			// 自動モードなら確認せずに実行する (管理者権限と、危ない操作はこれまでどおり確認する)
+			var answer string
+			if l.autoRun() && !r.Admin && !riskyCommand(r.Command) {
+				l.write("\n"+T("auto.running")+"\n", "cyan")
+				for _, line := range strings.Split(r.Command, "\n") {
+					l.write("  "+strings.TrimRight(line, "\r")+"\n", "white")
+				}
+				answer = "y"
+			} else {
+				if l.autoRun() && !r.Admin {
+					l.write("\n"+T("auto.risky")+"\n", "yellow")
+				}
+				answer = l.confirm(r)
+			}
 			if answer != "y" && answer != "a" {
 				l.write(T("tool.notRun")+"\n", "dim")
 				report.WriteString(T("tool.declined") + "\n")

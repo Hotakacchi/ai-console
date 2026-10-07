@@ -193,6 +193,8 @@ function termMain() {
     }
     if (ctrl && e.key === "l") { e.preventDefault(); clear(); return; }
     if (busy) { if (e.key !== "Tab") return; e.preventDefault(); return; }
+    // Shift+Tab: 自動モード (確認せずにコマンドを実行する) の切り替え
+    if (e.key === "Tab" && e.shiftKey) { e.preventDefault(); emit("toggleAuto"); return; }
     if (e.key === "Tab") {
       // Tab を押すたびに候補を順に切り替える
       e.preventDefault();

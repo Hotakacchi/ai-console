@@ -160,12 +160,31 @@ func runShellWith(sh shellSpec, command, dir string, cancel <-chan struct{}, onL
 	cmd.Dir = dir
 	// wsl.exe は、こうしないと UTF-16 で書き出して文字化けする
 	cmd.Env = append(os.Environ(), "WSL_UTF8=1")
+	newDir := ""
+	err := streamCmd(cmd, cancel, func(line string) {
+		if d, ok := strings.CutPrefix(line, cwdMarker); ok {
+			newDir = filepath.Clean(strings.TrimSpace(d))
+			return
+		}
+		if strings.HasPrefix(line, "#< CLIXML") || strings.HasPrefix(line, "<Objs Version=") {
+			return // PowerShell の内部向けの出力
+		}
+		if sh.Kind == "wsl" && strings.HasPrefix(line, "wsl: ") {
+			return // WSL 自体のお知らせ (Windows の PATH を読み替えられなかった、など)
+		}
+		onLine(line)
+	})
+	return newDir, err
+}
+
+// cmd を (窓を出さずに) 動かし、出力 (標準出力とエラー) を読める 1 行ずつにして渡す。cancel が閉じたら止める
+func streamCmd(cmd *exec.Cmd, cancel <-chan struct{}, onLine func(string)) error {
 	hideWindow(cmd)
 	newGroup(cmd)
 	pr, pw := io.Pipe()
 	cmd.Stdout, cmd.Stderr = pw, pw
 	if err := cmd.Start(); err != nil {
-		return "", err
+		return err
 	}
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
@@ -178,29 +197,17 @@ func runShellWith(sh shellSpec, command, dir string, cancel <-chan struct{}, onL
 	}()
 	go func() { pw.CloseWithError(cmd.Wait()) }()
 
-	newDir := ""
 	sc := bufio.NewScanner(pr)
 	sc.Buffer(make([]byte, 64*1024), 4<<20)
 	for sc.Scan() {
 		// 表の右側の詰め物の空白は取る
-		line := strings.TrimRight(cleanLine(decodeOutput(sc.Bytes())), " \t")
-		if d, ok := strings.CutPrefix(line, cwdMarker); ok {
-			newDir = filepath.Clean(strings.TrimSpace(d))
-			continue
-		}
-		if strings.HasPrefix(line, "#< CLIXML") || strings.HasPrefix(line, "<Objs Version=") {
-			continue // PowerShell の内部向けの出力
-		}
-		if sh.Kind == "wsl" && strings.HasPrefix(line, "wsl: ") {
-			continue // WSL 自体のお知らせ (Windows の PATH を読み替えられなかった、など)
-		}
-		onLine(line)
+		onLine(strings.TrimRight(cleanLine(decodeOutput(sc.Bytes())), " \t"))
 	}
 	err := sc.Err()
 	if _, ok := err.(*exec.ExitError); ok {
 		err = nil // 終了コードが 0 でないだけなら、出力を見ればわかる
 	}
-	return newDir, err
+	return err
 }
 
 // 端末向けの出力を、画面に出せる 1 行にする:

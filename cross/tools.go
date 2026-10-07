@@ -23,10 +23,10 @@ type toolRequest struct {
 	Attrs   map[string]string // <remind in="300"> などの属性
 }
 
-var toolTags = []string{"run", "search", "fetch", "face", "remind", "remember", "forget", "clipboard", "screen"}
+var toolTags = []string{"run", "search", "fetch", "face", "remind", "remember", "forget", "clipboard", "screen", "plugin"}
 
 // 中身が空でも意味のあるタグ
-var emptyOK = map[string]bool{"clipboard": true, "screen": true}
+var emptyOK = map[string]bool{"clipboard": true, "screen": true, "plugin": true}
 
 var attrRe = regexp.MustCompile(`(\w+)\s*=\s*"([^"]*)"`)
 

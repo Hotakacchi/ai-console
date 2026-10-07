@@ -213,6 +213,9 @@ func (s *Settings) SystemPrompt() string {
 		if mine := userCommands(); mine != "" {
 			p += "\n" + T("prompt.pcMine") + "\n" + mine
 		}
+		if plugins := pluginsPrompt(); plugins != "" {
+			p += "\n\n" + plugins
+		}
 		if s.Get("auto_run", "off") == "on" {
 			p += "\n" + T("prompt.auto")
 		}

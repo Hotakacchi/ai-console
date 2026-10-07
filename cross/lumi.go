@@ -210,11 +210,7 @@ func (l *Lumi) sendVoiceSettings() {
 
 // 画面の準備ができたら呼ばれる
 func (l *Lumi) ready() {
-	names := make([]string, len(commands))
-	for i, c := range commands {
-		names[i] = c.name
-	}
-	l.emit("commands", names)
+	l.sendCommands()
 	l.emit("i18n", clientMessages())
 	l.emit("basePrompt", basePrompt())
 	l.sendShells()
@@ -401,11 +397,24 @@ func (l *Lumi) submit(text string) {
 			}
 			b.WriteString("  " + padRight(c.name+args, 24) + c.help() + "\n")
 		}
+		if list := listPlugins(); len(list) > 0 {
+			b.WriteString("\n  " + T("help.plugins") + "\n")
+			for _, p := range list {
+				b.WriteString("  " + padRight("/"+p.Name, 24) + p.Desc + "\n")
+			}
+		}
 		b.WriteString("\n  " + T("help.wake", l.wakeWord()) + "\n  " + T("help.tab") + "\n")
 		b.WriteString("  " + T("help.shell") + "\n")
 		b.WriteString("  " + T("help.keys"))
 		l.info(b.String())
+	case "/plugins", "/plugin":
+		l.pluginsCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	default:
+		// plugins フォルダのスクリプト (/名前 引数)
+		if p, ok := findPlugin(cmd); ok {
+			l.runPluginCommand(p, strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
+			return
+		}
 		l.errorText(T("cmd.unknown", cmd))
 	}
 }
@@ -419,7 +428,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", "cmd.install-local.args"}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", "cmd.peek.args"}, {"/cls", ""}, {"/exit", ""},
 }
@@ -765,6 +774,10 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 				} else {
 					report.WriteString(why + "\n")
 				}
+				continue
+			}
+			if r.Kind == "plugin" {
+				report.WriteString(l.pluginTool(r))
 				continue
 			}
 			if r.Kind == "search" || r.Kind == "fetch" {

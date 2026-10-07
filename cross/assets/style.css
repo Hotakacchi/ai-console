@@ -68,3 +68,10 @@ body.peek { background: transparent; }
 
 /* ログの中の画像 (スマホ用の QR コードなど) */
 .logimg { display: block; width: 192px; height: 192px; margin: 6px 0; image-rendering: pixelated; border: 8px solid #fff; }
+
+/* 上の場所の小窓は、上から出てきて上へ引っ込む */
+#peek.top #bubble { top: 8px; bottom: auto; transform: translateY(-110%); }
+#peek.top #bubble.pop { transform: translateY(0); }
+#peek.top #bubble.retract, #peek.top #bubble.sleepy { transform: translateY(-110%); }
+/* /peek move: ドラッグで動かせる */
+#bubble.moving { --wails-draggable: drag; cursor: move; border-style: dashed; }

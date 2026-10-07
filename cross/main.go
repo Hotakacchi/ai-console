@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -74,6 +75,9 @@ func main() {
 	})
 	lumi.updateTitle()
 	lumi.peek = newPeek(app)
+	lumi.peek.where = func() (string, int, int) {
+		return lumi.s.Get("peek_position", "bottom-right"), lumi.s.GetInt("peek_x", 0), lumi.s.GetInt("peek_y", 0)
+	}
 
 	// × で閉じたときは、設定が on ならトレイに隠れて動き続ける
 	toldAboutTray := false
@@ -167,6 +171,8 @@ func main() {
 		lumi.peek.retract(false, "")
 		lumi.show()
 	})
+	// /peek move でドラッグして、ダブルクリックで決めた場所を覚える
+	app.Event.On("peekMoved", func(*application.CustomEvent) { lumi.savePeekPlace() })
 
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		lumi.applyStartup()
@@ -203,6 +209,32 @@ func (l *Lumi) applyStartup() {
 }
 
 // 呼ばれたときのアニメーションを試す (ウィンドウを隠して、右下から顔を出す)
+// ドラッグで決めた小窓の場所を保存する
+func (l *Lumi) savePeekPlace() {
+	if !l.peek.moving {
+		return
+	}
+	l.peek.moving = false
+	x, y := l.peek.win.Position()
+	if l.s.Err == nil {
+		l.s.Set("peek_position", "custom")
+		l.s.Set("peek_x", x)
+		l.s.Set("peek_y", y)
+	}
+	l.peek.retract(false, T("peek.ok"))
+	l.info(T("peek.saved"))
+}
+
+// /peek [move]
+func (l *Lumi) peekCommand(arg string) {
+	if strings.EqualFold(strings.TrimSpace(arg), "move") {
+		l.peek.startMove(T("peek.moveHint"))
+		l.info(T("peek.moving"))
+		return
+	}
+	l.demoPeek()
+}
+
 func (l *Lumi) demoPeek() {
 	l.win.Hide()
 	go func() {

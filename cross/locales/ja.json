@@ -51,7 +51,7 @@
   "cmd.mic": "音声入力のオン/オフ",
   "cmd.install-local": "ローカルAIをダウンロードする",
   "cmd.install-voice": "音声入力の認識モデルをダウンロードする",
-  "cmd.peek": "バックグラウンドで呼ばれたときの動きを試す",
+  "cmd.peek": "バックグラウンドで呼ばれたときの小窓を試す。move で出てくる場所をドラッグで決める",
   "cmd.cls": "画面と会話をリセット",
   "cmd.exit": "終了",
   "set.language": "表示と会話の言語 (auto は OS に合わせる)",
@@ -335,5 +335,10 @@
   "phone.page.admin": "管理者で (a)",
   "phone.page.no": "やめる (N)",
   "phone.page.hint": "キーボードのマイクで声でも入力できます。「声」を押すと返事を読み上げます。",
-  "phone.page.disconnected": "PC とつながっていません (ルミが起動しているか、同じ Wi-Fi か確かめてください)"
+  "phone.page.disconnected": "PC とつながっていません (ルミが起動しているか、同じ Wi-Fi か確かめてください)",
+  "cmd.peek.args": "[move]",
+  "set.peek_position": "小窓が出てくる場所 (bottom-right / bottom-left / bottom-center / top-right / top-left / top-center / custom は /peek move で決めた場所)",
+  "peek.moveHint": "ドラッグして、ダブルクリックで決定",
+  "peek.moving": "小窓を出しました。好きな場所へドラッグして、ダブルクリックで決めてください。",
+  "peek.saved": "小窓の場所を覚えました。決まった場所に戻すときは /set peek_position bottom-right"
 }

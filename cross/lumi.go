@@ -354,7 +354,7 @@ func (l *Lumi) submit(text string) {
 			go l.respond(q, true)
 		}
 	case "/peek":
-		l.demoPeek()
+		l.peekCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/help":
 		var b strings.Builder
 		for _, c := range commands {
@@ -384,7 +384,7 @@ var commands = []command{
 	{"/install-whisper", ""}, {"/install-vision", ""},
 	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", ""}, {"/routines", "cmd.routines.args"}, {"/phone", "cmd.phone.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
-	{"/peek", ""}, {"/cls", ""}, {"/exit", ""},
+	{"/peek", "cmd.peek.args"}, {"/cls", ""}, {"/exit", ""},
 }
 
 // 設定項目 (説明は locales の set.<項目>)。rule: 選べる値 (カンマ区切り) か #int:min:max / #num:min:max
@@ -420,6 +420,7 @@ var settingKeys = []settingKey{
 	{"keep_history", "on,off"},
 	{"update_check", "on,off"},
 	{"weather_location", ""},
+	{"peek_position", "bottom-right,bottom-left,bottom-center,top-right,top-left,top-center,custom"},
 	{"phone", "off,on"},
 	{"phone_port", "#int:1024:65535"},
 	{"face_color", ""},

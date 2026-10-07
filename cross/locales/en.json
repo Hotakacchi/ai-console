@@ -51,7 +51,7 @@
   "cmd.mic": "Turn voice input on/off",
   "cmd.install-local": "Download the local AI",
   "cmd.install-voice": "Download the speech recognition model",
-  "cmd.peek": "Try the animation shown when called in the background",
+  "cmd.peek": "Try the small window shown when called in the background. move: drag it to choose where it appears",
   "cmd.cls": "Clear the screen and the conversation",
   "cmd.exit": "Quit",
   "set.language": "Language for the screen and conversation (auto follows the OS)",
@@ -335,5 +335,10 @@
   "phone.page.admin": "As admin (a)",
   "phone.page.no": "Don't (N)",
   "phone.page.hint": "You can also dictate with your keyboard's mic. Tap Voice to hear the replies.",
-  "phone.page.disconnected": "Not connected to the PC (check that Lumi is running and you're on the same Wi-Fi)"
+  "phone.page.disconnected": "Not connected to the PC (check that Lumi is running and you're on the same Wi-Fi)",
+  "cmd.peek.args": "[move]",
+  "set.peek_position": "Where the small window appears (bottom-right / bottom-left / bottom-center / top-right / top-left / top-center / custom = the place set with /peek move)",
+  "peek.moveHint": "Drag, then double-click to set",
+  "peek.moving": "Here's the small window. Drag it where you like and double-click to set it.",
+  "peek.saved": "Saved the small window's place. To use a fixed place again: /set peek_position bottom-right"
 }

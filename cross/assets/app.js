@@ -473,20 +473,26 @@ function peekMain() {
   on("appearance", d => { base = baseColor(d.faceColor); recolor(); });
 
   let doneTimer = null;
+  let moving = false;
   on("peek", d => {
     textEl.textContent = d.text || "";
     clearTimeout(doneTimer);
-    if (d.mode === "pop") {
-      face.expression = "listen";
+    if (d.from) peek.classList.toggle("top", d.from === "top");   // 上の場所なら、上から出てくる
+    if (d.mode === "pop" || d.mode === "move") {
+      moving = d.mode === "move";
+      face.expression = moving ? "happy" : "listen";
       face.poke(false);
       bubble.className = "";
-      void bubble.offsetWidth;   // いったん下に戻してから飛び出させる
-      bubble.className = "pop";
+      void bubble.offsetWidth;   // いったん引っ込めてから飛び出させる
+      bubble.className = moving ? "pop moving" : "pop";
       return;
     }
+    moving = false;
     face.expression = d.mode === "sleepy" ? "sleep" : "happy";
     bubble.className = d.mode === "sleepy" ? "sleepy" : "retract";
     doneTimer = setTimeout(() => emit("peekDone"), d.mode === "sleepy" ? 1650 : 350);
   });
-  bubble.addEventListener("click", () => emit("peekClicked"));
+  bubble.addEventListener("click", () => { if (!moving) emit("peekClicked"); });
+  // 場所を決めている途中: ドラッグで動かし、ダブルクリックで決める
+  bubble.addEventListener("dblclick", () => { if (moving) { moving = false; emit("peekMoved"); } });
 }

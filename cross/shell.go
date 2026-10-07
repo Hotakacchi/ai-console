@@ -64,6 +64,17 @@ func (l *Lumi) currentDir() string {
 	return l.shellDir
 }
 
+// ふだんのプロンプト (その OS のコンソールらしく。PC やユーザーの本当の名前は出さない)
+func basePrompt() string {
+	switch runtime.GOOS {
+	case "windows":
+		return `C:\Lumi> `
+	case "darwin":
+		return "lumi@Mac ~ % "
+	}
+	return "lumi@linux:~$ "
+}
+
 // シェルモードのプロンプト ("" なら普段のプロンプト)
 func (l *Lumi) promptText() string {
 	if !l.shellOn {

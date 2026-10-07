@@ -197,6 +197,7 @@ func (l *Lumi) ready() {
 	}
 	l.emit("commands", names)
 	l.emit("i18n", clientMessages())
+	l.emit("basePrompt", basePrompt())
 	l.emit("admin", l.elevated)
 	l.sendVoiceSettings()
 	l.sendAppearance()

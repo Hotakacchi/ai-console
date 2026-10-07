@@ -95,7 +95,8 @@ function termMain() {
 
   // ---- 入力行 (今の行の最後に置く) ----
   // シェルモードでは Go から送られたプロンプト (PS C:\Users\…> など) に変わる
-  const NORMAL_PROMPT = "C:\\Lumi> ";
+  // ふだんのプロンプトは OS ごとに Go から届く (Windows は C:\Lumi>、Mac は lumi@Mac ~ %、Linux は lumi@linux:~$)
+  let NORMAL_PROMPT = "C:\\Lumi> ";
   let PROMPT = NORMAL_PROMPT;
   const input = document.createElement("span");
   input.id = "input";
@@ -431,6 +432,7 @@ function termMain() {
   on("ask", q => { askPrompt = q; setBuffer(""); thinking = false; voice.confirming(true); render(); keys.focus(); });
   on("i18n", m => { msgs = m; });
   on("prompt", p => { PROMPT = p || NORMAL_PROMPT; render(); });
+  on("basePrompt", p => { if (PROMPT === NORMAL_PROMPT) PROMPT = p; NORMAL_PROMPT = p; render(); });
   // コマンドの実行中とシェルモードは、顔の見た目を変える
   on("running", d => face.setRunning(!!d.on, d.cmd || ""));
   on("fx", d => face.effect(d.name, d.seconds));

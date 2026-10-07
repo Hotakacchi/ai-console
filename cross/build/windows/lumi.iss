@@ -28,7 +28,8 @@ PrivilegesRequiredOverridesAllowed=dialog commandline
 UsedUserAreasWarning=no
 OutputBaseFilename=Lumi-Windows-Setup-{#AppVersion}
 OutputDir=..\..\dist
-SetupIconFile=..\..\assets\icon.ico
+; アプリのアイコンにダウンロードのバッジを付けたもの (setupicon.py で作る)
+SetupIconFile=setup.ico
 UninstallDisplayIcon={app}\lumi.exe
 UninstallDisplayName=Lumi
 Compression=lzma2

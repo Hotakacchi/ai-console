@@ -340,5 +340,6 @@
   "set.peek_position": "Where the small window appears (bottom-right / bottom-left / bottom-center / top-right / top-left / top-center / custom = the place set with /peek move)",
   "peek.moveHint": "Drag, then double-click to set",
   "peek.moving": "Here's the small window. Drag it where you like and double-click to set it.",
-  "peek.saved": "Saved the small window's place. To use a fixed place again: /set peek_position bottom-right"
+  "peek.saved": "Saved the small window's place. To use a fixed place again: /set peek_position bottom-right",
+  "update.retry": "Try /update again, or download and install it from this page: %s"
 }

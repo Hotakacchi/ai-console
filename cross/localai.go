@@ -16,6 +16,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -140,8 +141,55 @@ func installLocal(base string, progress func(string, float64), cancelled func() 
 	return nil
 }
 
-// 途中で止まっても .part から再開できるダウンロード。最後にサイズと SHA-256 を確かめる
+// ダウンロード用の HTTP。つながるまで少し長めに待つ (GitHub のファイル置き場は時々遅い)
+var downloadClient = &http.Client{Transport: &http.Transport{
+	Proxy:                 http.ProxyFromEnvironment,
+	DialContext:           (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+	TLSHandshakeTimeout:   30 * time.Second,
+	ResponseHeaderTimeout: 60 * time.Second,
+	IdleConnTimeout:       90 * time.Second,
+	ForceAttemptHTTP2:     true,
+}}
+
+// 途中で止まっても .part から再開できるダウンロード。最後にサイズと SHA-256 を確かめる。
+// つながらない・途中で切れたときは、少し待ってから続きを取り直す (4 回まで)
 func download(a asset, dest string, progress func(int64), cancelled func() bool, verifying func()) error {
+	var err error
+	for attempt := 0; attempt < 4; attempt++ {
+		if err = downloadOnce(a, dest, progress, cancelled, verifying); err == nil || !retryable(err) {
+			return err
+		}
+		for i := 0; i < (attempt+1)*3*10; i++ { // 3 秒、6 秒、9 秒待つ (中断はすぐ受け付ける)
+			if cancelled() {
+				return errCancelled
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	return shortNetError(err)
+}
+
+// ネットワークの一時的な失敗か (やり直せば直りそうか)
+func retryable(err error) bool {
+	var ne net.Error
+	var ue *url.Error
+	return errors.As(err, &ne) || errors.As(err, &ue) || errors.Is(err, io.ErrUnexpectedEOF)
+}
+
+// 署名つきの長い URL をそのまま見せないように、「サーバー名: 理由」にする
+func shortNetError(err error) error {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		host := ue.URL
+		if u, perr := url.Parse(ue.URL); perr == nil {
+			host = u.Host
+		}
+		return fmt.Errorf("%s: %v", host, ue.Err)
+	}
+	return err
+}
+
+func downloadOnce(a asset, dest string, progress func(int64), cancelled func() bool, verifying func()) error {
 	part := dest + ".part"
 	var have int64
 	if st, err := os.Stat(part); err == nil {
@@ -157,11 +205,18 @@ func download(a asset, dest string, progress func(int64), cancelled func() bool,
 		if have > 0 {
 			req.Header.Set("Range", fmt.Sprintf("bytes=%d-", have))
 		}
-		res, err := http.DefaultClient.Do(req)
+		res, err := downloadClient.Do(req)
 		if err != nil {
 			return err
 		}
 		defer res.Body.Close()
+		if res.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+			os.Remove(part) // 続きから取れないので、次は最初から
+			return io.ErrUnexpectedEOF
+		}
+		if res.StatusCode >= 500 {
+			return &url.Error{Op: "Get", URL: a.URL, Err: errors.New(T("download.http", res.StatusCode))} // サーバーの一時的な不調
+		}
 		if res.StatusCode >= 300 {
 			return errors.New(T("download.http", res.StatusCode))
 		}

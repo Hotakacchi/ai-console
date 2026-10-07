@@ -203,7 +203,7 @@ func (l *Lumi) updateCommand() {
 			if err == errCancelled {
 				l.write("^C\n\n", "dim")
 			} else {
-				l.errorText(T("update.failed", err.Error()))
+				l.errorText(T("update.failed", err.Error()) + "\n" + T("update.retry", r.URL))
 			}
 			return
 		}

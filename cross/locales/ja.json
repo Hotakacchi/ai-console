@@ -340,5 +340,6 @@
   "set.peek_position": "小窓が出てくる場所 (bottom-right / bottom-left / bottom-center / top-right / top-left / top-center / custom は /peek move で決めた場所)",
   "peek.moveHint": "ドラッグして、ダブルクリックで決定",
   "peek.moving": "小窓を出しました。好きな場所へドラッグして、ダブルクリックで決めてください。",
-  "peek.saved": "小窓の場所を覚えました。決まった場所に戻すときは /set peek_position bottom-right"
+  "peek.saved": "小窓の場所を覚えました。決まった場所に戻すときは /set peek_position bottom-right",
+  "update.retry": "もう一度 /update を試すか、次のページから手でダウンロードして入れてください: %s"
 }

@@ -56,7 +56,11 @@ type Lumi struct {
 	pending   []attachment    // 次の発言に付けるファイル (ドラッグ＆ドロップ・/attach)
 	shellOn   bool            // シェルモード (打った行をそのままコマンドとして実行)
 	shellDir  string          // コマンドを実行する場所 (cd で変わる)
+	cli       *cliUI          // ターミナル版 (--cli) のときの画面。窓はない
 }
+
+// 窓のあるルミか (ターミナル版でなければ true)
+func (l *Lumi) gui() bool { return l.win != nil }
 
 func newLumi(app *application.App, muted, noMic bool) *Lumi {
 	l := &Lumi{app: app, muted: muted, micOn: !noMic, elevated: isElevated(), creditedStyle: -1, answers: make(chan string, 1), spoken: make(chan int, 8)}
@@ -71,6 +75,9 @@ func newLumi(app *application.App, muted, noMic bool) *Lumi {
 func (l *Lumi) emit(name string, data any) {
 	if l.win != nil {
 		l.win.EmitEvent(name, data)
+	}
+	if l.cli != nil {
+		l.cli.event(name, data)
 	}
 	if phone.running() {
 		phone.publish(name, data) // スマホでも見られるように
@@ -1118,6 +1125,10 @@ func (l *Lumi) quit() {
 	discord.stop()
 	l.interrupt()
 	localServer.Stop()
+	if !l.gui() {
+		l.cli.exit()
+		return
+	}
 	l.app.Quit()
 }
 

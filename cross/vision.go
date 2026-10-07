@@ -135,7 +135,7 @@ func (l *Lumi) screenTool() ([]byte, string) {
 
 // ルミの窓が写り込まないよう、少しの間隠してから撮る
 func (l *Lumi) captureScreen() (image.Image, error) {
-	visible := l.win.IsVisible()
+	visible := l.gui() && l.win.IsVisible()
 	if visible {
 		l.win.Hide()
 		time.Sleep(400 * time.Millisecond)

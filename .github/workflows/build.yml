@@ -60,19 +60,24 @@ jobs:
         shell: bash
         env:
           CGO_ENABLED: "0"
-        run: go build -tags production -ldflags "-s -w -H windowsgui -X main.version=$VERSION" -o lumi.exe .
+        run: |
+          go build -tags production -ldflags "-s -w -H windowsgui -X main.version=$VERSION" -o lumi.exe .
+          # ターミナル版 (Windows ターミナルのタブで動く)。窓のアプリではなくコンソールのアプリとして作る
+          go build -tags production -ldflags "-s -w -X main.version=$VERSION" -o lumi-cli.exe .
       - name: インストーラーを作る
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Qp "/DAppVersion=$env:VERSION" "/DSourceExe=..\..\lumi.exe" build\windows\lumi.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Qp "/DAppVersion=$env:VERSION" "/DSourceExe=..\..\lumi.exe" "/DSourceCliExe=..\..\lumi-cli.exe" build\windows\lumi.iss
           Copy-Item lumi.exe dist\lumi-windows-amd64.exe
+          Copy-Item lumi-cli.exe dist\lumi-cli-windows-amd64.exe
       - uses: actions/upload-artifact@v4
         with:
           name: windows
           path: |
             cross/dist/Lumi-Windows-Setup-*.exe
             cross/dist/lumi-windows-amd64.exe
+            cross/dist/lumi-cli-windows-amd64.exe
 
   macos:
     needs: version

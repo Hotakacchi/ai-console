@@ -53,6 +53,9 @@ func openURL(url string) {
 
 // hotkey の設定 (例: CmdOrCtrl+Alt+L) を登録し直す。押すとウィンドウを出す / 隠す
 func (l *Lumi) applyHotkey() {
+	if !l.gui() {
+		return
+	}
 	gs := l.app.GlobalShortcut
 	gs.UnregisterAll()
 	key := l.s.Get("hotkey", "CmdOrCtrl+Alt+L")
@@ -87,7 +90,7 @@ func (l *Lumi) clipboardTool() string {
 			return head + T("web.denied") + "\n"
 		}
 	}
-	text, ok := l.app.Clipboard.Text()
+	text, ok := l.readClipboard()
 	if !ok || strings.TrimSpace(text) == "" {
 		l.write(T("clip.empty")+"\n", "dim")
 		return head + T("clip.empty") + "\n"
@@ -97,6 +100,28 @@ func (l *Lumi) clipboardTool() string {
 	}
 	l.write(T("clip.read", len([]rune(text)))+"\n\n", "cyan")
 	return head + text + "\n"
+}
+
+// コピーされている文字。ターミナル版 (窓がない) では OS のコマンドで読む
+func (l *Lumi) readClipboard() (string, bool) {
+	if l.gui() {
+		return l.app.Clipboard.Text()
+	}
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("powershell", "-NoProfile", "-Command", "[Console]::OutputEncoding = [Text.Encoding]::UTF8; Get-Clipboard -Raw")
+		hideWindow(cmd)
+	case "darwin":
+		cmd = exec.Command("pbpaste")
+	default:
+		cmd = exec.Command("sh", "-c", "wl-paste 2>/dev/null || xclip -selection clipboard -o 2>/dev/null || xsel -b")
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", false
+	}
+	return strings.TrimRight(string(out), "\r\n"), true
 }
 
 // ---- 見た目 ----

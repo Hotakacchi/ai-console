@@ -11,6 +11,9 @@ import (
 
 // 起動時や設定を読み直したときに、設定どおり音声入力を始める (止める)
 func (l *Lumi) applyVoice(announce bool) {
+	if !l.gui() {
+		return
+	}
 	if !l.micOn || !l.s.On("voice_input", "on") {
 		l.emit("voiceStop", nil)
 		return

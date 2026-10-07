@@ -31,6 +31,12 @@ func main() {
 	loadLocales()
 	setLanguage(LoadSettings().Get("language", "auto"))
 
+	// ターミナル版 (窓を開かずに、端末の中で話す)
+	if wantCLI(args) {
+		runCLI()
+		return
+	}
+
 	app := application.New(application.Options{
 		Name:        "Lumi",
 		Description: T("app.description"),
@@ -220,6 +226,9 @@ func asString(v any) string {
 
 // トレイからウィンドウを出して前に持ってくる
 func (l *Lumi) show() {
+	if !l.gui() {
+		return
+	}
 	l.win.Show()
 	l.win.Restore()
 	l.win.Focus()
@@ -227,6 +236,9 @@ func (l *Lumi) show() {
 
 // startup の設定に合わせて、ログイン時の自動起動を登録・解除する
 func (l *Lumi) applyStartup() {
+	if !l.gui() {
+		return
+	}
 	if l.s.Get("startup", "off") == "on" {
 		l.app.Autostart.EnableWithOptions(application.AutostartOptions{Identifier: "Lumi", Arguments: []string{"--background"}})
 	} else if on, _ := l.app.Autostart.IsEnabled(); on {
@@ -253,6 +265,10 @@ func (l *Lumi) savePeekPlace() {
 
 // /peek [move]
 func (l *Lumi) peekCommand(arg string) {
+	if !l.gui() {
+		l.info(T("cli.noWindow"))
+		return
+	}
 	if strings.EqualFold(strings.TrimSpace(arg), "move") {
 		l.peek.startMove(T("peek.moveHint"))
 		l.info(T("peek.moving"))

@@ -69,6 +69,9 @@ func (d *discordRPC) observe(name string, data any) {
 
 // 設定に合わせて始める / やめる
 func (l *Lumi) applyDiscord() {
+	if !l.gui() {
+		return
+	}
 	on := l.s.Get("discord", "off") == "on"
 	id := strings.TrimSpace(l.s.Get("discord_app_id", ""))
 	if id == "" {

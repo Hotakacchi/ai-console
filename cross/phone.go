@@ -57,6 +57,9 @@ func phoneToken(reset bool) string {
 
 // 起動時: 設定が on なら受け付けを始める
 func (l *Lumi) applyPhone(announce bool) {
+	if !l.gui() {
+		return // ターミナル版では、スマホとの接続は窓のルミに任せる
+	}
 	if l.s.Get("phone", "off") != "on" {
 		phone.stop()
 		return

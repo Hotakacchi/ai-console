@@ -178,7 +178,7 @@ func (l *Lumi) announce(text string) {
 	}
 	defer l.setBusy(false)
 	popped := false
-	if !l.win.IsVisible() {
+	if l.gui() && !l.win.IsVisible() {
 		l.peek.pop(text)
 		popped = true
 	}

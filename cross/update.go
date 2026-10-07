@@ -139,6 +139,10 @@ func (l *Lumi) checkUpdate() {
 
 // /update: 新しい版があれば、確認してから入れ替える
 func (l *Lumi) updateCommand() {
+	if !l.gui() {
+		l.info(T("cli.updateInWindow")) // 入れ替えるのは窓のルミの exe なので、そちらで
+		return
+	}
 	if !l.begin() {
 		return
 	}

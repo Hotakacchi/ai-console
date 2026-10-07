@@ -147,7 +147,7 @@ func (l *Lumi) discordStatus() (string, string) {
 	case l.shellOn:
 		details = T("discord.shell")
 	}
-	return details, "Lumi " + version
+	return details, "Lumi " + versionLabel()
 }
 
 func (d *discordRPC) update(details, state string) {

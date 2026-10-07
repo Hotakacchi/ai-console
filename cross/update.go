@@ -159,7 +159,7 @@ func (l *Lumi) updateCommand() {
 			return
 		}
 		if !newerVersion(r.version(), version) {
-			l.info(T("update.latest", version))
+			l.info(T("update.latest", versionLabel()))
 			return
 		}
 		kind, exe := currentInstall()

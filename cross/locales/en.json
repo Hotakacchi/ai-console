@@ -376,6 +376,7 @@
   "tab.choose": "Open with a shell",
   "tab.close": "Close tab (Ctrl+W)",
   "tab.hello": "This is a %s tab. Lines you type run as commands as-is (no confirmation). exit or × closes it.",
+  "version.test": "(test)",
   "cli.hint": "This is Lumi in the terminal. Talk to Lumi, or /help for commands. exit quits (voice and the small window are in the windowed Lumi only).",
   "cli.howToExit": "Type exit to quit",
   "cli.updateInWindow": "Please run /update in the windowed Lumi (the terminal version is updated with it).",

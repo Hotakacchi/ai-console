@@ -50,7 +50,7 @@ func runCLI() {
 	l := newLumi(nil, true, true) // 読み上げも聞き取りもしない
 	c := &cliUI{l: l, out: os.Stdout, color: color, expr: "normal", lineStart: true}
 	l.cli = c
-	l.write("Lumi Assistant [Version "+version+"]\n", "fg")
+	l.write("Lumi Assistant [Version "+versionLabel()+"]\n", "fg")
 	l.write(T("cli.hint")+"\n\n", "dim")
 	if l.s.Err != nil {
 		l.errorText(T("settings.readError", l.s.Err.Error()))

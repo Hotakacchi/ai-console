@@ -23,6 +23,17 @@ import (
 // ビルド時に -ldflags "-X main.version=..." で上書きされる
 var version = "1.5.2"
 
+// タグのない CI ビルド (テスト版) は "1" (-X main.testBuild=1)。バージョンの横に「(テスト)」を付ける
+var testBuild = ""
+
+// 画面に出すバージョン
+func versionLabel() string {
+	if testBuild != "" {
+		return version + " " + T("version.test")
+	}
+	return version
+}
+
 type Lumi struct {
 	app   *application.App
 	win   *application.WebviewWindow
@@ -210,7 +221,7 @@ func (l *Lumi) ready() {
 	l.emit("admin", l.elevated)
 	l.sendVoiceSettings()
 	l.sendAppearance()
-	l.write("Lumi Assistant [Version "+version+"]\n", "fg")
+	l.write("Lumi Assistant [Version "+versionLabel()+"]\n", "fg")
 	l.write(T("welcome.hint")+"\n\n", "dim")
 	if l.s.Err != nil {
 		l.errorText(T("settings.readError", l.s.Err.Error()))

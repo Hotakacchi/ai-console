@@ -603,7 +603,7 @@ func (offlineProvider) Reply(t Turn, onText func(string)) {
 	}
 	switch {
 	case has("offline.words.version"):
-		onText(T("offline.version", version, osName()))
+		onText(T("offline.version", versionLabel(), osName()))
 	case has("offline.words.time"):
 		onText(T("offline.time", now.Hour(), now.Minute()))
 	case has("offline.words.date"):

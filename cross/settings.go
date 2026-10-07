@@ -201,7 +201,7 @@ func (s *Settings) SystemPrompt() string {
 		p = custom + "\n" + T("prompt.language")
 	}
 	// 自分のこと (バージョン・OS・使っている AI・できること) を聞かれても答えられるように
-	p += "\n\n" + T("prompt.self", version, osName(), aiLabel(s))
+	p += "\n\n" + T("prompt.self", versionLabel(), osName(), aiLabel(s))
 	if s.PcControl() {
 		// 小さなモデルでも迷わないよう、この OS で使える具体例を添える
 		disk, folder := pcExamples()

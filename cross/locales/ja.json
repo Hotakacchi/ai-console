@@ -376,6 +376,7 @@
   "tab.choose": "シェルを選んで開く",
   "tab.close": "タブを閉じる (Ctrl+W)",
   "tab.hello": "%s のタブです。打った行はそのままコマンドとして実行されます (確認はしません)。exit か × で閉じます。",
+  "version.test": "(テスト)",
   "cli.hint": "ターミナル版のルミです。話しかけるか、/help でコマンドの一覧。exit で終わります (声・小窓は窓のルミだけ)。",
   "cli.howToExit": "終わるときは exit",
   "cli.updateInWindow": "更新は窓のルミで /update してください (ターミナル版もいっしょに新しくなります)。",

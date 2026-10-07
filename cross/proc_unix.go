@@ -36,3 +36,5 @@ func relaunchLater(exe string) error {
 }
 
 func setCmdLine(cmd *exec.Cmd, line string) {}
+
+func hiddenConsole(cmd *exec.Cmd) {}

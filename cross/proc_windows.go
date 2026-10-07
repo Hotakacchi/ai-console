@@ -109,3 +109,9 @@ func relaunchLater(exe string) error {
 	}
 	return cmd.Start()
 }
+
+// 見えないコンソールを付けて動かす (コンソールの文字コードを切り替えるコマンドのため)
+func hiddenConsole(cmd *exec.Cmd) {
+	cmd.SysProcAttr.HideWindow = true
+	cmd.SysProcAttr.CreationFlags = cmd.SysProcAttr.CreationFlags&^0x08000000 | 0x00000010 // CREATE_NO_WINDOW をやめて CREATE_NEW_CONSOLE
+}

@@ -4,6 +4,7 @@ package main
 
 import (
 	"embed"
+	"encoding/json"
 	_ "embed"
 	"log"
 	"os"
@@ -162,6 +163,13 @@ func main() {
 	})
 	app.Event.On("tabInterrupt", func(e *application.CustomEvent) { id, _ := tabArg(e); lumi.tabInterrupt(id) })
 	app.Event.On("tabClose", func(e *application.CustomEvent) { id, _ := tabArg(e); lumi.tabClose(id) })
+	// --script の "#tab dump <ファイル>" (テスト用): 画面のタブの様子をファイルに書く
+	app.Event.On("testDump", func(e *application.CustomEvent) {
+		if lumi.dumpPath != "" {
+			b, _ := json.MarshalIndent(e.Data, "", "  ")
+			os.WriteFile(lumi.dumpPath, b, 0o644)
+		}
+	})
 	app.Event.On("voiceState", func(e *application.CustomEvent) {
 		m, _ := e.Data.(map[string]any)
 		lumi.voiceState(asString(m["state"]), asString(m["message"]))

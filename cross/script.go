@@ -29,6 +29,16 @@ func (l *Lumi) runScript(path string) {
 				}
 				continue
 			}
+			// "#tab open [シェル]" "#tab run <コマンド>" "#tab next" "#tab close": 画面のタブを操作する
+			if rest, ok := strings.CutPrefix(line, "#tab "); ok {
+				op, arg, _ := strings.Cut(strings.TrimSpace(rest), " ")
+				if op == "dump" {
+					l.dumpPath = arg
+				}
+				l.emit("testTab", map[string]any{"op": op, "arg": arg})
+				time.Sleep(700 * time.Millisecond)
+				continue
+			}
 			for l.isBusy() {
 				time.Sleep(200 * time.Millisecond)
 			}

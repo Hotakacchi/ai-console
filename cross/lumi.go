@@ -35,6 +35,7 @@ type Lumi struct {
 	installLocalOnStart bool // --install-local: 起動したらローカルAIをダウンロードする
 	elevated            bool   // ルミ自体が管理者 (root) として動いている
 	scriptPath          string // --script: テスト用に入力を流し込むファイル
+	dumpPath            string // --script の "#tab dump <ファイル>" で画面の様子を書く先
 
 	micOn     bool // 音声入力をこのセッションで使うか (--no-mic や /mic で切り替え)
 	listening bool // 画面側で聞き取りが動いているか

@@ -233,6 +233,27 @@ function termMain() {
   on("tabBusy", d => { const t = findTab(d.tab); if (t) { t.busy = d.on; if (t === active) render(); } });
   on("tabClear", d => { const t = findTab(d.tab); if (t) clearTab(t); });
   on("tabClosed", d => closeTab(findTab(d.tab)));
+  // --script の "#tab ..." (テスト用): タブを開く・打つ・切り替える・閉じる
+  on("testTab", d => {
+    if (d.op === "open") openTab(d.arg);
+    else if (d.op === "next") switchTab(tabs[(tabs.indexOf(active) + 1) % tabs.length]);
+    else if (d.op === "close") closeTab(active);
+    else if (d.op === "dump") {
+      // タブの様子と、それぞれの画面の文字を Go に送る (Go がファイルに書く)
+      emit("testDump", tabs.map(t => ({
+        title: t.title, active: t === active, busy: t === lumiTab ? busy : t.busy,
+        prompt: t === lumiTab ? PROMPT : t.prompt, faceShell: face.shell,
+        text: t.log.innerText.slice(-1500),
+      })));
+    }
+    else if (d.op === "run" && !isLumi()) {
+      writeTab(active, active.prompt, "fg");
+      writeTab(active, d.arg + "\n", "white");
+      active.busy = true;
+      render();
+      emit("tabSubmit", { tab: active.id, text: d.arg });
+    }
+  });
 
   // ---- 入力行 (今の行の最後に置く) ----
   // シェルモードでは Go から送られたプロンプト (PS C:\Users\…> など) に変わる

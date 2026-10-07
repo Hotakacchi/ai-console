@@ -35,7 +35,8 @@ type discordRPC struct {
 	last    string // 最後に送った内容 (同じなら送らない)
 	nonce   int
 
-	// 画面に送ったイベントから分かる様子
+	// 画面に送ったイベントから分かる様子 (画面への送信を止めないよう、つなぐ処理とは別の鍵)
+	stateMu  sync.Mutex
 	running  bool
 	activity string
 	thinking bool
@@ -50,8 +51,8 @@ func (d *discordRPC) observe(name string, data any) {
 	default:
 		return
 	}
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.stateMu.Lock()
+	defer d.stateMu.Unlock()
 	switch name {
 	case "running":
 		m, _ := data.(map[string]any)
@@ -78,8 +79,7 @@ func (l *Lumi) applyDiscord() {
 	discord.on, discord.appID = on && id != "", id
 	if (!discord.on || changed) && discord.conn != nil {
 		discord.clearLocked()
-		discord.conn.Close()
-		discord.conn = nil
+		discord.dropLocked()
 	}
 	discord.last = ""
 	discord.mu.Unlock()
@@ -126,9 +126,9 @@ func (l *Lumi) runDiscord() {
 
 // 今の様子 (1 行目・2 行目)
 func (l *Lumi) discordStatus() (string, string) {
-	discord.mu.Lock()
+	discord.stateMu.Lock()
 	running, activity, thinking := discord.running, discord.activity, discord.thinking
-	discord.mu.Unlock()
+	discord.stateMu.Unlock()
 	details := T("discord.idle")
 	switch {
 	case running:
@@ -167,9 +167,8 @@ func (d *discordRPC) update(details, state string) {
 	if string(b) == d.last {
 		return
 	}
-	if err := d.sendLocked(1, d.command("SET_ACTIVITY", activity)); err != nil {
-		d.conn.Close()
-		d.conn = nil
+	if err := d.requestLocked(d.command("SET_ACTIVITY", activity)); err != nil {
+		d.dropLocked()
 		return
 	}
 	d.last = string(b)
@@ -187,7 +186,15 @@ func (d *discordRPC) command(cmd string, activity any) map[string]any {
 // 終わるときなどに、ステータスを消す
 func (d *discordRPC) clearLocked() {
 	if d.conn != nil {
-		d.sendLocked(1, d.command("SET_ACTIVITY", nil))
+		d.requestLocked(d.command("SET_ACTIVITY", nil))
+	}
+}
+
+// つながりを捨てる (閉じるのは別のゴルーチンで。止まった Discord に引きずられないように)
+func (d *discordRPC) dropLocked() {
+	if d.conn != nil {
+		go d.conn.Close()
+		d.conn = nil
 	}
 }
 
@@ -196,8 +203,7 @@ func (d *discordRPC) stop() {
 	defer d.mu.Unlock()
 	if d.conn != nil {
 		d.clearLocked()
-		d.conn.Close()
-		d.conn = nil
+		d.dropLocked()
 	}
 }
 
@@ -214,34 +220,48 @@ func (d *discordRPC) connectLocked() error {
 		return errors.New("discord is not running")
 	}
 	d.conn = conn
-	if err := d.sendLocked(0, map[string]any{"v": 1, "client_id": d.appID}); err != nil {
-		conn.Close()
-		d.conn = nil
-		return err
-	}
-	// 返事 (READY か、ID が違うときのエラー) を読む
-	op, payload, err := readDiscordFrame(conn)
+	// あいさつして、返事 (READY か、ID が違うときのエラー) を読む
+	op, payload, err := d.exchangeLocked(0, map[string]any{"v": 1, "client_id": d.appID})
 	if err != nil || op != 1 || !strings.Contains(string(payload), `"READY"`) {
-		conn.Close()
-		d.conn = nil
+		d.dropLocked()
 		return fmt.Errorf("handshake failed: %s", payload)
 	}
-	// 以降の返事は読み捨てる (読まないとパイプが詰まる)
-	go func() {
-		for {
-			if _, _, err := readDiscordFrame(conn); err != nil {
-				return
-			}
-		}
-	}()
 	return nil
 }
 
-func (d *discordRPC) sendLocked(op uint32, v any) error {
-	payload, _ := json.Marshal(v)
-	_, err := d.conn.Write(discordFrame(op, payload))
+// コマンドを送って、その返事を読む
+func (d *discordRPC) requestLocked(v any) error {
+	_, _, err := d.exchangeLocked(1, v)
 	return err
 }
+
+// 1 通送って 1 通読む。Windows の名前付きパイプは、読んでいる間は書けないので、
+// 読み続けるゴルーチンは置かずに、送るたびにその返事を読む (5 秒で返事がなければあきらめる)
+func (d *discordRPC) exchangeLocked(op uint32, v any) (uint32, []byte, error) {
+	conn := d.conn
+	payload, _ := json.Marshal(v)
+	type result struct {
+		op  uint32
+		b   []byte
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		if _, err := conn.Write(discordFrame(op, payload)); err != nil {
+			done <- result{err: err}
+			return
+		}
+		rop, b, err := readDiscordFrame(conn)
+		done <- result{rop, b, err}
+	}()
+	select {
+	case r := <-done:
+		return r.op, r.b, r.err
+	case <-time.After(5 * time.Second):
+		return 0, nil, errors.New("discord did not answer")
+	}
+}
+
 
 // Discord の IPC の 1 通: 種類 (4 バイト) + 長さ (4 バイト) + JSON
 func discordFrame(op uint32, payload []byte) []byte {

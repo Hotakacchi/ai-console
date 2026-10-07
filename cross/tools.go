@@ -267,7 +267,8 @@ func windowsCommand(ctx context.Context, command string, admin bool, marker, hom
 		// inner はファイルに書いて渡す (確認画面の「詳細」で、何を動かすのか分かるように)
 		ps1 := filepath.Join(filepath.Dir(marker), "lumi_admin.ps1")
 		os.WriteFile(ps1, append([]byte("\xef\xbb\xbf"), inner...), 0o644) // BOM つきの UTF-8 (日本語を正しく読ませる)
-		script = "try { $p = Start-Process powershell -Verb RunAs -Wait -PassThru " +
+		// (管理者の PowerShell の窓は出さない。出力はファイルで受け取る)
+		script = "try { $p = Start-Process powershell -Verb RunAs -Wait -PassThru -WindowStyle Hidden " +
 			"-ArgumentList '-NoProfile','-ExecutionPolicy','RemoteSigned','-File','\"" + strings.ReplaceAll(ps1, "'", "''") + "\"'; exit $p.ExitCode } " +
 			"catch { Write-Output 'LUMI_UAC_DENIED' }"
 	}

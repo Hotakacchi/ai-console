@@ -67,7 +67,8 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Uninstall\Lumi"; 
 
 [Icons]
 Name: "{autoprograms}\Lumi"; Filename: "{app}\lumi.exe"
-Name: "{autodesktop}\Lumi"; Filename: "{app}\lumi.exe"; Tasks: desktopicon
+; デスクトップのショートカットは、もうあれば作り直さない (作り直すと、置いた位置が毎回リセットされる)
+Name: "{autodesktop}\Lumi"; Filename: "{app}\lumi.exe"; Tasks: desktopicon; Check: DesktopIconMissing
 
 [Run]
 ; 自動アップデート (/update) から /RELAUNCH 付きで動かされたときは、入れ終わったらルミを起動し直す
@@ -80,6 +81,11 @@ Filename: "{app}\lumi.exe"; Description: "{cm:Launch}"; Flags: postinstall nowai
 function RelaunchRequested: Boolean;
 begin
   Result := Pos('/RELAUNCH', UpperCase(GetCmdTail)) > 0;
+end;
+
+function DesktopIconMissing: Boolean;
+begin
+  Result := not FileExists(ExpandConstant('{autodesktop}\Lumi.lnk'));
 end;
 
 // アンインストールのとき、設定とダウンロードしたものも消すか聞く

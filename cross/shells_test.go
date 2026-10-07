@@ -26,7 +26,8 @@ func TestAllShells(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if j := strings.Join(lines, "|"); !strings.Contains(j, "hello-lumi") || !strings.Contains(j, "こんにちは") {
+			// cmd の日本語は Windows の言語しだい (英語版では ? になる) なので、cmd 以外で確かめる
+			if j := strings.Join(lines, "|"); !strings.Contains(j, "hello-lumi") || (sh.Kind != "cmd" && !strings.Contains(j, "こんにちは")) {
 				t.Errorf("output %q", lines)
 			}
 			if !sameDir(newDir, filepath.Join(dir, "sub")) {

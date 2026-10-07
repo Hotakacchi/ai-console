@@ -126,7 +126,7 @@ export class Face {
     this.lookX += (this.lookXT - this.lookX) * 0.2;
     this.lookY += (this.lookYT - this.lookY) * 0.2;
     this.tilt += (this.tiltT - this.tilt) * 0.12;
-    this.eyeScale += ((ex === "listen" ? 1.25 : 1) - this.eyeScale) * 0.25;
+    this.eyeScale += ((fx && fx.name === "surprised" ? 1.4 : ex === "listen" ? 1.25 : 1) - this.eyeScale) * 0.25;
 
     if (!this.speaking) this.target = 0;
     else if (now - this.lastViseme > 250 && now >= this.nextMouth) {
@@ -187,6 +187,8 @@ export class Face {
     // エラー: 顔が乱れる
     if (fxName === "glitch") ctx.translate((Math.random() - 0.5) * 40, (Math.random() - 0.5) * 10);
     ctx.translate(0, bob);
+    // 驚いた: 最初にぴょこっと跳ねる
+    if (fxName === "surprised" && fxT < 0.4) ctx.translate(0, -Math.sin(fxT / 0.4 * Math.PI) * 36);
     ctx.rotate(this.tilt * Math.PI / 180);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -234,8 +236,8 @@ export class Face {
         ctx.beginPath(); ctx.arc(x, y + 34, 8, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       }
-      else if (ex === "happy" || fxName === "eat" && fxT > 1.2) ellipseArc(ctx, x, y + 10, 34, 30, 200, 140);
-      else if (ex === "sleep") ellipseArc(ctx, x, y - 8, 32, 22, 30, 120);
+      else if (fxName !== "surprised" && (ex === "happy" || fxName === "eat" && fxT > 1.2)) ellipseArc(ctx, x, y + 10, 34, 30, 200, 140);
+      else if (fxName !== "surprised" && ex === "sleep") ellipseArc(ctx, x, y - 8, 32, 22, 30, 120);
       else {
         const r = 30 * this.eyeScale, hh = r * (1 - blink);
         if (hh < 4) line(ctx, x - r, y, x + r, y);
@@ -247,7 +249,8 @@ export class Face {
             ctx.restore();
           }
         }
-        if (ex === "sad") {   // 困り眉 (内側を上げる)
+        if (fxName === "surprised") ellipseArc(ctx, x, y - 18, 40, 52, 235, 70);   // 高く上がった眉
+        else if (ex === "sad") {   // 困り眉 (内側を上げる)
           if (ex0 < 0) line(ctx, x - 30, y - 48, x + 25, y - 62);
           else line(ctx, x - 25, y - 62, x + 30, y - 48);
         }
@@ -275,6 +278,9 @@ export class Face {
     const my = 95;
     if (this.activity === "download") drawProgress(ctx, my, this.progress, c);
     else if (fxName === "eat") drawEating(ctx, my, fxT, c);
+    else if (fxName === "surprised" && !this.speaking) {   // 「お」の口
+      ctx.beginPath(); ctx.ellipse(0, my + 4, 20, 28, 0, 0, Math.PI * 2); ctx.stroke();
+    }
     else if (this.speaking || this.open > 0) {
       const hh = 6 + this.open * 60;
       ctx.beginPath(); ctx.ellipse(0, my, 48, hh / 2, 0, 0, Math.PI * 2); ctx.stroke();

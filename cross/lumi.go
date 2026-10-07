@@ -216,6 +216,7 @@ func (l *Lumi) ready() {
 	l.startOnce.Do(func() {
 		go l.runDiscord()
 		go l.runReminders()
+		go l.watchDrives()
 		if l.scriptPath != "" {
 			l.runScript(l.scriptPath)
 		}

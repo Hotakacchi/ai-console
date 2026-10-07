@@ -279,7 +279,7 @@
   "pcbook.windows": "free space on drives → Get-PSDrive -PSProvider FileSystem\nlist a drive → Get-ChildItem X:\\\nfind files by name → Get-ChildItem X:\\ -Recurse -Filter *name* -ErrorAction SilentlyContinue | Select-Object -First 50 FullName\nfind by type (PDF etc.) → Get-ChildItem X:\\ -Recurse -Filter *.pdf -ErrorAction SilentlyContinue | Select-Object -First 50 FullName\nlargest files → Get-ChildItem X:\\ -Recurse -File -ErrorAction SilentlyContinue | Sort-Object Length -Descending | Select-Object -First 20 FullName, @{n='MB';e={[math]::Round($_.Length/1MB)}}\nsize of each folder → Get-ChildItem X:\\ -Directory | ForEach-Object { [pscustomobject]@{Name=$_.Name; MB=[math]::Round((Get-ChildItem $_.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum/1MB)} }\nrecently changed files → Get-ChildItem $HOME -Recurse -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 20 FullName, LastWriteTime\nopen a folder → Start-Process explorer X:\\\nopen an app → Start-Process notepad\nmemory usage → Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 10 Name, @{n='MB';e={[math]::Round($_.WorkingSet64/1MB)}}\nCPU usage → Get-CimInstance Win32_Processor | Select-Object LoadPercentage\nWindows version → Get-ComputerInfo -Property OsName, OsVersion\nPC name → $env:COMPUTERNAME\nIP address → ipconfig\nWi-Fi status → netsh wlan show interfaces\nbattery → Get-CimInstance Win32_Battery | Select-Object EstimatedChargeRemaining\nopen windows → Get-Process | Where-Object MainWindowTitle | Select-Object Name, MainWindowTitle\nshut down in 1 hour → shutdown /s /t 3600\ncancel shutdown → shutdown /a",
   "pcbook.darwin": "free disk space → df -h\nlist a folder → ls -la ~/Documents\nfind files by name → mdfind -name name | head -50\nlargest files → find ~ -type f -size +500M 2>/dev/null | head -20\nsize of each folder → du -sh ~/* 2>/dev/null | sort -h\nopen a folder → open ~/Downloads\nopen an app → open -a Safari\nmemory usage → top -l 1 -o mem -n 10\nmacOS version → sw_vers\nIP address → ipconfig getifaddr en0\nbattery → pmset -g batt",
   "pcbook.linux": "free disk space → df -h\nlist a folder → ls -la ~/Documents\nfind files by name → find ~ -iname '*name*' 2>/dev/null | head -50\nlargest files → find ~ -type f -size +500M 2>/dev/null | head -20\nsize of each folder → du -sh ~/* 2>/dev/null | sort -h\nopen a folder → xdg-open ~/Downloads\nmemory usage → free -h\nOS version → cat /etc/os-release\nIP address → ip -brief address\nbattery → upower -i $(upower -e | grep BAT)\nshut down in 1 hour → shutdown -h +60",
-  "cmd.shell": "Toggle shell mode (lines run as commands; prefix ! to run just one)",
+  "cmd.shell": "Toggle shell mode (lines run as commands; prefix ! to run just one). list: available shells; a name: switch shell",
   "shell.on": "Shell mode is on. Lines you type run as %s commands as-is (no confirmation). Lines starting with / are Lumi commands. Type exit or /shell to leave.",
   "shell.off": "Shell mode is off.",
   "shell.failed": "Couldn't run the command: %s",
@@ -364,5 +364,11 @@
   "auto.off": "Auto mode is off. Commands ask before running.",
   "auto.running": "▶ Running automatically:",
   "auto.risky": "This may be irreversible or risky, so it asks even in auto mode.",
-  "prompt.auto": "Auto mode is on: commands that don't need administrator rights run immediately without confirmation. Before writing a command for anything irreversible (deleting files, changing settings), ask the user in words whether they really want it."
+  "prompt.auto": "Auto mode is on: commands that don't need administrator rights run immediately without confirmation. Before writing a command for anything irreversible (deleting files, changing settings), ask the user in words whether they really want it.",
+  "cmd.shell.args": "[list|name]",
+  "set.shell": "Shell for /shell and ! (auto picks one for this PC: PowerShell 7 or Windows PowerShell on Windows, your login shell on Mac/Linux)",
+  "shell.cmdLabel": "Command Prompt",
+  "shell.notFound": "No shell named “%s” was found on this PC.",
+  "shell.switched": "Switched the shell to %s.",
+  "shell.listHow": "Switch with /shell <name> (* = current). /set shell auto goes back to automatic."
 }

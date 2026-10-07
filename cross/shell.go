@@ -45,11 +45,43 @@ func (l *Lumi) submitTyped(text string) {
 	l.submit(text)
 }
 
-// /shell
+// 今使うシェル (設定 shell。auto ならこの PC に合わせて選ぶ)
+func (l *Lumi) shell() shellSpec {
+	s, _ := pickShell(l.s.Get("shell", "auto"))
+	return s
+}
+
+// /shell (切り替え)、/shell list (一覧)、/shell <名前> (そのシェルでシェルモードに)
+func (l *Lumi) shellCommand(arg string) {
+	arg = strings.ToLower(strings.TrimSpace(arg))
+	switch arg {
+	case "":
+		l.toggleShell()
+		return
+	case "list":
+		l.listShells()
+		return
+	}
+	if _, ok := pickShell(arg); !ok && arg != "auto" {
+		l.errorText(T("shell.notFound", arg))
+		l.listShells()
+		return
+	}
+	if l.s.Err == nil {
+		l.s.Set("shell", arg)
+	}
+	if l.shellOn {
+		l.info(T("shell.switched", l.shell().Label))
+		l.emit("prompt", l.promptText())
+		return
+	}
+	l.toggleShell()
+}
+
 func (l *Lumi) toggleShell() {
 	l.shellOn = !l.shellOn
 	if l.shellOn {
-		l.info(T("shell.on", shellName()))
+		l.info(T("shell.on", l.shell().Label))
 	} else {
 		l.info(T("shell.off"))
 	}
@@ -80,14 +112,7 @@ func (l *Lumi) promptText() string {
 	if !l.shellOn {
 		return ""
 	}
-	dir := l.currentDir()
-	if runtime.GOOS == "windows" {
-		return "PS " + dir + "> "
-	}
-	if home := homeDir(); dir == home || strings.HasPrefix(dir, home+"/") {
-		dir = "~" + strings.TrimPrefix(dir, home)
-	}
-	return dir + " $ "
+	return l.shell().prompt(l.currentDir())
 }
 
 func (l *Lumi) startShell(command string) {
@@ -98,7 +123,7 @@ func (l *Lumi) startShell(command string) {
 		lines := 0
 		l.emit("running", map[string]any{"on": true, "cmd": command})
 		defer l.emit("running", map[string]any{"on": false})
-		dir, err := runShell(command, l.currentDir(), l.cancelChan(), func(line string) {
+		dir, err := runShellWith(l.shell(), command, l.currentDir(), l.cancelChan(), func(line string) {
 			if lines++; lines <= maxShellLines {
 				l.write(line+"\n", "fg")
 			} else if lines == maxShellLines+1 {
@@ -122,29 +147,15 @@ func (l *Lumi) startShell(command string) {
 	}()
 }
 
-// command を dir で実行し、出力を 1 行ずつ渡す。終わったときの場所 (cd したあと) を返す
+// command を dir で、この PC の標準のシェルで実行する (ルーティンの「実行:」など)
 func runShell(command, dir string, cancel <-chan struct{}, onLine func(string)) (string, error) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "windows":
-		// 出力は UTF-8 のバイトで書き出させる (コンソールの文字コードに左右されないように)。
-		// *>&1 で Write-Host やエラーも含めて受け取る
-		// 進み具合の表示は、出力を受け取る側では読めない形 (CLIXML) になるので出さない
-		script := "$ErrorActionPreference = 'Continue'; $ProgressPreference = 'SilentlyContinue'\n" +
-			"$__o = [Console]::OpenStandardOutput(); $__e = New-Object Text.UTF8Encoding $false\n" +
-			"function __w($s) { $b = $__e.GetBytes([string]$s + \"`n\"); $__o.Write($b, 0, $b.Length); $__o.Flush() }\n" +
-			"Set-Location -LiteralPath '" + strings.ReplaceAll(dir, "'", "''") + "' -ErrorAction SilentlyContinue\n" +
-			"try { & {\n" + command + "\n} *>&1 | Out-String -Stream -Width 200 | ForEach-Object { __w $_ } } catch { __w $_ }\n" +
-			"__w ('" + cwdMarker + "' + (Get-Location).Path)\n"
-		cmd = exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
-	default:
-		sh := "/bin/bash"
-		if runtime.GOOS == "darwin" {
-			sh = "/bin/zsh"
-		}
-		script := "cd '" + strings.ReplaceAll(dir, "'", `'\''`) + "' 2>/dev/null\n" + command + "\nprintf '\\n" + cwdMarker + "%s\\n' \"$PWD\"\n"
-		cmd = exec.Command(sh, "-c", script)
-	}
+	sh, _ := pickShell("auto")
+	return runShellWith(sh, command, dir, cancel, onLine)
+}
+
+// command を dir で sh を使って実行し、出力を 1 行ずつ渡す。終わったときの場所 (cd したあと) を返す
+func runShellWith(sh shellSpec, command, dir string, cancel <-chan struct{}, onLine func(string)) (string, error) {
+	cmd := sh.command(command, dir)
 	cmd.Dir = dir
 	hideWindow(cmd)
 	newGroup(cmd)
@@ -176,6 +187,9 @@ func runShell(command, dir string, cancel <-chan struct{}, onLine func(string)) 
 		}
 		if strings.HasPrefix(line, "#< CLIXML") || strings.HasPrefix(line, "<Objs Version=") {
 			continue // PowerShell の内部向けの出力
+		}
+		if sh.Kind == "wsl" && strings.HasPrefix(line, "wsl: ") {
+			continue // WSL 自体のお知らせ (Windows の PATH を読み替えられなかった、など)
 		}
 		onLine(line)
 	}

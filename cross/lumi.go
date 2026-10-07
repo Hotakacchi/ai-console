@@ -343,7 +343,7 @@ func (l *Lumi) submit(text string) {
 	case "/words":
 		l.wordsFile()
 	case "/shell":
-		l.toggleShell()
+		l.shellCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/auto":
 		l.autoCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/discord":
@@ -394,7 +394,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", ""}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", "cmd.peek.args"}, {"/cls", ""}, {"/exit", ""},
 }
@@ -413,6 +413,7 @@ var settingKeys = []settingKey{
 	{"local_gpu", "auto,off"},
 	{"pc_control", "on,off"},
 	{"auto_run", "off,on"},
+	{"shell", "auto,powershell,pwsh,cmd,gitbash,wsl,bash,zsh,fish,sh"},
 	{"web_search", "on,ask,off"},
 	{"search_url", ""},
 	{"voice_input", "on,off"},

@@ -36,6 +36,7 @@ func settingsTemplate(provider string) string {
   "local_gpu": "auto",
   "pc_control": "on",
   "auto_run": "off",
+  "shell": "auto",
   "web_search": "on",
   "clipboard": "ask",
   "screen": "ask",

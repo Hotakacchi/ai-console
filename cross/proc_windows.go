@@ -11,8 +11,15 @@ import (
 
 // 子プロセスのコンソール窓を出さない
 func hideWindow(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.SysProcAttr.HideWindow = true
+	cmd.SysProcAttr.CreationFlags |= 0x08000000 // CREATE_NO_WINDOW
 }
+
+// コマンドラインをそのまま渡す (cmd.exe の引用符の決まりは、ふつうの書き方と違うので)
+func setCmdLine(cmd *exec.Cmd, line string) { cmd.SysProcAttr.CmdLine = line }
 
 func killWithParent(cmd *exec.Cmd) {}
 

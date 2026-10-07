@@ -34,3 +34,5 @@ func relaunchLater(exe string) error {
 	detach(cmd)
 	return cmd.Start()
 }
+
+func setCmdLine(cmd *exec.Cmd, line string) {}

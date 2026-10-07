@@ -52,6 +52,26 @@ func TestRunShell(t *testing.T) {
 		t.Errorf("after cd: %q", newDir)
 	}
 
+	// 引用符や記号を含むコマンドも、そのまま届く
+	quoted := `echo "a  b"; echo 'x"y'; echo "$((1+2))"`
+	wantQ := []string{"a  b", `x"y`, "3"}
+	if runtime.GOOS == "windows" {
+		quoted = `Write-Output "a  b"; Write-Output 'x"y'; Write-Output "$(1+2)"; Write-Output "100%"`
+		wantQ = []string{"a  b", `x"y`, "3", "100%"}
+	}
+	lines, _ = runLines(t, quoted, dir)
+	for _, w := range wantQ {
+		found := false
+		for _, l := range lines {
+			if l == w {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%q not in %q", w, lines)
+		}
+	}
+
 	// 失敗するコマンドでも出力 (エラー) は受け取れる
 	lines, _ = runLines(t, "nosuchcommand_lumi", dir)
 	if len(lines) == 0 {

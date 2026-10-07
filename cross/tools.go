@@ -6,7 +6,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,7 +14,6 @@ import (
 	"runtime"
 	"strings"
 	"time"
-	"unicode/utf16"
 )
 
 type toolRequest struct {
@@ -264,14 +262,17 @@ func windowsCommand(ctx context.Context, command string, admin bool, marker, hom
 		"$o = & { " + command + "\n} 2>&1 | Out-String -Width 200\n" +
 		"[IO.File]::WriteAllText('" + strings.ReplaceAll(out, "'", "''") + "', $o, (New-Object Text.UTF8Encoding $false))\n"
 	script := inner
-	if admin {
-		// UAC の確認画面を出して、許可されたら管理者の PowerShell で inner を動かす
-		script = "try { $p = Start-Process powershell -Verb RunAs -Wait -PassThru -WindowStyle Hidden " +
-			"-ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-EncodedCommand','" + encodePS(inner) + "'; exit $p.ExitCode } " +
+	if admin && marker != "" {
+		// UAC の確認画面を出して、許可されたら管理者の PowerShell で inner を動かす。
+		// inner はファイルに書いて渡す (確認画面の「詳細」で、何を動かすのか分かるように)
+		ps1 := filepath.Join(filepath.Dir(marker), "lumi_admin.ps1")
+		os.WriteFile(ps1, append([]byte("\xef\xbb\xbf"), inner...), 0o644) // BOM つきの UTF-8 (日本語を正しく読ませる)
+		script = "try { $p = Start-Process powershell -Verb RunAs -Wait -PassThru " +
+			"-ArgumentList '-NoProfile','-ExecutionPolicy','RemoteSigned','-File','\"" + strings.ReplaceAll(ps1, "'", "''") + "\"'; exit $p.ExitCode } " +
 			"catch { Write-Output 'LUMI_UAC_DENIED' }"
 	}
 	// 確認を断ったときの目印は標準出力に出る (そのときは出力ファイルができない)
-	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encodePS(script))
+	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
 	return cmd, out
 }
 
@@ -282,14 +283,6 @@ func homeDir() string {
 	return os.TempDir()
 }
 
-func encodePS(s string) string {
-	u := utf16.Encode([]rune(s))
-	b := make([]byte, len(u)*2)
-	for i, c := range u {
-		b[i*2], b[i*2+1] = byte(c), byte(c>>8)
-	}
-	return base64.StdEncoding.EncodeToString(b)
-}
 
 func appleScriptEscape(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s)

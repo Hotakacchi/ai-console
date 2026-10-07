@@ -91,3 +91,14 @@ func killTree(cmd *exec.Cmd) {
 func detach(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x00000008 | 0x00000200} // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
 }
+
+// 少し待ってから exe を起動する (ルミが終わってから。cmd.exe の timeout と start を使う)
+func relaunchLater(exe string) error {
+	cmd := exec.Command("cmd.exe")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x00000008 | 0x00000200, // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+		CmdLine:       `cmd.exe /d /c "timeout /t 2 /nobreak >nul & start "" "` + exe + `""`,
+	}
+	return cmd.Start()
+}

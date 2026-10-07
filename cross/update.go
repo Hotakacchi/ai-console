@@ -227,10 +227,9 @@ func applyUpdate(kind installKind, exe, file string) error {
 		if pf := os.Getenv("ProgramFiles"); pf != "" && strings.HasPrefix(strings.ToLower(exe), strings.ToLower(pf)) {
 			mode = "/ALLUSERS" // すべてのユーザー用に入っていれば、同じ形で (OS の確認が出る)
 		}
-		script := "Start-Sleep -Seconds 2\n" +
-			"Start-Process -FilePath " + psQuote(file) + " -ArgumentList '/SILENT','/SUPPRESSMSGBOXES','/NORESTART','" + mode + "' -Wait\n" +
-			"Start-Process -FilePath " + psQuote(exe) + "\n"
-		return startDetached("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-EncodedCommand", encodePS(script))
+		// /RELAUNCH: 入れ終わったらルミを起動し直す (インストーラーの [Run] で)。
+		// ルミが動いたままでも、インストーラーが閉じるのを待ってから入れ替える
+		return startDetached(file, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", mode, "/RELAUNCH")
 	case kindWinPortable:
 		// 動いている exe は消せないが名前は変えられるので、古いほうを .old にして新しいものを置く
 		old := exe + ".old"
@@ -242,8 +241,7 @@ func applyUpdate(kind installKind, exe, file string) error {
 			os.Rename(old, exe)
 			return err
 		}
-		script := "Start-Sleep -Seconds 2\nStart-Process -FilePath " + psQuote(exe) + "\n"
-		return startDetached("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-EncodedCommand", encodePS(script))
+		return relaunchLater(exe)
 	case kindMacApp:
 		app := filepath.Dir(filepath.Dir(filepath.Dir(exe)))
 		if !writable(filepath.Dir(app)) {
@@ -260,12 +258,12 @@ func applyUpdate(kind installKind, exe, file string) error {
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("%v: %s", err, lastLine(string(out)))
 		}
-		return startDetached("/bin/sh", "-c", "sleep 2; exec "+shQuote(exe))
+		return relaunchLater(exe)
 	case kindTar:
 		if err := extractLumiBinary(file, exe); err != nil {
 			return err
 		}
-		return startDetached("/bin/sh", "-c", "sleep 2; exec "+shQuote(exe))
+		return relaunchLater(exe)
 	}
 	return errors.New("unsupported")
 }
@@ -339,7 +337,6 @@ func writable(dir string) bool {
 	return true
 }
 
-func psQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
 func shQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
 func lastLine(s string) string {

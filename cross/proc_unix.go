@@ -4,6 +4,7 @@ package main
 
 import (
 	"os/exec"
+	"strings"
 	"syscall"
 )
 
@@ -25,4 +26,11 @@ func killTree(cmd *exec.Cmd) {
 // ルミが終わっても動き続けるように (更新のときに使う)
 func detach(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+}
+
+// 少し待ってから exe を起動する (ルミが終わってから)
+func relaunchLater(exe string) error {
+	cmd := exec.Command("/bin/sh", "-c", "sleep 2; exec '"+strings.ReplaceAll(exe, "'", `'\''`)+"'")
+	detach(cmd)
+	return cmd.Start()
 }

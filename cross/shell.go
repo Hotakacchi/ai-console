@@ -125,7 +125,7 @@ func runShell(command, dir string, cancel <-chan struct{}, onLine func(string)) 
 			"Set-Location -LiteralPath '" + strings.ReplaceAll(dir, "'", "''") + "' -ErrorAction SilentlyContinue\n" +
 			"try { & {\n" + command + "\n} *>&1 | Out-String -Stream -Width 200 | ForEach-Object { __w $_ } } catch { __w $_ }\n" +
 			"__w ('" + cwdMarker + "' + (Get-Location).Path)\n"
-		cmd = exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encodePS(script))
+		cmd = exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
 	default:
 		sh := "/bin/bash"
 		if runtime.GOOS == "darwin" {

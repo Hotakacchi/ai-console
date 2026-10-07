@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"unicode/utf8"
@@ -157,6 +158,8 @@ func runShell(command, dir string, cancel <-chan struct{}, onLine func(string)) 
 func runShellWith(sh shellSpec, command, dir string, cancel <-chan struct{}, onLine func(string)) (string, error) {
 	cmd := sh.command(command, dir)
 	cmd.Dir = dir
+	// wsl.exe は、こうしないと UTF-16 で書き出して文字化けする
+	cmd.Env = append(os.Environ(), "WSL_UTF8=1")
 	hideWindow(cmd)
 	newGroup(cmd)
 	pr, pw := io.Pipe()
@@ -180,7 +183,7 @@ func runShellWith(sh shellSpec, command, dir string, cancel <-chan struct{}, onL
 	sc.Buffer(make([]byte, 64*1024), 4<<20)
 	for sc.Scan() {
 		// 表の右側の詰め物の空白は取る
-		line := strings.TrimRight(decodeOutput(sc.Bytes()), "\r \t")
+		line := strings.TrimRight(cleanLine(decodeOutput(sc.Bytes())), " \t")
 		if d, ok := strings.CutPrefix(line, cwdMarker); ok {
 			newDir = filepath.Clean(strings.TrimSpace(d))
 			continue
@@ -198,6 +201,36 @@ func runShellWith(sh shellSpec, command, dir string, cancel <-chan struct{}, onL
 		err = nil // 終了コードが 0 でないだけなら、出力を見ればわかる
 	}
 	return newDir, err
+}
+
+// 端末向けの出力を、画面に出せる 1 行にする:
+//   - 色などの制御コード (ESC[33m など) を取る
+//   - 行頭に戻る \r で描き直している進み具合の表示 (winget など) は、最後に描いたものだけ残す
+//   - \b は 1 文字戻す。そのほかの制御文字 (UTF-16 の名残の NUL など) は取る
+var ansiCode = regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])`)
+
+func cleanLine(s string) string {
+	if strings.IndexFunc(s, func(r rune) bool { return r < 0x20 && r != '\t' || r == 0x7f }) < 0 {
+		return s
+	}
+	s = ansiCode.ReplaceAllString(s, "")
+	s = strings.TrimRight(s, "\r")
+	if i := strings.LastIndexByte(s, '\r'); i >= 0 {
+		s = s[i+1:]
+	}
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		switch {
+		case r == '\b':
+			if len(out) > 0 {
+				out = out[:len(out)-1]
+			}
+		case r < 0x20 && r != '\t', r == 0x7f:
+		default:
+			out = append(out, r)
+		}
+	}
+	return string(out)
 }
 
 // UTF-8 でなければ Shift_JIS として読む (日本語の Windows の古いコマンドの出力など)

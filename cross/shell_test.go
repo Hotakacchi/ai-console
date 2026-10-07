@@ -111,3 +111,18 @@ func TestRunShellCancel(t *testing.T) {
 		}
 	}
 }
+
+func TestCleanLine(t *testing.T) {
+	for in, want := range map[string]string{
+		"plain 日本語":                                 "plain 日本語",
+		"\x1b[33m2b453a3\x1b[m v1.5.2":              "2b453a3 v1.5.2",
+		"  ▒▒▒  1 MB / 5 MB\r  ███▒  4 MB / 5 MB\r": "  ███▒  4 MB / 5 MB",
+		"-\b|\b/\bdone":                             "done",
+		"L\x00i\x00n\x00u\x00x\x00":                 "Linux",
+		"\x1b]0;title\x07after\ttab":                "after\ttab",
+	} {
+		if got := cleanLine(in); got != want {
+			t.Errorf("cleanLine(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

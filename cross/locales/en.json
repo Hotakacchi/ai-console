@@ -341,5 +341,20 @@
   "peek.moveHint": "Drag, then double-click to set",
   "peek.moving": "Here's the small window. Drag it where you like and double-click to set it.",
   "peek.saved": "Saved the small window's place. To use a fixed place again: /set peek_position bottom-right",
-  "update.retry": "Try /update again, or download and install it from this page: %s"
+  "update.retry": "Try /update again, or download and install it from this page: %s",
+  "cmd.discord": "Show Lumi's status on Discord / stop",
+  "cmd.discord.args": "[on|off]",
+  "set.discord": "Show what Lumi is doing in your Discord status (never the conversation itself)",
+  "set.discord_app_id": "Discord application ID (empty = the default one)",
+  "discord.off": "Not showing on Discord. Turn it on with /discord on.",
+  "discord.connected": "Showing Lumi's status on Discord (never the conversation itself). /discord off to stop.",
+  "discord.waiting": "Ready to show on Discord. It connects when Discord is running.",
+  "discord.noAppID": "No Discord application ID is set. Set one with /set discord_app_id <ID> (create an application in the Discord Developer Portal to get one)",
+  "discord.idle": "Idle",
+  "discord.talking": "Talking with Lumi",
+  "discord.thinking": "Thinking",
+  "discord.running": "Running a command",
+  "discord.searching": "Searching the web",
+  "discord.downloading": "Downloading",
+  "discord.shell": "Shell mode"
 }

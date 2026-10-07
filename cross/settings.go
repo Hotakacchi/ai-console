@@ -42,6 +42,7 @@ func settingsTemplate(provider string) string {
   "update_check": "on",
   "weather_location": "",
   "phone": "off",
+  "discord": "off",
   "keep_history": "on",
   "search_url": "",
   "voice_input": "on",

@@ -341,5 +341,20 @@
   "peek.moveHint": "ドラッグして、ダブルクリックで決定",
   "peek.moving": "小窓を出しました。好きな場所へドラッグして、ダブルクリックで決めてください。",
   "peek.saved": "小窓の場所を覚えました。決まった場所に戻すときは /set peek_position bottom-right",
-  "update.retry": "もう一度 /update を試すか、次のページから手でダウンロードして入れてください: %s"
+  "update.retry": "もう一度 /update を試すか、次のページから手でダウンロードして入れてください: %s",
+  "cmd.discord": "Discord のステータスにルミの様子を出す / やめる",
+  "cmd.discord.args": "[on|off]",
+  "set.discord": "Discord のステータスにルミの様子を出すか (会話の中身は出しません)",
+  "set.discord_app_id": "Discord のアプリの ID (空なら標準のもの)",
+  "discord.off": "Discord のステータスには出していません。/discord on で出せます。",
+  "discord.connected": "Discord のステータスに出しています (会話の中身は出しません)。/discord off でやめられます。",
+  "discord.waiting": "Discord のステータスに出す準備ができました。Discord が起動するとつながります。",
+  "discord.noAppID": "Discord のアプリの ID が決まっていません。/set discord_app_id <ID> で設定してください (Discord Developer Portal でアプリを作ると ID がもらえます)",
+  "discord.idle": "待機中",
+  "discord.talking": "ルミとお話し中",
+  "discord.thinking": "考えています",
+  "discord.running": "コマンドを実行中",
+  "discord.searching": "Web を調べています",
+  "discord.downloading": "ダウンロード中",
+  "discord.shell": "シェルモード"
 }

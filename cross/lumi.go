@@ -74,6 +74,7 @@ func (l *Lumi) emit(name string, data any) {
 	if phone.running() {
 		phone.publish(name, data) // スマホでも見られるように
 	}
+	discord.observe(name, data) // Discord のステータス用
 }
 
 func (l *Lumi) write(text, color string) { l.emit("write", map[string]any{"text": text, "color": color}) }
@@ -169,6 +170,7 @@ func (l *Lumi) reload(announce bool) {
 	l.applyStartup()
 	l.applyHotkey()
 	l.applyPhone(false)
+	l.applyDiscord()
 	l.restoreHistory(false) // AI を作り直したので、前の会話をもう一度渡す
 	l.warmupLocal()
 }
@@ -203,8 +205,10 @@ func (l *Lumi) ready() {
 	l.restoreHistory(true)
 	l.applyHotkey()
 	l.applyPhone(false)
+	l.applyDiscord()
 	l.checkUpdate()
 	l.startOnce.Do(func() {
+		go l.runDiscord()
 		go l.runReminders()
 		if l.scriptPath != "" {
 			l.runScript(l.scriptPath)
@@ -336,6 +340,8 @@ func (l *Lumi) submit(text string) {
 		l.wordsFile()
 	case "/shell":
 		l.toggleShell()
+	case "/discord":
+		l.discordCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/phone":
 		l.phoneCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/routines", "/routine":
@@ -382,7 +388,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", ""}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", ""}, {"/routines", "cmd.routines.args"}, {"/phone", "cmd.phone.args"},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", ""}, {"/routines", "cmd.routines.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", "cmd.peek.args"}, {"/cls", ""}, {"/exit", ""},
 }
@@ -422,6 +428,8 @@ var settingKeys = []settingKey{
 	{"weather_location", ""},
 	{"peek_position", "bottom-right,bottom-left,bottom-center,top-right,top-left,top-center,custom"},
 	{"phone", "off,on"},
+	{"discord", "off,on"},
+	{"discord_app_id", ""},
 	{"phone_port", "#int:1024:65535"},
 	{"face_color", ""},
 	{"face_size", "#int:20:100"},
@@ -1070,6 +1078,7 @@ func (l *Lumi) quit() {
 	}
 	voicevox.Stop()
 	phone.stop()
+	discord.stop()
 	l.interrupt()
 	localServer.Stop()
 	l.app.Quit()

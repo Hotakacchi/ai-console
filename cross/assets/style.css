@@ -37,6 +37,11 @@ body { background: var(--bg); color: var(--fg); font: 15px/1.45 var(--mono); }
 .cursor { display: inline-block; width: 0.6em; height: 1.2em; vertical-align: text-bottom; background: var(--fg); }
 #term.blur .cursor { background: transparent; outline: 1px solid var(--fg); outline-offset: -1px; }
 .cursor.off { visibility: hidden; }
+/* 文字の上にあるカーソル: 文字の幅になり、文字を反転して見せる */
+.cursor.char { width: auto; height: auto; vertical-align: baseline; color: var(--bg); }
+.cursor.char.off { visibility: visible; background: transparent; color: var(--white); }
+#term.blur .cursor.char { color: var(--white); }
+#input .after { color: var(--white); }
 .spinner { color: var(--dim); }
 
 /* キー入力と日本語変換を受けるための見えない入力欄 (カーソルの位置に置く) */

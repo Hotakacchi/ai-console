@@ -100,9 +100,20 @@ function termMain() {
   const input = document.createElement("span");
   input.id = "input";
   input.innerHTML = '<span class="prompt"></span><span class="typed"></span><span class="compose"></span>' +
-    '<span class="cursor"></span><span class="ghost"></span><span class="hint"></span><span class="spinner"></span>';
-  const [promptEl, typedEl, composeEl, cursorEl, ghostEl, hintEl, spinnerEl] = input.children;
+    '<span class="cursor"></span><span class="after"></span><span class="ghost"></span><span class="hint"></span><span class="spinner"></span>';
+  const [promptEl, typedEl, composeEl, cursorEl, afterEl, ghostEl, hintEl, spinnerEl] = input.children;
   let buffer = "", compose = "", busy = false, thinking = false, askPrompt = null;
+  let caret = 0;   // カーソルの位置 (何文字目か。日本語も 1 文字と数える)
+  const chars = () => Array.from(buffer);
+  // 入力を丸ごと入れ替える (カーソルは最後に)
+  function setBuffer(s) { buffer = s; caret = Array.from(s).length; }
+  // カーソルの位置に文字を入れる
+  function insert(text) {
+    const a = chars(), add = Array.from(text);
+    a.splice(caret, 0, ...add);
+    buffer = a.join("");
+    caret += add.length;
+  }
   let hint = "", lastWasVoice = false, msgs = {};
   let commands = [], history = [], historyIndex = 0, tabPrefix = null, tabIndex = -1;
 
@@ -112,10 +123,15 @@ function termMain() {
     const editing = !busy || askPrompt !== null;
     promptEl.textContent = editing ? (askPrompt ?? PROMPT) : "";
     input.classList.toggle("asking", askPrompt !== null);
-    typedEl.textContent = editing ? buffer : "";
+    // カーソルより前・カーソルの上の 1 文字・後ろに分けて出す (コンソールのように、カーソルは文字に重なる)
+    const a = chars(), at = editing && !compose ? (a[caret] || "") : "";
+    typedEl.textContent = editing ? a.slice(0, caret).join("") : "";
     composeEl.textContent = editing ? compose : "";
     cursorEl.style.display = editing ? "" : "none";
-    ghostEl.textContent = editing && !compose ? ghost() : "";
+    cursorEl.textContent = at;
+    cursorEl.classList.toggle("char", !!at);
+    afterEl.textContent = editing ? a.slice(caret + (at ? 1 : 0)).join("") : "";
+    ghostEl.textContent = editing && !compose && caret >= a.length ? ghost() : "";
     hintEl.textContent = editing && !buffer && !compose && hint ? " " + hint : "";
     spinnerEl.textContent = !editing && thinking ? "|/-\\"[Math.floor(performance.now() / 125) % 4] : "";
     // 日本語変換の窓がカーソルの位置に出るよう、見えない入力欄を動かす
@@ -145,7 +161,7 @@ function termMain() {
   // 打った文字 (日本語変換の確定も含む)
   keys.addEventListener("input", e => {
     if (e.isComposing) return;
-    if (!busy || askPrompt !== null) buffer += keys.value.replace(/\r?\n/g, " ");
+    if (!busy || askPrompt !== null) insert(keys.value.replace(/\r?\n/g, " "));
     keys.value = "";
     tabPrefix = null;
     render();
@@ -153,7 +169,7 @@ function termMain() {
   keys.addEventListener("compositionupdate", e => { compose = e.data || ""; render(); });
   keys.addEventListener("compositionend", e => {
     compose = "";
-    if (!busy || askPrompt !== null) buffer += e.data || "";
+    if (!busy || askPrompt !== null) insert(e.data || "");
     keys.value = "";
     render();
   });
@@ -172,7 +188,7 @@ function termMain() {
     if (e.key === "Escape" || (ctrl && e.key === "c" && !window.getSelection().toString())) {
       e.preventDefault();
       if (busy) emit("interrupt");
-      else if (buffer) { write(PROMPT, "fg"); write(buffer + "^C\n", "white"); buffer = ""; render(); }
+      else if (buffer) { write(PROMPT, "fg"); write(buffer + "^C\n", "white"); setBuffer(""); render(); }
       return;
     }
     if (ctrl && e.key === "l") { e.preventDefault(); clear(); return; }
@@ -182,32 +198,52 @@ function termMain() {
       e.preventDefault();
       if (tabPrefix === null) { tabPrefix = buffer; tabIndex = -1; }
       const m = tabPrefix.startsWith("/") ? commands.filter(c => c.startsWith(tabPrefix)) : [];
-      if (m.length) { tabIndex = (tabIndex + 1) % m.length; buffer = m[tabIndex]; render(); }
+      if (m.length) { tabIndex = (tabIndex + 1) % m.length; setBuffer(m[tabIndex]); render(); }
       return;
     }
     tabPrefix = null;
     if (e.key === "Enter") {
       e.preventDefault();
       const text = buffer;
-      buffer = "";
+      setBuffer("");
       write(PROMPT, "fg");
       write(text + "\n", "white");
       if (text.trim()) { history.push(text); historyIndex = history.length; }
       lastWasVoice = false;
       emit("submit", text);
-    } else if (e.key === "Backspace" && buffer) {
+    } else if (e.key === "Backspace") {
+      // カーソルの前の 1 文字を消す
       e.preventDefault();
-      buffer = Array.from(buffer).slice(0, -1).join("");
+      if (caret > 0) { const a = chars(); a.splice(caret - 1, 1); buffer = a.join(""); caret--; render(); }
+    } else if (e.key === "Delete") {
+      // カーソルの上の 1 文字を消す
+      e.preventDefault();
+      const a = chars();
+      if (caret < a.length) { a.splice(caret, 1); buffer = a.join(""); render(); }
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      // 1 文字ずつ動く (Ctrl を押していれば単語ごと)
+      e.preventDefault();
+      const a = chars(), dir = e.key === "ArrowLeft" ? -1 : 1;
+      if (ctrl) {
+        let i = caret;
+        if (dir < 0) { while (i > 0 && a[i - 1] === " ") i--; while (i > 0 && a[i - 1] !== " ") i--; }
+        else { while (i < a.length && a[i] !== " ") i++; while (i < a.length && a[i] === " ") i++; }
+        caret = i;
+      } else caret = Math.max(0, Math.min(a.length, caret + dir));
       render();
+    } else if (e.key === "Home") {
+      e.preventDefault(); caret = 0; render();
+    } else if (e.key === "End") {
+      e.preventDefault(); caret = chars().length; render();
     } else if (e.key === "ArrowUp" && history.length) {
       e.preventDefault();
       historyIndex = Math.max(0, historyIndex - 1);
-      buffer = history[historyIndex];
+      setBuffer(history[historyIndex]);
       render();
     } else if (e.key === "ArrowDown" && history.length) {
       e.preventDefault();
       historyIndex = Math.min(history.length, historyIndex + 1);
-      buffer = history[historyIndex] ?? "";
+      setBuffer(history[historyIndex] ?? "");
       render();
     }
   });
@@ -278,7 +314,7 @@ function termMain() {
     write(askPrompt, "yellow");
     write(shown, "white");
     write((note ? "  " + note : "") + "\n", "dim");
-    askPrompt = null; buffer = "";
+    askPrompt = null; setBuffer("");
     voice.confirming(false);
     emit("answer", answer);
     render();
@@ -390,7 +426,7 @@ function termMain() {
   on("thinking", b => { thinking = b; render(); });
   on("face", expr => { face.expression = expr; });
   on("flash", d => face.flash(d.expr, d.seconds));
-  on("ask", q => { askPrompt = q; buffer = ""; thinking = false; voice.confirming(true); render(); keys.focus(); });
+  on("ask", q => { askPrompt = q; setBuffer(""); thinking = false; voice.confirming(true); render(); keys.focus(); });
   on("i18n", m => { msgs = m; });
   on("prompt", p => { PROMPT = p || NORMAL_PROMPT; render(); });
   // コマンドの実行中とシェルモードは、顔の見た目を変える
@@ -418,7 +454,7 @@ function termMain() {
     if (askPrompt === null) return;
     write(askPrompt, "yellow");
     write(a + "  📱\n", "white");
-    askPrompt = null; buffer = "";
+    askPrompt = null; setBuffer("");
     voice.confirming(false);
     render();
   });

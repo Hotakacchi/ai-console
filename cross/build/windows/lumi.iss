@@ -2,7 +2,7 @@
 ; 最初に「自分だけ (管理者権限なし、%LOCALAPPDATA%\Programs\Lumi)」か
 ; 「すべてのユーザー (管理者権限が必要、Program Files\Lumi)」かを選ぶ。新しい版で実行すれば上書き更新になる。
 ; 設定とダウンロードしたものは、どちらでもユーザーごとの %LOCALAPPDATA%\Lumi に置かれる。
-; ビルド: iscc /DAppVersion=1.5.1 /DSourceExe=..\..\lumi.exe lumi.iss
+; ビルド: iscc /DAppVersion=1.5.2 /DSourceExe=..\..\lumi.exe lumi.iss
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"

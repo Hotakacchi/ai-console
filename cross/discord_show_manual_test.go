@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// 実際に Discord のステータスに 30 秒だけ出して、消す: go test -tags manual -run DiscordShow -v
+// 実際に Discord のステータスに 60 秒だけ出して、消す: go test -tags manual -run DiscordShow -v
 func TestDiscordShow(t *testing.T) {
 	loadLocales()
 	setLanguage("ja")
@@ -20,10 +20,10 @@ func TestDiscordShow(t *testing.T) {
 		t.Fatal("not shown")
 	}
 	t.Log("shown")
-	time.Sleep(15 * time.Second)
+	time.Sleep(30 * time.Second)
 	d.update(T("discord.running"), "Lumi "+version+" (テスト)")
 	t.Log("changed")
-	time.Sleep(15 * time.Second)
+	time.Sleep(30 * time.Second)
 	d.stop()
 	t.Log("cleared")
 }

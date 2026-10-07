@@ -231,7 +231,11 @@ func (d *discordRPC) connectLocked() error {
 
 // コマンドを送って、その返事を読む
 func (d *discordRPC) requestLocked(v any) error {
-	_, _, err := d.exchangeLocked(1, v)
+	_, reply, err := d.exchangeLocked(1, v)
+	if err == nil && strings.Contains(string(reply), `"evt":"ERROR"`) {
+		// 中身を断られた。つながりは生きているので切らず、同じ内容は送り直さない (内容が変わったらまた送る)
+		return nil
+	}
 	return err
 }
 

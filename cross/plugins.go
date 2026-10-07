@@ -79,8 +79,9 @@ func pluginArgv(path string) ([]string, bool) {
 			}
 			exe = "powershell"
 		}
-		// Windows の標準 (Restricted) ではスクリプトが動かないので、自分で書いたもの (署名なし) は動く RemoteSigned にする
-		return []string{exe, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "RemoteSigned", "-File", path}, true
+		// Windows の標準 (Restricted) ではスクリプトが動かないので、自分で書いたもの (署名なし) は動く RemoteSigned にする。
+		// 出力を UTF-8 にする入口 (ps1Runner) を通す (そのままだと、コンソールの文字コードで日本語が化ける)
+		return []string{exe, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "RemoteSigned", "-File", ps1Runner(), path}, true
 	case ".bat", ".cmd":
 		return []string{"cmd.exe", "/d", "/c", path}, win
 	case ".exe":
@@ -103,6 +104,22 @@ func pluginArgv(path string) ([]string, bool) {
 		}
 	}
 	return nil, false
+}
+
+// .ps1 のプラグインを動かす入口 (データフォルダの plugin-run.ps1)。出力を UTF-8 にしてから、渡されたスクリプトを引数つきで動かす
+func ps1Runner() string {
+	path := filepath.Join(dataDir(), "plugin-run.ps1")
+	body := "# Lumi: runs a plugin (.ps1) with UTF-8 output\r\n" +
+		"[Console]::OutputEncoding = [Text.Encoding]::UTF8\r\n" +
+		"$OutputEncoding = [Text.Encoding]::UTF8\r\n" +
+		"$__script = $args[0]\r\n" +
+		"$__rest = @($args | Select-Object -Skip 1)\r\n" +
+		"& $__script @__rest\r\n"
+	if b, err := os.ReadFile(path); err != nil || string(b) != body {
+		os.MkdirAll(filepath.Dir(path), 0o755)
+		os.WriteFile(path, []byte(body), 0o644)
+	}
+	return path
 }
 
 // 最初のコメント行 (#!… の行と空行は飛ばす)。コメントで始まらなければ説明なし

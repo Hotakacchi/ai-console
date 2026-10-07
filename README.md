@@ -5,13 +5,27 @@
 [English](#english)
 
 コンソールそっくりのウィンドウの背景に顔が浮かび、返事を声で読み上げるアシスタントです。
-まばたきやよそ見をし、喋るときは口が動きます。「ルミ」と呼びかければ声で話しかけられ、頼めば Web を調べたり PC を操作したりもします (PC の操作は実行前に必ず確認します)。
+まばたきやよそ見をし、喋るときは口が動きます。「ルミ」と呼びかければ声で話しかけられ、頼めば Web を調べたり PC を操作したりもします (PC の操作は実行前に確認します。確認なしで実行する自動モードもあります)。
+
+<p align="center"><img src="screenshots/10-morning.png" width="720" alt="ルミの画面"></p>
 
 - **Windows / macOS / Linux** に対応 (Go + [Wails](https://wails.io))
 - **ローカルAIを標準搭載** — インターネットなしで会話できる ([llama.cpp](https://github.com/ggml-org/llama.cpp) + [Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B)、初回にダウンロード)
 - **声で話しかけられる** — 呼びかけ・音声認識もPCの中だけで処理 ([Vosk](https://alphacephei.com/vosk/))
 - **日本語・英語** に対応 (翻訳ファイルを足せば言語を増やせる)
 - つなぐ AI は自由に選べる: ローカル / Claude / OpenAI 互換 API (Ollama・LM Studio など) / 自作スクリプト / AI なし
+
+## スクリーンショット
+
+<table>
+<tr><td align="center" width="33%"><img src="screenshots/02-chat.png" alt="話しかけると声で返事"><br><sub>話しかけると声で返事</sub></td><td align="center" width="33%"><img src="screenshots/04-confirm.png" alt="PC の操作は実行前に確認"><br><sub>PC の操作は実行前に確認</sub></td><td align="center" width="33%"><img src="screenshots/05-running.png" alt="コマンドの実行中は顔の中をプログラムが流れる"><br><sub>コマンドの実行中は顔の中をプログラムが流れる</sub></td></tr>
+<tr><td align="center" width="33%"><img src="screenshots/06-shell.png" alt="シェルモードでは顔が >_ に"><br><sub>シェルモードでは顔が >_ に</sub></td><td align="center" width="33%"><img src="screenshots/07-search.png" alt="Web を調べているところ"><br><sub>Web を調べているところ</sub></td><td align="center" width="33%"><img src="screenshots/08-download.png" alt="ダウンロード中は口がプログレスバーに"><br><sub>ダウンロード中は口がプログレスバーに</sub></td></tr>
+<tr><td align="center" width="33%"><img src="screenshots/09-file.png" alt="落としたファイルを読み込む"><br><sub>落としたファイルを読み込む</sub></td><td align="center" width="33%"><img src="screenshots/10-morning.png" alt="「おはよう」で天気と予定 (晴れ)"><br><sub>「おはよう」で天気と予定 (晴れ)</sub></td><td align="center" width="33%"><img src="screenshots/11-rain.png" alt="雨の日は傘"><br><sub>雨の日は傘</sub></td></tr>
+<tr><td align="center" width="33%"><img src="screenshots/12-reminder.png" alt="リマインダー"><br><sub>リマインダー</sub></td><td align="center" width="33%"><img src="screenshots/13-memory.png" alt="名前や好みを覚える"><br><sub>名前や好みを覚える</sub></td><td align="center" width="33%"><img src="screenshots/14-error.png" alt="エラーのときは顔が乱れる"><br><sub>エラーのときは顔が乱れる</sub></td></tr>
+<tr><td align="center" width="33%"><img src="screenshots/15-phone-qr.png" alt="/phone の QR コード"><br><sub>/phone の QR コード</sub></td><td align="center" width="33%"><img src="screenshots/16-pink.png" alt="顔の色を変えられる"><br><sub>顔の色を変えられる</sub></td><td align="center" width="33%"><img src="screenshots/01-boot.png" alt="起動画面"><br><sub>起動画面</sub></td></tr>
+</table>
+
+<p align="center"><img src="screenshots/17-phone.png" width="300" alt="スマホから話しかける"><br><sub>同じ Wi-Fi のスマホから話しかける (/phone)</sub></p>
 
 ## インストール
 
@@ -154,7 +168,9 @@ VOICEVOX はそれぞれのキャラクターの利用規約に従ってくだ�
 
 ## English
 
-Lumi is a console-style assistant with an animated face in the background that answers out loud. It runs on **Windows, macOS and Linux**, ships with a **local AI** (llama.cpp + Qwen3.5-4B, downloaded on first use), listens for its **wake word** ("Lumi") with on-device speech recognition (Vosk), can **search the web**, and can **run commands on your PC — always after asking you first**. The UI and the conversation are available in Japanese and English (`/set language en`).
+<p align="center"><img src="screenshots/05-running.png" width="720" alt="Lumi running a command"></p>
+
+Lumi is a console-style assistant with an animated face in the background that answers out loud. It runs on **Windows, macOS and Linux**, ships with a **local AI** (llama.cpp + Qwen3.5-4B, downloaded on first use), listens for its **wake word** ("Lumi") with on-device speech recognition (Vosk), can **search the web**, and can **run commands on your PC — after asking you first** (or without asking in auto mode, `/auto`; administrator and risky commands always ask). The UI and the conversation are available in Japanese and English (`/set language en`).
 
 It also changes its expression to match what it says, sets **timers and reminders** ("remind me in 5 minutes"), **remembers** things you tell it (`/memory`), keeps the **conversation history** across restarts, can read your **clipboard** when asked, reads **files you drop onto the window** (text, PDF, Word, Excel, PowerPoint, images), can **look at your screen** when you ask (`/screen`, always after asking), toggles with a **global hotkey** (`Ctrl+Alt+L`), lets you change its **colors, size and fonts**, checks for and installs **updates** (`/update`), runs **routines** ("good morning" → weather and reminders; `/routines`), and lets you **talk from your phone** on the same Wi-Fi (`/phone`). Optional downloads: `/install-voicevox` for natural Japanese voices with lip-sync ([VOICEVOX](https://voicevox.hiroshiba.jp/)) and `/install-whisper` for more accurate speech recognition ([Whisper](https://github.com/openai/whisper)).
 

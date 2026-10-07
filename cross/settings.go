@@ -200,6 +200,8 @@ func (s *Settings) SystemPrompt() string {
 		// 自分で書いたキャラクター設定でも、話す言語は今の言語に合わせる
 		p = custom + "\n" + T("prompt.language")
 	}
+	// 自分のこと (バージョン・OS・使っている AI・できること) を聞かれても答えられるように
+	p += "\n\n" + T("prompt.self", version, osName(), aiLabel(s))
 	if s.PcControl() {
 		// 小さなモデルでも迷わないよう、この OS で使える具体例を添える
 		disk, folder := pcExamples()
@@ -272,4 +274,26 @@ func shellName() string {
 		return "zsh"
 	}
 	return "bash"
+}
+
+// 今つないでいる AI の名前 (指示文で自分のことを話すため)
+func aiLabel(s *Settings) string {
+	model := s.Get("model", "")
+	switch strings.ToLower(s.Get("provider", "offline")) {
+	case "local":
+		if model == "" {
+			model = modelName
+		}
+		return T("self.local", strings.TrimSuffix(filepath.Base(model), filepath.Ext(model)))
+	case "anthropic":
+		if model == "" {
+			model = "claude-opus-5-5"
+		}
+		return "Claude (" + model + ")"
+	case "openai":
+		return T("self.openai", model)
+	case "command":
+		return T("self.command")
+	}
+	return T("self.offline")
 }

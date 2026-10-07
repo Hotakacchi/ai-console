@@ -375,5 +375,12 @@
   "tab.new": "New tab (Ctrl+T)",
   "tab.choose": "Open with a shell",
   "tab.close": "Close tab (Ctrl+W)",
-  "tab.hello": "This is a %s tab. Lines you type run as commands as-is (no confirmation). exit or × closes it."
+  "tab.hello": "This is a %s tab. Lines you type run as commands as-is (no confirmation). exit or × closes it.",
+  "prompt.self": "About yourself: you are the app “Lumi” version %s, running on %s. The AI you are connected to is %s. You can: talk and listen by voice, search the web, operate the PC (commands), set timers and reminders, remember things, look at files and the screen, run routines, talk from a phone, show a Discord status, and open terminal tabs. When asked about yourself, answer with this information, and point to /help (commands) or /settings (settings) for details. /update checks for a new version. When asked about yourself, answer in words from this information only, without web searches or commands.",
+  "self.local": "a local AI running on this PC (%s)",
+  "self.openai": "an OpenAI-compatible AI (%s)",
+  "self.command": "a custom script",
+  "self.offline": "none (only fixed replies)",
+  "offline.words.version": "version,which version",
+  "offline.version": "Lumi is version %s, running on %s. /update checks for a new version."
 }

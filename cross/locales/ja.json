@@ -370,5 +370,10 @@
   "shell.cmdLabel": "コマンドプロンプト",
   "shell.notFound": "「%s」というシェルは、この PC で見つかりませんでした。",
   "shell.switched": "シェルを %s にしました。",
-  "shell.listHow": "/shell <名前> で切り替えます (* が今のシェル)。/set shell auto で自動に戻ります。"
+  "shell.listHow": "/shell <名前> で切り替えます (* が今のシェル)。/set shell auto で自動に戻ります。",
+  "tab.lumi": "ルミ",
+  "tab.new": "新しいタブ (Ctrl+T)",
+  "tab.choose": "シェルを選んで開く",
+  "tab.close": "タブを閉じる (Ctrl+W)",
+  "tab.hello": "%s のタブです。打った行はそのままコマンドとして実行されます (確認はしません)。exit か × で閉じます。"
 }

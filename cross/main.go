@@ -146,6 +146,22 @@ func main() {
 		}
 		lumi.showVoices(names, asString(m["current"]))
 	})
+	// タブ (シェルのタブを + で開いて × で閉じる)
+	tabArg := func(e *application.CustomEvent) (int, map[string]any) {
+		m, _ := e.Data.(map[string]any)
+		id, _ := m["tab"].(float64)
+		return int(id), m
+	}
+	app.Event.On("tabOpen", func(e *application.CustomEvent) {
+		id, m := tabArg(e)
+		lumi.tabOpen(id, asString(m["shell"]))
+	})
+	app.Event.On("tabSubmit", func(e *application.CustomEvent) {
+		id, m := tabArg(e)
+		lumi.tabSubmit(id, asString(m["text"]))
+	})
+	app.Event.On("tabInterrupt", func(e *application.CustomEvent) { id, _ := tabArg(e); lumi.tabInterrupt(id) })
+	app.Event.On("tabClose", func(e *application.CustomEvent) { id, _ := tabArg(e); lumi.tabClose(id) })
 	app.Event.On("voiceState", func(e *application.CustomEvent) {
 		m, _ := e.Data.(map[string]any)
 		lumi.voiceState(asString(m["state"]), asString(m["message"]))

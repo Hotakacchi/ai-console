@@ -93,6 +93,147 @@ function termMain() {
     if (stick) log.scrollTop = log.scrollHeight;
   }
 
+  // ---- タブ ----
+  // 最初のタブはルミ (AI と話す)。+ でシェルのタブを開ける (Go の tabs.go が動かす)。
+  // 入力中の文字・カーソル・履歴はタブごとに持ち、切り替えるときに入れ替える
+  const tabsEl = document.getElementById("tabs");
+  const lumiTab = { id: 0, kind: "lumi", log, title: "" };
+  const tabs = [lumiTab];
+  let active = lumiTab, nextTabId = 1, shellList = [], lumiShell = false;
+  const isLumi = () => active === lumiTab;
+  // 今のタブで文字を打てるか (返事やコマンドの途中は打てない。確認の質問には答えられる)
+  const canType = () => isLumi() ? (!busy || askPrompt !== null) : !active.busy;
+  const findTab = id => tabs.find(t => t.id === id);
+
+  function writeTab(t, text, color = "fg") {
+    const stick = t.log.scrollHeight - t.log.scrollTop - t.log.clientHeight < 40;
+    text.split("\n").forEach((part, i) => {
+      if (i > 0) t.current = newLineIn(t.log);
+      if (part) {
+        const span = document.createElement("span");
+        span.className = color;
+        span.textContent = part;
+        t.current.appendChild(span);
+      }
+    });
+    if (t === active) placeInput();
+    if (stick) t.log.scrollTop = t.log.scrollHeight;
+  }
+  function newLineIn(el) {
+    const div = document.createElement("div");
+    div.className = "line";
+    el.appendChild(div);
+    return div;
+  }
+  function clearTab(t) { t.log.textContent = ""; t.current = newLineIn(t.log); placeInput(); }
+
+  function updateFaceShell() { face.shell = !isLumi() || lumiShell; face.lastState = ""; }
+
+  function switchTab(t) {
+    if (!t || t === active) return;
+    // 今のタブの入力を覚えておき、切り替え先の入力に入れ替える
+    Object.assign(active, { buffer, caret, history, historyIndex });
+    active = t;
+    buffer = t.buffer || ""; caret = t.caret || 0; history = t.history || []; historyIndex = t.historyIndex ?? history.length;
+    for (const x of tabs) x.log.hidden = x !== active;
+    updateFaceShell();
+    renderTabs();
+    placeInput();
+    active.log.scrollTop = active.log.scrollHeight;
+    keys.focus();
+  }
+
+  function openTab(kind) {
+    const el = document.createElement("div");
+    el.className = "log";
+    term.insertBefore(el, keys);
+    const t = { id: nextTabId++, kind: "shell", log: el, title: "…", prompt: "", busy: true, buffer: "", caret: 0, history: [], historyIndex: 0 };
+    t.current = newLineIn(el);
+    tabs.push(t);
+    switchTab(t);
+    emit("tabOpen", { tab: t.id, shell: kind || "" });
+  }
+
+  function closeTab(t) {
+    if (!t || t === lumiTab) return;
+    emit("tabClose", { tab: t.id });
+    const i = tabs.indexOf(t);
+    if (i < 0) return;
+    if (active === t) switchTab(tabs[i - 1] || lumiTab);
+    tabs.splice(i, 1);
+    t.log.remove();
+    renderTabs();
+  }
+
+  function renderTabs() {
+    tabsEl.textContent = "";
+    lumiTab.title = msgs["tab.lumi"] || "Lumi";
+    for (const t of tabs) {
+      const el = document.createElement("div");
+      el.className = "tab" + (t === active ? " active" : "");
+      const title = document.createElement("span");
+      title.className = "title";
+      title.textContent = t.title;
+      el.appendChild(title);
+      if (t !== lumiTab) {
+        const x = document.createElement("span");
+        x.className = "close";
+        x.textContent = "×";
+        x.title = msgs["tab.close"] || "";
+        x.addEventListener("click", ev => { ev.stopPropagation(); closeTab(t); });
+        el.appendChild(x);
+      }
+      el.addEventListener("click", () => switchTab(t));
+      el.addEventListener("auxclick", ev => { if (ev.button === 1) closeTab(t); });   // 中ボタンでも閉じる
+      tabsEl.appendChild(el);
+    }
+    const plus = document.createElement("div");
+    plus.className = "tabbtn";
+    plus.textContent = "+";
+    plus.title = msgs["tab.new"] || "";
+    plus.addEventListener("click", () => openTab(""));
+    tabsEl.appendChild(plus);
+    if (shellList.length > 1) {
+      const more = document.createElement("div");
+      more.className = "tabbtn";
+      more.textContent = "▾";
+      more.title = msgs["tab.choose"] || "";
+      more.addEventListener("click", ev => { ev.stopPropagation(); toggleShellMenu(more); });
+      tabsEl.appendChild(more);
+    }
+  }
+
+  // ▾: シェルを選んでタブを開く
+  let shellMenu = null;
+  function toggleShellMenu(anchor) {
+    if (shellMenu) { shellMenu.remove(); shellMenu = null; return; }
+    shellMenu = document.createElement("div");
+    shellMenu.id = "shellmenu";
+    for (const s of shellList) {
+      const item = document.createElement("div");
+      item.textContent = s.label;
+      item.addEventListener("click", () => { shellMenu.remove(); shellMenu = null; openTab(s.kind); });
+      shellMenu.appendChild(item);
+    }
+    shellMenu.style.left = (anchor.offsetLeft) + "px";
+    term.appendChild(shellMenu);
+  }
+  document.addEventListener("click", () => { if (shellMenu) { shellMenu.remove(); shellMenu = null; } });
+
+  on("shells", list => { shellList = list || []; renderTabs(); });
+  on("tabInfo", d => {
+    const t = findTab(d.tab);
+    if (!t) return;
+    t.title = d.title;
+    t.prompt = d.prompt;
+    renderTabs();
+    if (t === active) render();
+  });
+  on("tabWrite", d => { const t = findTab(d.tab); if (t) writeTab(t, d.text, d.color); });
+  on("tabBusy", d => { const t = findTab(d.tab); if (t) { t.busy = d.on; if (t === active) render(); } });
+  on("tabClear", d => { const t = findTab(d.tab); if (t) clearTab(t); });
+  on("tabClosed", d => closeTab(findTab(d.tab)));
+
   // ---- 入力行 (今の行の最後に置く) ----
   // シェルモードでは Go から送られたプロンプト (PS C:\Users\…> など) に変わる
   // ふだんのプロンプトは OS ごとに Go から届く (Windows は C:\Lumi>、Mac は lumi@Mac ~ %、Linux は lumi@linux:~$)
@@ -118,12 +259,12 @@ function termMain() {
   let hint = "", lastWasVoice = false, msgs = {};
   let commands = [], history = [], historyIndex = 0, tabPrefix = null, tabIndex = -1;
 
-  function placeInput() { current.appendChild(input); render(); }
+  function placeInput() { (active === lumiTab ? current : active.current).appendChild(input); render(); }
 
   function render() {
-    const editing = !busy || askPrompt !== null;
-    promptEl.textContent = editing ? (askPrompt ?? PROMPT) : "";
-    input.classList.toggle("asking", askPrompt !== null);
+    const editing = canType();
+    promptEl.textContent = editing ? (isLumi() ? (askPrompt ?? PROMPT) : active.prompt) : "";
+    input.classList.toggle("asking", isLumi() && askPrompt !== null);
     // カーソルより前・カーソルの上の 1 文字・後ろに分けて出す (コンソールのように、カーソルは文字に重なる)
     const a = chars(), at = editing && !compose ? (a[caret] || "") : "";
     typedEl.textContent = editing ? a.slice(0, caret).join("") : "";
@@ -133,8 +274,8 @@ function termMain() {
     cursorEl.classList.toggle("char", !!at);
     afterEl.textContent = editing ? a.slice(caret + (at ? 1 : 0)).join("") : "";
     ghostEl.textContent = editing && !compose && caret >= a.length ? ghost() : "";
-    hintEl.textContent = editing && !buffer && !compose && hint ? " " + hint : "";
-    spinnerEl.textContent = !editing && thinking ? "|/-\\"[Math.floor(performance.now() / 125) % 4] : "";
+    hintEl.textContent = editing && isLumi() && !buffer && !compose && hint ? " " + hint : "";
+    spinnerEl.textContent = !editing && isLumi() && thinking ? "|/-\\"[Math.floor(performance.now() / 125) % 4] : "";
     // 日本語変換の窓がカーソルの位置に出るよう、見えない入力欄を動かす
     const r = cursorEl.getBoundingClientRect(), t = term.getBoundingClientRect();
     keys.style.left = (r.left - t.left) + "px";
@@ -144,7 +285,7 @@ function termMain() {
 
   // 入力中の / コマンドの候補 (先頭一致) の残り部分
   function ghost() {
-    if (askPrompt !== null || !buffer.startsWith("/") || buffer.includes(" ")) return "";
+    if (!isLumi() || askPrompt !== null || !buffer.startsWith("/") || buffer.includes(" ")) return "";
     const m = commands.find(c => c.startsWith(buffer));
     return m ? m.slice(buffer.length) : "";
   }
@@ -162,7 +303,7 @@ function termMain() {
   // 打った文字 (日本語変換の確定も含む)
   keys.addEventListener("input", e => {
     if (e.isComposing) return;
-    if (!busy || askPrompt !== null) insert(keys.value.replace(/\r?\n/g, " "));
+    if (canType()) insert(keys.value.replace(/\r?\n/g, " "));
     keys.value = "";
     tabPrefix = null;
     render();
@@ -170,7 +311,7 @@ function termMain() {
   keys.addEventListener("compositionupdate", e => { compose = e.data || ""; render(); });
   keys.addEventListener("compositionend", e => {
     compose = "";
-    if (!busy || askPrompt !== null) insert(e.data || "");
+    if (canType()) insert(e.data || "");
     keys.value = "";
     render();
   });
@@ -180,7 +321,16 @@ function termMain() {
     face.poke(true);
     if (e.isComposing || e.keyCode === 229) return;
     const ctrl = e.ctrlKey || e.metaKey;
-    if (askPrompt !== null && (e.key === "Enter" || e.key === "Escape" || (ctrl && e.key === "c"))) {
+    // タブ: Ctrl+T で開く、Ctrl+W で閉じる、Ctrl+Tab で次へ
+    if (ctrl && e.key.toLowerCase() === "t") { e.preventDefault(); openTab(""); return; }
+    if (ctrl && e.key.toLowerCase() === "w") { e.preventDefault(); closeTab(active); return; }
+    if (ctrl && e.key === "Tab") {
+      e.preventDefault();
+      const i = tabs.indexOf(active);
+      switchTab(tabs[(i + (e.shiftKey ? tabs.length - 1 : 1)) % tabs.length]);
+      return;
+    }
+    if (isLumi() && askPrompt !== null && (e.key === "Enter" || e.key === "Escape" || (ctrl && e.key === "c"))) {
       e.preventDefault();
       if (e.key === "Enter") answerAsk(buffer, buffer, "");
       else answerAsk("", buffer + "^C", "");
@@ -188,23 +338,42 @@ function termMain() {
     }
     if (e.key === "Escape" || (ctrl && e.key === "c" && !window.getSelection().toString())) {
       e.preventDefault();
+      if (!isLumi()) {
+        if (active.busy) emit("tabInterrupt", { tab: active.id });
+        else if (buffer) { writeTab(active, active.prompt, "fg"); writeTab(active, buffer + "^C\n", "white"); setBuffer(""); render(); }
+        return;
+      }
       if (busy) emit("interrupt");
       else if (buffer) { write(PROMPT, "fg"); write(buffer + "^C\n", "white"); setBuffer(""); render(); }
       return;
     }
-    if (ctrl && e.key === "l") { e.preventDefault(); clear(); return; }
-    if (busy) { if (e.key !== "Tab") return; e.preventDefault(); return; }
+    if (ctrl && e.key === "l") { e.preventDefault(); if (isLumi()) clear(); else clearTab(active); return; }
+    if (!canType()) { if (e.key !== "Tab") return; e.preventDefault(); return; }
     // Shift+Tab: 自動モード (確認せずにコマンドを実行する) の切り替え
     if (e.key === "Tab" && e.shiftKey) { e.preventDefault(); emit("toggleAuto"); return; }
     if (e.key === "Tab") {
       // Tab を押すたびに候補を順に切り替える
       e.preventDefault();
+      if (!isLumi()) return;
       if (tabPrefix === null) { tabPrefix = buffer; tabIndex = -1; }
       const m = tabPrefix.startsWith("/") ? commands.filter(c => c.startsWith(tabPrefix)) : [];
       if (m.length) { tabIndex = (tabIndex + 1) % m.length; setBuffer(m[tabIndex]); render(); }
       return;
     }
     tabPrefix = null;
+    if (e.key === "Enter" && !isLumi()) {
+      // シェルのタブ: 打った行をそのタブのシェルで実行する
+      e.preventDefault();
+      const text = buffer;
+      setBuffer("");
+      writeTab(active, active.prompt, "fg");
+      writeTab(active, text + "\n", "white");
+      if (text.trim()) { history.push(text); historyIndex = history.length; }
+      active.busy = true;
+      render();
+      emit("tabSubmit", { tab: active.id, text });
+      return;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       const text = buffer;
@@ -336,6 +505,7 @@ function termMain() {
       hint = "";
       if (face.expression === "listen") face.expression = "normal";
       if (busy || askPrompt !== null) { render(); return; }
+      switchTab(lumiTab);   // 声で話しかけた内容は、ルミのタブで受ける
       write(PROMPT, "fg");
       write(text, "white");
       write("  " + (msgs["voice.mark"] || "") + "\n", "dim");
@@ -429,8 +599,8 @@ function termMain() {
   on("thinking", b => { thinking = b; render(); });
   on("face", expr => { face.expression = expr; });
   on("flash", d => face.flash(d.expr, d.seconds));
-  on("ask", q => { askPrompt = q; setBuffer(""); thinking = false; voice.confirming(true); render(); keys.focus(); });
-  on("i18n", m => { msgs = m; });
+  on("ask", q => { switchTab(lumiTab); askPrompt = q; setBuffer(""); thinking = false; voice.confirming(true); render(); keys.focus(); });
+  on("i18n", m => { msgs = m; renderTabs(); });
   on("prompt", p => { PROMPT = p || NORMAL_PROMPT; render(); });
   on("basePrompt", p => { if (PROMPT === NORMAL_PROMPT) PROMPT = p; NORMAL_PROMPT = p; render(); });
   // コマンドの実行中とシェルモードは、顔の見た目を変える
@@ -442,7 +612,7 @@ function termMain() {
     const r = document.getElementById("face").getBoundingClientRect();
     face.lookAt((e.clientX - r.left - r.width / 2) / (r.width / 2), (e.clientY - r.top - r.height / 2) / (r.height / 2));
   });
-  on("shellMode", on => { face.shell = !!on; face.lastState = ""; });
+  on("shellMode", on => { lumiShell = !!on; updateFaceShell(); });
   // QR コードなどの画像を、ログの中に出す
   on("image", src => {
     const img = document.createElement("img");

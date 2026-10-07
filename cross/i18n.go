@@ -119,6 +119,7 @@ func TList(key string) []string {
 func clientMessages() map[string]string {
 	keys := []string{"voice.wakeWord", "voice.wakeAliases", "voice.yes", "voice.no", "voice.listening",
 		"voice.letterY", "voice.letterA", "voice.letterN",
+		"tab.lumi", "tab.new", "tab.choose", "tab.close",
 		"voice.cmd.mute", "voice.cmd.cls", "voice.cmd.mic", "voice.cmd.exit", "voice.mark"}
 	m := map[string]string{"lang": currentLang()}
 	for _, k := range keys {

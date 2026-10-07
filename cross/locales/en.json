@@ -370,5 +370,10 @@
   "shell.cmdLabel": "Command Prompt",
   "shell.notFound": "No shell named “%s” was found on this PC.",
   "shell.switched": "Switched the shell to %s.",
-  "shell.listHow": "Switch with /shell <name> (* = current). /set shell auto goes back to automatic."
+  "shell.listHow": "Switch with /shell <name> (* = current). /set shell auto goes back to automatic.",
+  "tab.lumi": "Lumi",
+  "tab.new": "New tab (Ctrl+T)",
+  "tab.choose": "Open with a shell",
+  "tab.close": "Close tab (Ctrl+W)",
+  "tab.hello": "This is a %s tab. Lines you type run as commands as-is (no confirmation). exit or × closes it."
 }

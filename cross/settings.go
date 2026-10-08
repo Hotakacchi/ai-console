@@ -34,7 +34,7 @@ func settingsTemplate(provider string) string {
   "max_tokens": 0,
   "effort": "",
   "local_gpu": "auto",
-  "idle_unload": 5,
+  "idle_unload": 1,
   "pc_control": "on",
   "auto_run": "off",
   "shell": "auto",

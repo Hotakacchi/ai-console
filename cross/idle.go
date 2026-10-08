@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const defaultIdleUnload = 5
+const defaultIdleUnload = 1
 
 // 使わない時間がこの分数続いたら外す (0 は外さない)
 func (l *Lumi) idleUnloadMinutes() int {

@@ -197,6 +197,14 @@ export class Voice {
     this.node.connect(this.ctx.destination);
   }
 
+  // しばらく使っていないとき: Whisper のモデルを外してメモリを空ける (次に使うときに読み込み直す)。
+  // 書き起こしの途中なら外さない
+  unloadWhisper() {
+    if (!this.worker || this.waiting.size > 0) return;
+    this.worker.terminate();
+    this.worker = this.waiting = null;
+  }
+
   stop() {
     this.gen = (this.gen || 0) + 1;   // 読み込み中の start があれば無効にする
     const was = this.mode !== "off";

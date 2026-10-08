@@ -63,7 +63,7 @@
   "set.max_tokens": "Maximum reply tokens (0 = default)",
   "set.effort": "Anthropic effort",
   "set.local_gpu": "Use the GPU for the local AI",
-  "set.local_unload": "Unload the local AI to free memory after this many minutes unused (it loads again when you talk; 0 keeps it loaded)",
+  "set.idle_unload": "Unload the local AI, VOICEVOX and Whisper to free memory after this many minutes unused (they load again when needed; 0 keeps them loaded)",
   "local.loading": "Loading the local AI…",
   "set.pc_control": "PC control (always confirmed)",
   "set.web_search": "Web search (ask = confirm every time)",

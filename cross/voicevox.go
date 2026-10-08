@@ -344,6 +344,13 @@ func isClosed(c chan struct{}) bool {
 	}
 }
 
+// エンジンが動いているか
+func (v *voicevoxServer) Running() bool {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.cmd != nil && !isClosed(v.exited)
+}
+
 func (v *voicevoxServer) Stop() {
 	v.mu.Lock()
 	defer v.mu.Unlock()

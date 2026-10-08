@@ -63,7 +63,7 @@
   "set.max_tokens": "返答の最大トークン数 (0 で既定)",
   "set.effort": "Anthropic の effort",
   "set.local_gpu": "ローカルAIで GPU を使うか",
-  "set.local_unload": "ローカルAIを使わない時間がこの分数続いたら外してメモリを空ける (次に話しかけたときに読み込み直す。0 でずっと読み込んだまま)",
+  "set.idle_unload": "ローカルAI・VOICEVOX・Whisper を使わない時間がこの分数続いたら外してメモリを空ける (次に使うときに読み込み直す。0 でずっと読み込んだまま)",
   "local.loading": "ローカルAIを読み込んでいます…",
   "set.pc_control": "PC の操作 (毎回確認あり)",
   "set.web_search": "Web 検索 (ask は毎回確認)",

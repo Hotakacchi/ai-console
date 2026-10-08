@@ -12,7 +12,7 @@ import (
 func TestLocalUnload(t *testing.T) {
 	loadLocales()
 	setLanguage("ja")
-	l := &Lumi{s: &Settings{vals: map[string]any{"provider": "local", "model": "qwen3.5-0.8b", "local_unload": 1, "keep_history": "off"}},
+	l := &Lumi{s: &Settings{vals: map[string]any{"provider": "local", "model": "qwen3.5-0.8b", "idle_unload": 1, "keep_history": "off"}},
 		answers: make(chan string, 1), spoken: make(chan int, 8)}
 	l.ai = newProvider(l.s)
 	defer localServer.Stop()
@@ -24,7 +24,7 @@ func TestLocalUnload(t *testing.T) {
 	}
 	var log strings.Builder
 	l.cli = &cliUI{l: l, out: &log, lineStart: true}
-	go l.unloadIdleLocal()
+	go l.unloadIdle()
 
 	start := time.Now()
 	if !l.begin() {

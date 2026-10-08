@@ -683,6 +683,7 @@ function termMain() {
   });
   on("voiceStart", d => voice.start(d, msgs));
   on("voiceStop", () => voice.stop());
+  on("whisperUnload", () => voice.unloadWhisper());
   // Whisper に見せる単語帳 (呼びかけのたびに Go から最新のものが届く)
   on("voiceVocab", v => { voice.vocab = v || ""; });
   // テスト用: マイクの代わりに音声ファイルを聞かせる

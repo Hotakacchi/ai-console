@@ -59,7 +59,7 @@ func runCLI() {
 	l.startOnce.Do(func() {
 		go l.runReminders()
 		go l.watchDrives()
-		go l.unloadIdleLocal()
+		go l.unloadIdle()
 	})
 	l.flashFace("happy", 2.5)
 	l.warmupLocal()

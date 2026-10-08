@@ -51,6 +51,7 @@ func settingsTemplate(provider string) string {
   "search_url": "",
   "voice_input": "on",
   "wake_word": "",
+  "wake_mode": "hey",
   "wake_confidence": 0.6,
   "stt": "vosk",
   "whisper_model": "base",

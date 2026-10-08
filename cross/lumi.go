@@ -183,7 +183,18 @@ func (l *Lumi) loadSettings() {
 func (l *Lumi) wakeWord() string { return l.s.WakeWord() }
 
 func (l *Lumi) voiceKey() string {
-	return currentLang() + "|" + l.s.WakeWord() + "|" + l.s.Get("voice_input", "on") + "|" + l.s.Get("stt", "vosk") + "|" + l.s.Get("whisper_model", "base")
+	return currentLang() + "|" + l.s.WakeWord() + "|" + l.s.Get("voice_input", "on") + "|" + l.s.Get("stt", "vosk") + "|" + l.s.Get("whisper_model", "base") + "|" + l.s.Get("wake_mode", "hey")
+}
+
+// 「ねえルミ」だけで反応するか (wake_mode が hey。誤って反応しにくい)
+func (l *Lumi) heyOnly() bool { return !strings.EqualFold(l.s.Get("wake_mode", "hey"), "name") }
+
+// 画面や案内に出す呼びかけの言い方 (「ねえルミ」か「ルミ」)
+func (l *Lumi) wakePhrase() string {
+	if p := TList("voice.wakePrefixes"); l.heyOnly() && len(p) > 0 {
+		return p[0] + T("voice.prefixJoin") + l.wakeWord()
+	}
+	return l.wakeWord()
 }
 
 // 音声の設定が、最後に聞き取りを始めた (止めた) ときから変わったか
@@ -430,7 +441,7 @@ func (l *Lumi) submit(text string) {
 				b.WriteString("  " + padRight("/"+p.Name, 24) + p.Desc + "\n")
 			}
 		}
-		b.WriteString("\n  " + T("help.wake", l.wakeWord()) + "\n  " + T("help.tab") + "\n")
+		b.WriteString("\n  " + T("help.wake", l.wakePhrase()) + "\n  " + T("help.tab") + "\n")
 		b.WriteString("  " + T("help.shell") + "\n")
 		b.WriteString("  " + T("help.voiceCmd") + "\n")
 		b.WriteString("  " + T("help.keys"))
@@ -481,7 +492,7 @@ var settingKeys = []settingKey{
 	{"web_search", "on,ask,off"},
 	{"search_url", ""},
 	{"voice_input", "on,off"},
-	{"wake_word", ""},
+	{"wake_word", ""}, {"wake_mode", "hey,name"},
 	{"voice_debug", "off,on"},
 	{"stt", "vosk,whisper"},
 	{"whisper_model", "base,small"},

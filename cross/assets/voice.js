@@ -33,7 +33,7 @@ export class Voice {
   }
 
   // msgs: 画面に渡された今の言語の文言 (voice.wakeAliases など)
-  async start({ lang, model, wake, whisper, whisperNative }, msgs, withMic = true) {
+  async start({ lang, model, wake, whisper, whisperNative, heyOnly }, msgs, withMic = true) {
     this.stop();
     // 読み込み中に別の start / stop が来たら、この start は途中でやめる
     const gen = this.gen = (this.gen || 0) + 1;
@@ -46,8 +46,12 @@ export class Voice {
     if (this.whisper && !this.whisperNative) this.whisperCall("load").catch(e => this.whisperFailed(e));
     const raw = key => (msgs[key] || "").split(",").map(s => s.trim()).filter(Boolean);
     const phrases = [...new Set([wake, ...raw("voice.wakeAliases")].filter(Boolean))];
-    this.aliases = [...new Set(phrases.map(p => this.norm(p)))].sort((a, b) => b.length - a.length);
     this.prefixes = raw("voice.wakePrefixes").map(p => this.norm(p));
+    // 「ねえルミ」だけで反応する (heyOnly) ときは、書き起こしから探す言葉も「ねえるみ」などの組み合わせだけ
+    this.heyOnly = !!heyOnly && this.prefixes.length > 0;
+    const names = phrases.map(p => this.norm(p));
+    const look = this.heyOnly ? this.prefixes.flatMap(pre => names.map(n => pre + n)) : names;
+    this.aliases = [...new Set(look)].sort((a, b) => b.length - a.length);
     this.yes = raw("voice.yes").map(s => this.norm(s));
     this.no = raw("voice.no").map(s => this.norm(s));
     // y / a / n をアルファベットの読みで答える (「ワイ」など。発言全体がその読みのときだけ)
@@ -71,7 +75,8 @@ export class Voice {
       // 「ねえ ルミ」のような前置きつきの言い方も入れる (別の言葉の並びなので確からしさは割れない)。
       // 2 語で聞こえたら呼びかけの証拠として十分なので、onWake で必ず受け付ける
       const name = wake || phrases[0];
-      const grammar = [name, ...raw("voice.wakePrefixes").map(p => p + " " + name), "[unk]"];
+      const withPrefix = raw("voice.wakePrefixes").map(p => p + " " + name);
+      const grammar = [...(this.heyOnly ? [] : [name]), ...withPrefix, "[unk]"];
       this.wake = new this.model.KaldiRecognizer(rate, JSON.stringify(grammar));
       this.wake.setWords(true);
       this.wake.on("result", m => this.onWake(m.result));
@@ -336,6 +341,7 @@ export class Voice {
     if (!words.length || this.stale(words) || !this.findAlias(this.norm(this.join(words)))) return;
     // 「ねえ ルミ」のように前置きつきで聞こえたら、それだけで呼びかけとして受け付ける
     const prefixed = words.length >= 2 && this.prefixes.includes(this.norm(words[0].word));
+    if (this.heyOnly && !prefixed) return;   // 「ねえルミ」だけで反応する設定
     if (!prefixed && Math.min(...words.map(w => w.conf)) < WAKE_MIN_CONF) return;
     // 同じところを書き起こしがはっきり別の言葉 (「ルビー」など) と聞いていたら、呼びかけではない
     const start = words[0].start, end = words[words.length - 1].end;

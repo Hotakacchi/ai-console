@@ -37,6 +37,8 @@ func (l *Lumi) applyVoice(announce bool) {
 		"lang":  lang,
 		"model": "/voice/" + lang + "/model.tar.gz",
 		"wake":  l.s.WakeWord(),
+		// 「ねえルミ」のように前置きつきのときだけ反応する (wake_mode hey。name なら「ルミ」だけでも)
+		"heyOnly": l.heyOnly(),
 	}
 	if l.s.Get("stt", "vosk") == "whisper" {
 		model, base := whisperModel(l.s), dataDir()
@@ -170,4 +172,3 @@ func (l *Lumi) voiceTimeout() {
 		l.peek.retract(true, T("peek.bye"))
 	}
 }
-

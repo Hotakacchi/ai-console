@@ -47,3 +47,25 @@ func TestLocalUnload(t *testing.T) {
 	t.Logf("unloaded after %s", time.Since(start).Round(time.Second))
 	t.Log(log.String())
 }
+
+// VOICEVOX を止めても、次に使うときに起動し直せる: go test -tags manual -run VoicevoxRestart -v
+func TestVoicevoxRestart(t *testing.T) {
+	loadLocales()
+	base := dataDir()
+	defer voicevox.Stop()
+	for i := 0; i < 2; i++ {
+		start := time.Now()
+		if err := voicevox.Start(base); err != nil {
+			t.Fatal(err)
+		}
+		wav, _, err := voicevox.Synthesize("テストです。", voicevox.pickStyle(-1), 1)
+		if err != nil || len(wav) < 1000 || !voicevox.Running() {
+			t.Fatalf("round %d: %v %d", i, err, len(wav))
+		}
+		t.Logf("round %d: started and spoke in %s", i, time.Since(start).Round(time.Millisecond))
+		voicevox.Stop()
+		if voicevox.Running() {
+			t.Fatal("still running after Stop")
+		}
+	}
+}

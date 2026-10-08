@@ -53,7 +53,7 @@ func (l *Lumi) watchPC() {
 				return
 			}
 			last[kind] = time.Now()
-			go l.reportPC(text)
+			go l.reportPC(text, "sad")
 		}
 		if allOver(cpu, watchBusyPct) {
 			tell("cpu", T("watch.cpu", avg(cpu)))
@@ -78,7 +78,7 @@ func (l *Lumi) watchPC() {
 					batteryTold = false
 				case !batteryTold:
 					batteryTold = true
-					go l.reportPC(T("watch.battery", pct))
+					go l.reportPC(T("watch.battery", pct), "sad")
 				}
 			}
 		}
@@ -105,8 +105,8 @@ func avg(list []float64) float64 {
 	return sum / float64(len(list))
 }
 
-// 困った顔で知らせる。返事の途中なら終わるのを待つ。窓が隠れていれば小窓で顔を出す
-func (l *Lumi) reportPC(text string) {
+// 顔 (expr) とメッセージで知らせる。返事の途中なら終わるのを待つ。窓が隠れていれば小窓で顔を出す
+func (l *Lumi) reportPC(text, expr string) {
 	for !l.begin() {
 		time.Sleep(500 * time.Millisecond)
 	}
@@ -116,7 +116,7 @@ func (l *Lumi) reportPC(text string) {
 		l.peek.pop(text)
 		popped = true
 	}
-	l.emit("flash", map[string]any{"expr": "sad", "seconds": 4})
+	l.emit("flash", map[string]any{"expr": expr, "seconds": 4})
 	l.write(text+"\n\n", "yellow")
 	if popped {
 		time.Sleep(4 * time.Second)

@@ -61,6 +61,7 @@ func runCLI() {
 		go l.watchDrives()
 		go l.watchPower()
 		go l.watchPC()
+		go l.runProcWatch()
 		go l.unloadIdle()
 	})
 	l.flashFace("happy", 2.5)

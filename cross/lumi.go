@@ -243,6 +243,7 @@ func (l *Lumi) ready() {
 		go l.watchDrives()
 		go l.watchPower()
 		go l.watchPC()
+		go l.runProcWatch()
 		go l.unloadIdle()
 		if l.scriptPath != "" {
 			l.runScript(l.scriptPath)
@@ -427,6 +428,8 @@ func (l *Lumi) submit(text string) {
 		b.WriteString("  " + T("help.voiceCmd") + "\n")
 		b.WriteString("  " + T("help.keys"))
 		l.info(b.String())
+	case "/watch":
+		l.watchCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/plugins", "/plugin":
 		l.pluginsCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	default:
@@ -448,7 +451,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", "cmd.install-local.args"}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/watch", "cmd.watch.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", "cmd.peek.args"}, {"/cls", ""}, {"/exit", ""},
 }
@@ -802,6 +805,10 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 			// ルミ自身のことは Web ではなく説明書 (リポジトリの README) で
 			if r.Kind == "lumidoc" || r.Kind == "search" && aboutLumi(r.Command) {
 				report.WriteString(l.lumiDocTool(r.Command))
+				continue
+			}
+			if r.Kind == "watch" {
+				report.WriteString(l.watchTool(r))
 				continue
 			}
 			if r.Kind == "plugin" {

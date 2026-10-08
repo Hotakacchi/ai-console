@@ -234,6 +234,7 @@ func (s *Settings) SystemPrompt() string {
 	// 表情・リマインダー (今の時刻つき)・記憶
 	p += "\n\n" + T("prompt.face")
 	p += "\n\n" + T("prompt.remind")
+	p += "\n\n" + T("prompt.watch")
 	p += "\n\n" + T("prompt.memory") + "\n" + memories.prompt()
 	return p
 }

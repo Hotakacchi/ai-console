@@ -12,3 +12,9 @@ func TestDrives(t *testing.T) {
 		t.Log(T("drive.added", driveName(d), d))
 	}
 }
+
+// 電源の状態: go test -tags manual -run TestPower -v
+func TestPower(t *testing.T) {
+	on, ok := onACPower()
+	t.Logf("AC power: %v (has battery: %v)", on, ok)
+}

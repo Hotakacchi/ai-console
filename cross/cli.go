@@ -59,6 +59,7 @@ func runCLI() {
 	l.startOnce.Do(func() {
 		go l.runReminders()
 		go l.watchDrives()
+		go l.watchPower()
 		go l.unloadIdle()
 	})
 	l.flashFace("happy", 2.5)
@@ -81,6 +82,7 @@ var kaomoji = map[string]string{
 	"surprised": "(ﾟoﾟ)!",
 	"glitch":    "(×_×)",
 	"bell":      "(・o・)!",
+	"charge":    "(＾▽＾)⚡",
 }
 
 func (c *cliUI) faceNow() string {

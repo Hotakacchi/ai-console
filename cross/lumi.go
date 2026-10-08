@@ -233,6 +233,7 @@ func (l *Lumi) ready() {
 		go l.runDiscord()
 		go l.runReminders()
 		go l.watchDrives()
+		go l.watchPower()
 		go l.unloadIdle()
 		if l.scriptPath != "" {
 			l.runScript(l.scriptPath)

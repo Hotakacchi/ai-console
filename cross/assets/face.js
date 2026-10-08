@@ -236,7 +236,7 @@ export class Face {
         ctx.beginPath(); ctx.arc(x, y + 34, 8, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       }
-      else if (fxName !== "surprised" && (ex === "happy" || fxName === "eat" && fxT > 1.2)) ellipseArc(ctx, x, y + 10, 34, 30, 200, 140);
+      else if (fxName !== "surprised" && (ex === "happy" || fxName === "charge" || fxName === "eat" && fxT > 1.2)) ellipseArc(ctx, x, y + 10, 34, 30, 200, 140);
       else if (fxName !== "surprised" && ex === "sleep") ellipseArc(ctx, x, y - 8, 32, 22, 30, 120);
       else {
         const r = 30 * this.eyeScale, hh = r * (1 - blink);
@@ -268,7 +268,7 @@ export class Face {
     }
 
     // ほっぺ
-    if (ex === "happy" || this.speaking) {
+    if (ex === "happy" || this.speaking || fxName === "charge") {
       ctx.save(); ctx.strokeStyle = c.cheek; ctx.lineWidth = 6;
       for (const bx of [-215, 165]) for (let i = 0; i < 3; i++) line(ctx, bx + i * 18, 40, bx + i * 18 + 12, 18);
       ctx.restore();
@@ -278,6 +278,7 @@ export class Face {
     const my = 95;
     if (this.activity === "download") drawProgress(ctx, my, this.progress, c);
     else if (fxName === "eat") drawEating(ctx, my, fxT, c);
+    else if (fxName === "charge") drawCharge(ctx, my, fxT, c);
     else if (fxName === "surprised" && !this.speaking) {   // 「お」の口
       ctx.beginPath(); ctx.ellipse(0, my + 4, 20, 28, 0, 0, Math.PI * 2); ctx.stroke();
     }
@@ -365,6 +366,41 @@ function drawProgress(ctx, my, p, c) {
   ctx.font = "bold 30px Consolas, Menlo, monospace";
   ctx.textAlign = "center";
   ctx.fillText(Math.round(p * 100) + "%", 0, my + 66);
+  ctx.restore();
+}
+
+// ---- 充電を始めた: 口が電池になって、稲妻と一緒に満ちていく ----
+function drawCharge(ctx, my, t, c) {
+  ctx.save();
+  ctx.lineWidth = 6;
+  const w = 190, h = 64, x0 = -w / 2 - 8, y0 = my - h / 2;
+  roundRect(ctx, x0, y0, w, h, 12);
+  ctx.stroke();
+  roundRect(ctx, x0 + w + 2, my - 14, 14, 28, 4);   // 電池の出っぱり
+  ctx.fill();
+  // 中身: 1 目盛りずつ満ちていく (満ちたらそのまま)
+  const cells = 4, gap = 8, cw = (w - gap * (cells + 1)) / cells;
+  const filled = Math.min(cells, Math.floor(t / 0.45) + 1);
+  for (let i = 0; i < filled; i++) {
+    roundRect(ctx, x0 + gap + i * (cw + gap), y0 + gap, cw, h - gap * 2, 5);
+    ctx.fill();
+  }
+  // 稲妻 (背景の色で抜いて、ぴかっと点滅)
+  if (Math.floor(t * 4) % 2 === 0 || t > 1.8) {
+    ctx.fillStyle = c.bg;
+    ctx.strokeStyle = c.line;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x0 + w / 2 + 8, y0 - 6);
+    ctx.lineTo(x0 + w / 2 - 22, my + 4);
+    ctx.lineTo(x0 + w / 2 - 2, my + 4);
+    ctx.lineTo(x0 + w / 2 - 10, y0 + h + 6);
+    ctx.lineTo(x0 + w / 2 + 22, my - 6);
+    ctx.lineTo(x0 + w / 2 + 2, my - 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

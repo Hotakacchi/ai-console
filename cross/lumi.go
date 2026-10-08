@@ -67,7 +67,8 @@ type Lumi struct {
 	pending   []attachment    // 次の発言に付けるファイル (ドラッグ＆ドロップ・/attach)
 	shellOn   bool            // シェルモード (打った行をそのままコマンドとして実行)
 	shellDir  string          // コマンドを実行する場所 (cd で変わる)
-	cli       *cliUI          // ターミナル版 (--cli) のときの画面。窓はない
+	lastUsed  time.Time       // 最後に返事などをした時刻 (使っていないローカルAIを外すため)
+	cli       *cliUI         // ターミナル版 (--cli) のときの画面。窓はない
 }
 
 // 窓のあるルミか (ターミナル版でなければ true)
@@ -127,6 +128,7 @@ func (l *Lumi) isBusy() bool {
 func (l *Lumi) setBusy(b bool) {
 	l.mu.Lock()
 	l.busy = b
+	l.lastUsed = time.Now()
 	l.mu.Unlock()
 	l.emit("busy", b)
 }
@@ -231,6 +233,7 @@ func (l *Lumi) ready() {
 		go l.runDiscord()
 		go l.runReminders()
 		go l.watchDrives()
+		go l.unloadIdleLocal()
 		if l.scriptPath != "" {
 			l.runScript(l.scriptPath)
 		}
@@ -257,6 +260,10 @@ func (l *Lumi) warmupLocal() {
 		} else {
 			l.write(T("local.notInstalledHint", float64(localTotalSize(defaultLocalModel()))/1e9)+"\n\n", "yellow")
 		}
+		return
+	}
+	// local_unload が 0 でなければ、呼ばれたときに読み込む (ここでは入っているかだけ確かめる)
+	if l.localUnloadMinutes() > 0 {
 		return
 	}
 	l.write(T("local.starting")+"\n", "dim")
@@ -444,7 +451,7 @@ var settingKeys = []settingKey{
 	{"model", ""}, {"endpoint", ""}, {"api_key_env", ""}, {"command", ""},
 	{"max_tokens", "#int:0:1000000"},
 	{"effort", ",low,medium,high,xhigh,max"},
-	{"local_gpu", "auto,off"},
+	{"local_gpu", "auto,off"}, {"local_unload", "#int:0:1440"},
 	{"pc_control", "on,off"},
 	{"auto_run", "off,on"},
 	{"shell", "auto,powershell,pwsh,cmd,gitbash,wsl,bash,zsh,fish,sh"},
@@ -931,6 +938,7 @@ func (l *Lumi) replyOnce(turn Turn) []toolRequest {
 			}
 		},
 	}
+	l.noteLocalLoading()
 	l.ai.Reply(turn, tools.Push)
 	tools.Flush()
 	if rest := sp.Flush(); strings.TrimSpace(rest) != "" {

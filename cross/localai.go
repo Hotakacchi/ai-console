@@ -424,6 +424,13 @@ type llamaServer struct {
 
 var localServer = &llamaServer{}
 
+// 読み込んで動いているか
+func (s *llamaServer) Running() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.p != nil && s.p.alive()
+}
+
 func (s *llamaServer) Endpoint() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()

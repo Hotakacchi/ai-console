@@ -63,6 +63,8 @@
   "set.max_tokens": "Maximum reply tokens (0 = default)",
   "set.effort": "Anthropic effort",
   "set.local_gpu": "Use the GPU for the local AI",
+  "set.local_unload": "Unload the local AI to free memory after this many minutes unused (it loads again when you talk; 0 keeps it loaded)",
+  "local.loading": "Loading the local AI…",
   "set.pc_control": "PC control (always confirmed)",
   "set.web_search": "Web search (ask = confirm every time)",
   "set.search_url": "SearXNG URL (empty = DuckDuckGo)",

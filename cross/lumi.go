@@ -799,6 +799,11 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 				}
 				continue
 			}
+			// ルミ自身のことは Web ではなく説明書 (リポジトリの README) で
+			if r.Kind == "lumidoc" || r.Kind == "search" && aboutLumi(r.Command) {
+				report.WriteString(l.lumiDocTool(r.Command))
+				continue
+			}
 			if r.Kind == "plugin" {
 				report.WriteString(l.pluginTool(r))
 				continue

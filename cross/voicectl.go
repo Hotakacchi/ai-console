@@ -13,6 +13,7 @@ func (l *Lumi) applyVoice(announce bool) {
 	if !l.gui() {
 		return
 	}
+	l.voiceApplied = l.voiceKey()
 	if !l.micOn || !l.s.On("voice_input", "on") {
 		l.emit("voiceStop", nil)
 		return

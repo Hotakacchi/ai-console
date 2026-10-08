@@ -227,3 +227,28 @@ func TestBlockedIP(t *testing.T) {
 		}
 	}
 }
+
+// /set voice_input off などで、聞き取りのやり直し (止める) が必要と分かる
+func TestVoiceSettingChange(t *testing.T) {
+	loadLocales()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	os.WriteFile(path, []byte(`{"voice_input": "on"}`), 0o644)
+	s := &Settings{Path: path, vals: map[string]any{}}
+	s.parse([]byte(`{"voice_input": "on"}`))
+	l := &Lumi{s: s}
+	l.voiceApplied = l.voiceKey() // 聞き取りを始めた
+	if l.voiceChanged() {
+		t.Fatal("changed before anything changed")
+	}
+	// /set は先に設定を書き換えてから読み直す: それでも「変わった」と分かること
+	s.Set("voice_input", "off")
+	if !l.voiceChanged() {
+		t.Error("voice_input off was not noticed")
+	}
+	l.voiceApplied = l.voiceKey()
+	s.Set("stt", "whisper")
+	if !l.voiceChanged() {
+		t.Error("stt change was not noticed")
+	}
+}

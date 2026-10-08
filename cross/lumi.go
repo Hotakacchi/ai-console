@@ -43,7 +43,7 @@ type Lumi struct {
 	ai    Provider
 	muted bool
 
-	installLocalOnStart bool // --install-local: 起動したらローカルAIをダウンロードする
+	installLocalOnStart bool   // --install-local: 起動したらローカルAIをダウンロードする
 	elevated            bool   // ルミ自体が管理者 (root) として動いている
 	scriptPath          string // --script: テスト用に入力を流し込むファイル
 	dumpPath            string // --script の "#tab dump <ファイル>" で画面の様子を書く先
@@ -59,19 +59,20 @@ type Lumi struct {
 
 	onLanguageChanged func() // トレイのメニューなど、言語で変わるものを作り直す
 
-	startOnce     sync.Once // リマインダーの見張りは 1 回だけ始める
-	creditedStyle int       // VOICEVOX のクレジットを出した声
-	ttsErrorShown bool
+	startOnce         sync.Once // リマインダーの見張りは 1 回だけ始める
+	creditedStyle     int       // VOICEVOX のクレジットを出した声
+	ttsErrorShown     bool
 	whisperErrorShown bool
-	replyText strings.Builder // 今の返事で喋った文 (履歴に残す)
-	pending   []attachment    // 次の発言に付けるファイル (ドラッグ＆ドロップ・/attach)
-	shellOn   bool            // シェルモード (打った行をそのままコマンドとして実行)
-	shellDir  string          // コマンドを実行する場所 (cd で変わる)
-	lastUsed  time.Time       // 最後に返事などをした時刻 (使っていないローカルAIを外すため)
-	tainted   bool            // この会話で、外から来た文章を AI に読ませた (automode.go)
-	askCode   string          // 今の質問にスマホから「はい」と答えるための番号 (PC の画面にだけ出す)
-	askTries  int             // その番号を間違えた回数
-	cli       *cliUI         // ターミナル版 (--cli) のときの画面。窓はない
+	replyText         strings.Builder // 今の返事で喋った文 (履歴に残す)
+	pending           []attachment    // 次の発言に付けるファイル (ドラッグ＆ドロップ・/attach)
+	shellOn           bool            // シェルモード (打った行をそのままコマンドとして実行)
+	shellDir          string          // コマンドを実行する場所 (cd で変わる)
+	lastUsed          time.Time       // 最後に返事などをした時刻 (使っていないローカルAIを外すため)
+	tainted           bool            // この会話で、外から来た文章を AI に読ませた (automode.go)
+	voiceApplied      string          // 最後に聞き取りを始めた (止めた) ときの音声の設定 (voiceKey)
+	askCode           string          // 今の質問にスマホから「はい」と答えるための番号 (PC の画面にだけ出す)
+	askTries          int             // その番号を間違えた回数
+	cli               *cliUI          // ターミナル版 (--cli) のときの画面。窓はない
 }
 
 // 窓のあるルミか (ターミナル版でなければ true)
@@ -105,8 +106,10 @@ func (l *Lumi) emitLocal(name string, data any) {
 	}
 }
 
-func (l *Lumi) write(text, color string) { l.emit("write", map[string]any{"text": text, "color": color}) }
-func (l *Lumi) info(text string)         { l.write(text+"\n\n", "dim") }
+func (l *Lumi) write(text, color string) {
+	l.emit("write", map[string]any{"text": text, "color": color})
+}
+func (l *Lumi) info(text string) { l.write(text+"\n\n", "dim") }
 func (l *Lumi) errorText(text string) {
 	l.write(text+"\n\n", "red")
 	l.fx("glitch", 1.2) // エラーのときは顔が乱れる
@@ -125,7 +128,7 @@ func (l *Lumi) setActivity(name string, progress float64) {
 	}
 	l.emit("activity", map[string]any{"name": name, "progress": progress})
 }
-func (l *Lumi) face(expr string)         { l.emit("face", expr) }
+func (l *Lumi) face(expr string) { l.emit("face", expr) }
 
 func (l *Lumi) isBusy() bool {
 	l.mu.Lock()
@@ -183,11 +186,15 @@ func (l *Lumi) voiceKey() string {
 	return currentLang() + "|" + l.s.WakeWord() + "|" + l.s.Get("voice_input", "on") + "|" + l.s.Get("stt", "vosk") + "|" + l.s.Get("whisper_model", "base")
 }
 
+// 音声の設定が、最後に聞き取りを始めた (止めた) ときから変わったか
+func (l *Lumi) voiceChanged() bool { return l.voiceKey() != l.voiceApplied }
+
 func (l *Lumi) reload(announce bool) {
-	before := l.voiceKey()
 	l.loadSettings()
-	if l.voiceKey() != before {
-		defer l.applyVoice(true)   // 言語・呼びかけ・オンオフが変わったときだけ聞き取りをやり直す
+	// 言語・呼びかけ・オンオフなどが、最後に聞き取りを始めたときから変わっていたらやり直す。
+	// (前は読み直す前の値と比べていたが、/set は先に設定を書き換えるので、いつも「同じ」になっていた)
+	if l.voiceChanged() {
+		defer l.applyVoice(true)
 	}
 	if l.s.Err != nil {
 		l.errorText(T("settings.readError", l.s.Err.Error()))

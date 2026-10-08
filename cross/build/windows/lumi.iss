@@ -48,8 +48,8 @@ Name: "ja"; MessagesFile: "compiler:Languages\Japanese.isl"
 Name: "en"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
-ja.LocalAI=ローカルAIもダウンロードする (約2.8GB、インターネットなしで会話できる)
-en.LocalAI=Also download the local AI (about 2.8 GB; chat without the internet)
+ja.LocalAI=ローカルAIもダウンロードする (この PC の性能に合ったものを選びます。約0.6〜6GB、インターネットなしで会話できる)
+en.LocalAI=Also download the local AI (picks one that suits this PC; about 0.6-6 GB; chat without the internet)
 ja.Launch=ルミを起動する
 en.Launch=Launch Lumi
 ja.DeleteData=設定とダウンロードしたAI・音声認識モデルも削除しますか？

@@ -91,6 +91,12 @@ func (l *Lumi) installLocalCommand(arg string) {
 		if !ok {
 			m = defaultLocalModel()
 		}
+		// まだ何も選んでいなくて入ってもいなければ、この PC に合ったものを入れる
+		if l.s.Get("model", "") == "" && !localInstalled(dataDir(), "") {
+			spec := thisPC()
+			m = recommendLocalModel(spec)
+			l.write(T("local.recommendFor", spec.describe(), m.Name)+"\n", "cyan")
+		}
 		l.installLocalModel(m)
 		return
 	}
@@ -106,15 +112,21 @@ func (l *Lumi) installLocalCommand(arg string) {
 func (l *Lumi) listLocalModels() {
 	cur, _ := currentLocalModel(l.s)
 	base := dataDir()
+	spec := thisPC()
+	rec := recommendLocalModel(spec)
 	var b strings.Builder
+	b.WriteString("  " + T("local.specLine", spec.describe()) + "\n\n")
 	for _, m := range localModels {
 		mark := "  "
 		if m.ID == cur.ID && strings.EqualFold(l.s.Get("provider", ""), "local") {
 			mark = "* "
 		}
 		state := ""
+		if m.ID == rec.ID {
+			state = T("local.recommended") + " "
+		}
 		if m.installed(base) {
-			state = T("local.modelInstalled")
+			state += T("local.modelInstalled")
 		}
 		vision := ""
 		if m.Vision != nil {

@@ -18,3 +18,11 @@ func TestPower(t *testing.T) {
 	on, ok := onACPower()
 	t.Logf("AC power: %v (has battery: %v)", on, ok)
 }
+
+// この PC の性能とおすすめのモデル: go test -tags manual -run TestThisPC -v
+func TestThisPC(t *testing.T) {
+	loadLocales()
+	setLanguage("ja")
+	s := thisPC()
+	t.Logf("%+v → %s (%s)", s, recommendLocalModel(s).Name, s.describe())
+}

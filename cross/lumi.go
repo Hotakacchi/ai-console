@@ -267,7 +267,8 @@ func (l *Lumi) warmupLocal() {
 		if m, ok := currentLocalModel(l.s); ok && m.ID != defaultLocalModelID {
 			l.write(T("local.modelNotInstalled", m.Name, m.ID)+"\n\n", "yellow")
 		} else {
-			l.write(T("local.notInstalledHint", float64(localTotalSize(defaultLocalModel()))/1e9)+"\n\n", "yellow")
+			rec := recommendLocalModel(thisPC()) // 名前なしの /install-local は、この PC に合ったものを入れる
+			l.write(T("local.notInstalledHint", float64(localTotalSize(rec))/1e9)+"\n\n", "yellow")
 		}
 		return
 	}

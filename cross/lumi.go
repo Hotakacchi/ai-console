@@ -242,6 +242,7 @@ func (l *Lumi) ready() {
 		go l.runReminders()
 		go l.watchDrives()
 		go l.watchPower()
+		go l.watchPC()
 		go l.unloadIdle()
 		if l.scriptPath != "" {
 			l.runScript(l.scriptPath)
@@ -462,7 +463,7 @@ var settingKeys = []settingKey{
 	{"model", ""}, {"endpoint", ""}, {"api_key_env", ""}, {"command", ""},
 	{"max_tokens", "#int:0:1000000"},
 	{"effort", ",low,medium,high,xhigh,max"},
-	{"local_gpu", "auto,off"}, {"idle_unload", "#int:0:1440"},
+	{"local_gpu", "auto,off"}, {"idle_unload", "#int:0:1440"}, {"pc_watch", "on,off"},
 	{"pc_control", "on,off"},
 	{"auto_run", "off,on"},
 	{"shell", "auto,powershell,pwsh,cmd,gitbash,wsl,bash,zsh,fish,sh"},

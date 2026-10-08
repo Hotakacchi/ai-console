@@ -35,6 +35,7 @@ func settingsTemplate(provider string) string {
   "effort": "",
   "local_gpu": "auto",
   "idle_unload": 1,
+  "pc_watch": "on",
   "pc_control": "on",
   "auto_run": "off",
   "shell": "auto",

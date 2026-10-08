@@ -60,6 +60,7 @@ func runCLI() {
 		go l.runReminders()
 		go l.watchDrives()
 		go l.watchPower()
+		go l.watchPC()
 		go l.unloadIdle()
 	})
 	l.flashFace("happy", 2.5)

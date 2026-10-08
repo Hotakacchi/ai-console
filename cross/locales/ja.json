@@ -431,6 +431,7 @@
   "spec.unified": "メモリ %s (GPU と共用)",
   "spec.gpu": "メモリ %s、GPU %s (%s)",
   "spec.noGPU": "メモリ %s、GPU なし (CPU で動かします)",
+  "ai.empty": "(返事が空でした。もう一度話しかけてみてください)",
   "local.others": "ほかのモデル (選んで入れるもの):",
   "local.note.gemma1b": "Google 製。とても軽い",
   "local.note.gemma4b": "Google 製。日本語もそこそこ得意",

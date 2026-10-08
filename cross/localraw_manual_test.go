@@ -37,7 +37,11 @@ func TestLocalRaw(t *testing.T) {
 		if sys != "" {
 			msgs = append(msgs, map[string]string{"role": "system", "content": sys})
 		}
-		msgs = append(msgs, map[string]string{"role": "user", "content": "こんにちは！自己紹介して"})
+		q := os.Getenv("LUMI_Q")
+		if q == "" {
+			q = "こんにちは！自己紹介して"
+		}
+		msgs = append(msgs, map[string]string{"role": "user", "content": q})
 		body, _ := json.Marshal(map[string]any{"messages": msgs, "max_tokens": 4000, "temperature": 0.7})
 		req, _ := http.NewRequest("POST", localServer.Endpoint()+"/v1/chat/completions", bytes.NewReader(body))
 		req.Header.Set("Authorization", "Bearer "+localServer.APIKey())
@@ -90,4 +94,36 @@ func TestLocalBeforeFilter(t *testing.T) {
 	p.Clear()
 	p.Reply(Turn{Text: "こんにちは！自己紹介して"}, func(s string) { filtered.WriteString(s) })
 	t.Logf("raw=%q\nfiltered=%q", raw.String(), filtered.String())
+}
+
+// 2 回目の返事 (履歴あり) を、送ったものと届いたものごと見る: LUMI_MODEL=… go test -tags manual -run LocalSecondTurn -v
+func TestLocalSecondTurn(t *testing.T) {
+	loadLocales()
+	setLanguage("ja")
+	m, _ := findLocalModel(os.Getenv("LUMI_MODEL"))
+	s := &Settings{vals: map[string]any{"provider": "local", "model": m.ID}}
+	p := newLocal(s).(*thinkFiltered)
+	defer localServer.Stop()
+	for _, q := range []string{"こんにちは！自己紹介して", "Cドライブの空き容量を調べて"} {
+		var raw strings.Builder
+		p.openAIProvider.Reply(Turn{Text: q}, func(s string) { raw.WriteString(s) })
+		t.Logf("Q: %s\nraw=%q", q, raw.String())
+	}
+	for _, h := range p.history {
+		t.Logf("history %s: %q", h["role"], h["content"])
+	}
+	// 同じ履歴で、ストリーミングせずに送って生の返事を見る
+	msgs := append([]Message{{"role": "system", "content": s.SystemPrompt()}}, p.history[:len(p.history)-1]...)
+	body := map[string]any{"messages": msgs}
+	p.addOptions(body)
+	data, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", localServer.Endpoint()+"/v1/chat/completions", bytes.NewReader(data))
+	req.Header.Set("Authorization", "Bearer "+localServer.APIKey())
+	req.Header.Set("Content-Type", "application/json")
+	r, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, _ := io.ReadAll(r.Body)
+	t.Logf("status %d: %s", r.StatusCode, out)
 }

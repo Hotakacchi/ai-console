@@ -934,14 +934,19 @@ func (l *Lumi) replyOnce(turn Turn) []toolRequest {
 	l.face("think")
 	var sp sentenceSplitter
 	var requests []toolRequest
+	gotAnything := false // 文字かタグ (コマンドなど) が 1 つでも返ってきたか
 	tools := toolExtractor{
 		OnText: func(t string) {
+			if strings.TrimSpace(t) != "" {
+				gotAnything = true
+			}
 			l.replyText.WriteString(t)
 			for _, s := range sp.Push(t) {
 				sentences <- s
 			}
 		},
 		OnTag: func(r toolRequest) {
+			gotAnything = true
 			switch r.Kind {
 			case "face":
 				// 表情は、それより前の文を喋り終えたところで変える
@@ -966,6 +971,10 @@ func (l *Lumi) replyOnce(turn Turn) []toolRequest {
 	}
 	close(sentences)
 	<-done
+	// 何も返ってこなかった (考えるだけで終わった、など) ときは、黙らずにそう言う
+	if !gotAnything && !l.cancelled() {
+		l.write(T("ai.empty")+"\n", "dim")
+	}
 	l.write("\n", "fg")
 	return requests
 }

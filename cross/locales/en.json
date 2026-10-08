@@ -431,6 +431,7 @@
   "spec.unified": "%s memory (shared with the GPU)",
   "spec.gpu": "%s memory, GPU %s (%s)",
   "spec.noGPU": "%s memory, no GPU (runs on the CPU)",
+  "ai.empty": "(The reply was empty. Please try again.)",
   "local.others": "Other models (install if you like):",
   "local.note.gemma1b": "By Google. Very light",
   "local.note.gemma4b": "By Google. Fairly good at Japanese",

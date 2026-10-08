@@ -42,6 +42,41 @@ var localModels = []localModel{
 	{"phi-4-mini", "Phi-4 mini", "Phi-4-mini-instruct-Q4_K_M.gguf", "phi", "english",
 		asset{hfURL("unsloth/Phi-4-mini-instruct-GGUF", "78eb92a46fc37e6b524df991ed9aca9bc6aa7b80", "Phi-4-mini-instruct-Q4_K_M.gguf"), 2491874272, "88c00229914083cd112853aab84ed51b87bdf6b9ce42f532d8c85c7c63b1730a"},
 		nil},
+
+	// ほかの会社・研究所のモデル (選んで入れるもの。インストーラーやおすすめでは入れない)
+	{"gemma-3-1b", "Gemma 3 1B", "gemma-3-1b-it-Q4_K_M.gguf", "gemma", "gemma1b",
+		asset{hfURL("unsloth/gemma-3-1b-it-GGUF", "f0b45be0aac41bd6a100a4b5734cad5f67255bfb", "gemma-3-1b-it-Q4_K_M.gguf"), 806058272, "8270790f3ab69fdfe860b7b64008d9a19986d8df7e407bb018184caa08798ebd"},
+		nil},
+	{"gemma-3-4b", "Gemma 3 4B", "gemma-3-4b-it-Q4_K_M.gguf", "gemma", "gemma4b",
+		asset{hfURL("unsloth/gemma-3-4b-it-GGUF", "5a3566e716d80f709ed7b79817eaf7733d2a1fce", "gemma-3-4b-it-Q4_K_M.gguf"), 2489894016, "04a43a22e8d2003deda5acc262f68ec1005fa76c735a9962a8c77042a74a7d19"},
+		&asset{hfURL("unsloth/gemma-3-4b-it-GGUF", "5a3566e716d80f709ed7b79817eaf7733d2a1fce", "mmproj-F16.gguf"), 851251328, "731199e016ec5f227b8293fef839899472e0ee4c51adf5f9e5cb66f6558fa142"}},
+	{"gemma-3-12b", "Gemma 3 12B", "gemma-3-12b-it-Q4_K_M.gguf", "gemma", "gemma12b",
+		asset{hfURL("unsloth/gemma-3-12b-it-GGUF", "d15e4c7dc21dc55d56bf8549db57a71ad8a2a35d", "gemma-3-12b-it-Q4_K_M.gguf"), 7300778336, "15b8fd9d8672cd4240c178c217ca781409291f34e353d2e913b29c7602ceb3ff"},
+		&asset{hfURL("unsloth/gemma-3-12b-it-GGUF", "d15e4c7dc21dc55d56bf8549db57a71ad8a2a35d", "mmproj-F16.gguf"), 854200448, "5de4ccfc379faa4cbf608dd365c028aa41f9774cdb1191d148d88910d1014f71"}},
+	{"gpt-oss-20b", "gpt-oss 20B", "gpt-oss-20b-MXFP4.gguf", "gpt-oss", "gptoss",
+		asset{hfURL("ggml-org/gpt-oss-20b-GGUF", "ef9b12f2ff56c69cf32153a02784e7a3c88bf524", "gpt-oss-20b-MXFP4.gguf"), 12109566624, "27cd6c432c7672cb812a92f611cf3ba7bbc35928262bb1e1253ff4ee6ae35901"},
+		nil},
+	{"llama-3.2-3b", "Llama 3.2 3B", "Llama-3.2-3B-Instruct-Q4_K_M.gguf", "llama", "llama3b",
+		asset{hfURL("unsloth/Llama-3.2-3B-Instruct-GGUF", "e7d0997e49c9cb00d88b4c1a6a16aa894b0bbc31", "Llama-3.2-3B-Instruct-Q4_K_M.gguf"), 2019377600, "6c99cc00ae910f6a532a80022cb4bc1939094527a089c29294b841c0bd87f74d"},
+		nil},
+	{"llama-3.1-8b", "Llama 3.1 8B", "Llama-3.1-8B-Instruct-Q4_K_M.gguf", "llama", "llama8b",
+		asset{hfURL("unsloth/Llama-3.1-8B-Instruct-GGUF", "600b0020115fd6b17f0752848fe7b5a1be686bcd", "Llama-3.1-8B-Instruct-Q4_K_M.gguf"), 4920739200, "b3bdbf23b47d7e6bb791c99b206deb169cd5a96362a9e3399028df2faacdc506"},
+		nil},
+	{"mistral-small-24b", "Mistral Small 3.2 24B", "Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf", "mistral", "mistral",
+		asset{hfURL("unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF", "b750ec2299225e492f1bd27cab88a0a595fa848f", "Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf"), 14333922848, "a3cc56310807ed0d145eaf9f018ccda9ae7ad8edb41ec870aa2454b0d4700b3c"},
+		&asset{hfURL("unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF", "b750ec2299225e492f1bd27cab88a0a595fa848f", "mmproj-F16.gguf"), 878053568, "d6af684ae9136398eaa0b59ea9e0b0b850bb6ac5084f1e8c5cb8f85251825eaf"}},
+	{"deepseek-r1-8b", "DeepSeek-R1 8B", "DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf", "deepseek", "deepseek",
+		asset{hfURL("unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF", "eb48357c179d34dbf515983f798dfb8752a0f261", "DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf"), 5027785216, "a86349a4180c4e6bb43f874c29c404fa2be3f90b15509bd6d86f697dba724ec1"},
+		nil},
+	{"swallow-8b", "Llama 3.1 Swallow 8B", "Llama-3.1-Swallow-8B-Instruct-v0.5-Q4_K_M.gguf", "llama", "swallow",
+		asset{hfURL("mmnga/Llama-3.1-Swallow-8B-Instruct-v0.5-gguf", "dc00f584312c641eb7af415f7f44bcc4487350cb", "Llama-3.1-Swallow-8B-Instruct-v0.5-Q4_K_M.gguf"), 4920736064, "6da177cee6797ad8f67cdaf6fac5d52818cc0582c7b0779c5c50ef419ca0b088"},
+		nil},
+	{"sarashina-3b", "Sarashina2.2 3B", "sarashina2.2-3b-instruct-v0.1-Q4_K_M.gguf", "sarashina", "sarashina",
+		asset{hfURL("mmnga/sarashina2.2-3b-instruct-v0.1-gguf", "31d771319b04032f33e0d9d860f3984ea4812154", "sarashina2.2-3b-instruct-v0.1-Q4_K_M.gguf"), 2066390112, "d96f4d98eb528df26e8bc09ab81a1d165be4fce67616739e65980bed9038f0f2"},
+		nil},
+	{"llm-jp-1.8b", "LLM-jp-3.1 1.8B", "llm-jp-3.1-1.8b-instruct4-Q4_K_M.gguf", "llmjp", "llmjp",
+		asset{hfURL("mmnga/llm-jp-3.1-1.8b-instruct4-gguf", "14ddbab20c68d8befdced79bd9daa3d7a1a29376", "llm-jp-3.1-1.8b-instruct4-Q4_K_M.gguf"), 1164239136, "e442e3985ba1afd10700e04df2887f81e4c6075f144400d927e7f7d992501632"},
+		nil},
 }
 
 func defaultLocalModel() localModel {
@@ -116,7 +151,10 @@ func (l *Lumi) listLocalModels() {
 	rec := recommendLocalModel(spec)
 	var b strings.Builder
 	b.WriteString("  " + T("local.specLine", spec.describe()) + "\n\n")
-	for _, m := range localModels {
+	for i, m := range localModels {
+		if i > 0 && m.Family != "qwen" && localModels[i-1].Family == "qwen" {
+			b.WriteString("\n  " + T("local.others") + "\n")
+		}
 		mark := "  "
 		if m.ID == cur.ID && strings.EqualFold(l.s.Get("provider", ""), "local") {
 			mark = "* "
@@ -132,7 +170,7 @@ func (l *Lumi) listLocalModels() {
 		if m.Vision != nil {
 			vision = " 🖼"
 		}
-		fmt.Fprintf(&b, "  %s%s %6.1fGB%s  %s  %s\n", mark, padRight(m.ID, 14), float64(m.Asset.Size)/1e9, vision, T("local.note."+m.Note), state)
+		fmt.Fprintf(&b, "  %s%s %6.1fGB%s  %s  %s\n", mark, padRight(m.ID, 18), float64(m.Asset.Size)/1e9, vision, T("local.note."+m.Note), state)
 	}
 	b.WriteString("\n  " + T("local.modelsHow"))
 	l.info(b.String())

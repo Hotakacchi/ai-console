@@ -21,6 +21,9 @@ func TestLocalModelChat(t *testing.T) {
 	if !ok {
 		t.Fatal("no model", id)
 	}
+	if os.Getenv("LUMI_TEMP") != "" {
+		tempDataDir(t) // 本物のデータフォルダを汚さない (llama.cpp もダウンロードし直す)
+	}
 	base := dataDir()
 	start := time.Now()
 	last := -1

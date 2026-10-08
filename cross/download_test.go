@@ -64,3 +64,14 @@ func TestShortNetError(t *testing.T) {
 		t.Errorf("%q", err)
 	}
 }
+
+func TestRetryable(t *testing.T) {
+	for _, msg := range []string{"stream error: stream ID 1; CANCEL; received from peer", "read: connection reset by peer"} {
+		if !retryable(errors.New(msg)) {
+			t.Errorf("%q should be retried", msg)
+		}
+	}
+	if retryable(errors.New("sha256 mismatch")) {
+		t.Error("a bad file should not be retried")
+	}
+}

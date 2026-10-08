@@ -31,6 +31,28 @@ func TestLocalModels(t *testing.T) {
 	if p := localModelPath("/data", ""); filepath.Base(p) != "Qwen3.5-4B-Q4_K_M.gguf" {
 		t.Errorf("default path %q", p)
 	}
+	// 説明文がそろっていて、画像の部品のファイル名がかぶらない
+	loadLocales()
+	setLanguage("ja")
+	visions := map[string]string{}
+	for _, m := range localModels {
+		if key := "local.note." + m.Note; T(key) == key {
+			t.Errorf("%s: no %s", m.ID, key)
+		}
+		if m.Vision != nil {
+			if other, dup := visions[m.visionFile()]; dup {
+				t.Errorf("%s and %s share %s", m.ID, other, m.visionFile())
+			}
+			visions[m.visionFile()] = m.ID
+		}
+	}
+	// おすすめ (インストーラーで入れるもの) は Qwen3.5 からだけ
+	for _, spec := range []pcSpec{{RAM: 2 * gb}, {RAM: 8 * gb}, {RAM: 16 * gb}, {RAM: 64 * gb, VRAM: 24 * gb}, {RAM: 64 * gb, Unified: true}} {
+		if m := recommendLocalModel(spec); m.Family != "qwen" {
+			t.Errorf("%+v recommends %s", spec, m.ID)
+		}
+	}
+
 	s := &Settings{vals: map[string]any{"model": "my-own.gguf"}}
 	if _, ok := currentLocalModel(s); ok {
 		t.Error("an unlisted file should not match")

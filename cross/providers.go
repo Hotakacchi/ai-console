@@ -399,6 +399,9 @@ func newLocal(s *Settings) Provider {
 			// ほかのモデルは、ふつうの値で
 			body["temperature"] = 0.7
 			body["top_p"] = 0.9
+			if family == "sarashina" {
+				body["stop"] = []string{"</s>"} // この GGUF は終わりの印を文字として出してしまう
+			}
 			return
 		}
 		// Qwen3.5 は既定で考えてから答えるので、会話用に考える過程を切る。サンプリングはモデル推奨値

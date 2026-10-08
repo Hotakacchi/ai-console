@@ -149,9 +149,20 @@ var downloadClient = &http.Client{Transport: &http.Transport{
 // つながらない・途中で切れたときは、少し待ってから続きを取り直す (4 回まで)
 func download(a asset, dest string, progress func(int64), cancelled func() bool, verifying func()) error {
 	var err error
-	for attempt := 0; attempt < 4; attempt++ {
+	partSize := func() int64 {
+		if st, e := os.Stat(dest + ".part"); e == nil {
+			return st.Size()
+		}
+		return 0
+	}
+	// 少しでも進んでいれば、やり直しの回数は数え直す (大きいファイルは途中で何度か切れることがある。全部で 30 回まで)
+	for attempt, tries := 0, 0; attempt < 4 && tries < 30; attempt, tries = attempt+1, tries+1 {
+		before := partSize()
 		if err = downloadOnce(a, dest, progress, cancelled, verifying); err == nil || !retryable(err) {
 			return err
+		}
+		if partSize() > before {
+			attempt = 0
 		}
 		for i := 0; i < (attempt+1)*3*10; i++ { // 3 秒、6 秒、9 秒待つ (中断はすぐ受け付ける)
 			if cancelled() {
@@ -167,7 +178,12 @@ func download(a asset, dest string, progress func(int64), cancelled func() bool,
 func retryable(err error) bool {
 	var ne net.Error
 	var ue *url.Error
-	return errors.As(err, &ne) || errors.As(err, &ue) || errors.Is(err, io.ErrUnexpectedEOF)
+	if errors.As(err, &ne) || errors.As(err, &ue) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	// HTTP/2 で相手に切られたとき (stream error … CANCEL / INTERNAL_ERROR) や、つながりが切れたとき
+	msg := err.Error()
+	return strings.Contains(msg, "stream error") || strings.Contains(msg, "connection reset") || strings.Contains(msg, "unexpected EOF")
 }
 
 // 署名つきの長い URL をそのまま見せないように、「サーバー名: 理由」にする

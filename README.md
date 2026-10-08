@@ -54,7 +54,7 @@
 | `/reload` | 設定ファイルを読み直す |
 | `/mute` | 読み上げのオン/オフ |
 | `/mic` | 音声入力のオン/オフ (初回は認識モデル約50MBをダウンロード) |
-| `/install-local [list\|名前]` | ローカルAIをダウンロードする。`list` でモデルの一覧 (Qwen3.5 0.8B / 2B / 4B / 9B、Phi-4 mini)、名前でそのモデルを入れて切り替える |
+| `/install-local [list\|名前]` | ローカルAIをダウンロードする。`list` でモデルの一覧、名前でそのモデルを入れて切り替える。標準は Qwen3.5 (0.8B / 2B / 4B / 9B)。ほかに Phi-4 mini、Gemma 3 (1B / 4B / 12B)、gpt-oss 20B、Llama 3.2 3B / 3.1 8B、Mistral Small 3.2 24B、DeepSeek-R1 8B、Llama 3.1 Swallow 8B、Sarashina2.2 3B、LLM-jp-3.1 1.8B も選べる |
 | `/install-voice` | 音声認識モデルをダウンロードする |
 | `/install-voicevox` | より自然な声 (VOICEVOX、約330MB) を入れる |
 | `/install-whisper` | より正確な音声認識 (Whisper) を入れる (Windows・Linux は whisper.cpp で約70MB、Mac は約110MB) |

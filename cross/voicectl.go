@@ -39,11 +39,23 @@ func (l *Lumi) applyVoice(announce bool) {
 		"wake":  l.s.WakeWord(),
 	}
 	if l.s.Get("stt", "vosk") == "whisper" {
-		model := whisperModel(l.s)
-		if whisperInstalled(dataDir(), model) {
+		model, base := whisperModel(l.s), dataDir()
+		switch {
+		case whisperCppSupported() && whisperCppInstalled(base, model):
+			// whisper.cpp で (速い)。音は Go に送ってもらう
+			start["whisper"] = model
+			start["whisperNative"] = true
+		case whisperInstalled(base, model):
 			start["whisper"] = whisperClientModel(model)
-		} else if announce {
-			l.write(T("whisper.installHint", float64(whisperSize(model))/1e6)+"\n\n", "yellow")
+			if announce && whisperCppSupported() {
+				l.write(T("whisper.fasterHint", float64(whisperCppSize(base, model))/1e6)+"\n\n", "yellow")
+			}
+		case announce:
+			size := whisperSize(model)
+			if whisperCppSupported() {
+				size = whisperCppSize(base, model)
+			}
+			l.write(T("whisper.installHint", float64(size)/1e6)+"\n\n", "yellow")
 		}
 	}
 	l.emit("voiceStart", start)

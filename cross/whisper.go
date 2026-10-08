@@ -130,12 +130,17 @@ func (l *Lumi) installWhisperCmd() {
 	l.mu.Lock()
 	l.cancel = cancel
 	l.mu.Unlock()
-	l.write(T("whisper.installStart", model, float64(whisperSize(model))/1e6)+"\n", "dim")
+	// Windows・Linux は whisper.cpp (速い)、Mac は画面の中で動かすもの
+	size, install := whisperSize(model), installWhisper
+	if whisperCppSupported() {
+		size, install = whisperCppSize(dataDir(), model), installWhisperCpp
+	}
+	l.write(T("whisper.installStart", model, float64(size)/1e6)+"\n", "dim")
 	go func() {
 		defer l.setBusy(false)
 		lastPct := -1
 		defer l.setActivity("", 0)
-		err := installWhisper(dataDir(), model, func(step string, ratio float64) {
+		err := install(dataDir(), model, func(step string, ratio float64) {
 			l.setActivity("download", ratio) // 口がプログレスバーになる
 			if pct := int(ratio * 100); pct/10 != lastPct/10 {
 				l.write(fmt.Sprintf("  [%3d%%] %s\n", pct, step), "dim")

@@ -33,16 +33,17 @@ export class Voice {
   }
 
   // msgs: 画面に渡された今の言語の文言 (voice.wakeAliases など)
-  async start({ lang, model, wake, whisper }, msgs, withMic = true) {
+  async start({ lang, model, wake, whisper, whisperNative }, msgs, withMic = true) {
     this.stop();
     // 読み込み中に別の start / stop が来たら、この start は途中でやめる
     const gen = this.gen = (this.gen || 0) + 1;
     const stale = () => gen !== this.gen;
     this.lang = lang;
     this.whisper = whisper || null;
+    this.whisperNative = !!whisperNative;   // whisper.cpp (Go 側) で書き起こす
     this.chunks = [];
     this.fedSec = 0;
-    if (this.whisper) this.whisperCall("load").catch(e => this.whisperFailed(e));
+    if (this.whisper && !this.whisperNative) this.whisperCall("load").catch(e => this.whisperFailed(e));
     const raw = key => (msgs[key] || "").split(",").map(s => s.trim()).filter(Boolean);
     const phrases = [...new Set([wake, ...raw("voice.wakeAliases")].filter(Boolean))];
     this.aliases = [...new Set(phrases.map(p => this.norm(p)))].sort((a, b) => b.length - a.length);
@@ -126,6 +127,10 @@ export class Voice {
   }
 
   whisperCall(type, audio) {
+    if (this.whisperNative) {
+      if (type !== "transcribe") return Promise.resolve("");
+      return this.h.nativeWhisper(audio, this.lang, this.vocab || "");
+    }
     if (!this.worker) {
       this.worker = new Worker("/whisper-worker.js", { type: "module" });
       this.waiting = new Map();

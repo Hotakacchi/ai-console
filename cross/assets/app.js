@@ -531,7 +531,32 @@ function termMain() {
   }
 
   // ---- 声での入力 ----
+  // whisper.cpp (Go 側) に音を送って書き起こしてもらう: 16kHz の音を 16bit にして base64 で
+  const nativeWaiting = new Map();
+  let nativeId = 0;
+  on("whisperResult", d => {
+    const w = nativeWaiting.get(d.id);
+    if (!w) return;
+    nativeWaiting.delete(d.id);
+    if (d.error) w.reject(new Error(d.error)); else w.resolve(d.text || "");
+  });
+  function pcmBase64(audio) {
+    const pcm = new Int16Array(audio.length);
+    for (let i = 0; i < audio.length; i++) pcm[i] = Math.max(-32768, Math.min(32767, Math.round(audio[i] * 32767)));
+    const bytes = new Uint8Array(pcm.buffer);
+    let s = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+
   const voice = new Voice({
+    nativeWhisper(audio, lang, prompt) {
+      const id = ++nativeId;
+      return new Promise((resolve, reject) => {
+        nativeWaiting.set(id, { resolve, reject });
+        emit("whisperNative", { id, pcm: pcmBase64(audio), lang, prompt });
+      });
+    },
     woke() {
       face.expression = "listen";
       face.poke(false);

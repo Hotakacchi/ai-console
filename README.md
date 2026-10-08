@@ -57,7 +57,7 @@
 | `/install-local [list\|名前]` | ローカルAIをダウンロードする。`list` でモデルの一覧 (Qwen3.5 0.8B / 2B / 4B / 9B、Phi-4 mini)、名前でそのモデルを入れて切り替える |
 | `/install-voice` | 音声認識モデルをダウンロードする |
 | `/install-voicevox` | より自然な声 (VOICEVOX、約330MB) を入れる |
-| `/install-whisper` | より正確な音声認識 (Whisper、約110MB) を入れる |
+| `/install-whisper` | より正確な音声認識 (Whisper) を入れる (Windows・Linux は whisper.cpp で約70MB、Mac は約110MB) |
 | `/install-vision` | ローカルAIが画像を読めるようにする (約670MB) |
 | `/attach [パス]` / `/detach` | ファイルを付ける / 外す (窓にドラッグ＆ドロップでも付けられる) |
 | `/screen [質問]` | 画面を撮って見せる (例: `/screen このエラーは何？`) |
@@ -108,7 +108,7 @@ AI の提案は間違っていることもあります。内容を確かめて�
 - **ルーティン** — 「おはよう」と言うと、今日の天気とリマインダーをまとめて話します。`/routines` で開く `routines.txt` に、「仕事モード」でアプリやフォルダをまとめて開く、などを自分で書けます。`[名前 @07:30]` のように時刻を付けると毎日自動で動きます。
 - **スマホから** — `/phone` で出る QR コードを同じ Wi-Fi のスマホで読むと、スマホのブラウザから話しかけたり、返事を読み上げてもらったり、コマンドの確認に答えたりできます (家の中からだけ、鍵つきの URL でだけつながります)。
 - **自動アップデート** — 新しい版が出ると起動時に知らせ、`/update` でダウンロードから入れ替え・再起動まで行います。
-- **正確な聞き取り** — `/install-whisper` で、話しかけた内容を [Whisper](https://github.com/openai/whisper) で書き起こします (呼びかけは Vosk のまま)。`/set whisper_model small` でさらに正確に (約280MB)。
+- **正確な聞き取り** — `/install-whisper` で、話しかけた内容を [Whisper](https://github.com/openai/whisper) で書き起こします (呼びかけは Vosk のまま)。Windows・Linux では [whisper.cpp](https://github.com/ggml-org/whisper.cpp) で動かすので、話し終えてから 1 秒ほどで文字になります。`/set whisper_model small` でさらに正確に (少し遅くなります)。
 - **ドライブ** — USB メモリなどをつなぐと、驚いた顔をして知らせます。
 - **自作コマンド (プラグイン)** — `/plugins open` で開くフォルダにスクリプトを置くと、ファイル名が `/名前` のコマンドになります (例: `backup.ps1` → `/backup`)。`.ps1`・`.bat`・`.cmd`・`.exe` (Windows)、`.sh` (Mac・Linux)、`.py`、`.js` が使えます。最初のコメント行が説明になり、AI も「バックアップして」のように頼むと使います (実行前に確認します)。
 - **ターミナル版** — Windows ターミナルの新しいタブのメニューに「Lumi」が出て、タブの中でルミと話せます (Mac・Linux は `lumi --cli`)。会話・コマンドの実行・シェルモードは窓のルミと同じで、顔は `(・‿・)` のような顔文字になります。声と小窓は窓のルミだけです。

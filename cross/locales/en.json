@@ -227,6 +227,7 @@
   "set.whisper_model": "Whisper model (base is about 110 MB; small is about 280 MB and more accurate)",
   "whisper.installStart": "Downloading Whisper (%s, about %.0f MB). Press Ctrl+C to stop (it resumes next time).",
   "whisper.installed": "Whisper is installed. What you say will now be transcribed with Whisper.",
+  "whisper.fasterHint": "/install-whisper switches Whisper to a several times faster version (whisper.cpp, about %.0f MB).",
   "whisper.installHint": "Whisper isn't installed, so Vosk will transcribe. Install it with /install-whisper (about %.0f MB).",
   "whisper.error": "Whisper couldn't transcribe (using the Vosk result): %s",
   "cmd.install-vision": "Let the local AI read images (about 670 MB)",

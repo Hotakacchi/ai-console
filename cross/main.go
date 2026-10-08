@@ -135,6 +135,8 @@ func main() {
 		}
 	})
 	app.Event.On("interrupt", func(*application.CustomEvent) { lumi.interrupt() })
+	// 話しかけた内容の音を whisper.cpp で書き起こす (Windows・Linux)
+	app.Event.On("whisperNative", func(e *application.CustomEvent) { go lumi.nativeWhisper(e.Data) })
 	app.Event.On("spoken", func(e *application.CustomEvent) {
 		if f, ok := e.Data.(float64); ok {
 			select {

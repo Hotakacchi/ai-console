@@ -50,15 +50,45 @@ func TestPhoneServer(t *testing.T) {
 		}
 	}
 
-	// 確認への答えが届く
-	http.Post(base+"/api/answer?t="+token, "application/json", strings.NewReader(`{"answer":"y"}`))
-	select {
-	case a := <-l.answers:
-		if a != "y" {
-			t.Errorf("answer %q", a)
+	// 確認への答え: 「はい」には PC の画面に出た番号が要る。「いいえ」は番号なしで届く
+	answer := func(body string) int {
+		r, err := http.Post(base+"/api/answer?t="+token, "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
 		}
-	case <-time.After(2 * time.Second):
-		t.Error("no answer")
+		return r.StatusCode
+	}
+	got := func() string {
+		select {
+		case a := <-l.answers:
+			return a
+		case <-time.After(500 * time.Millisecond):
+			return ""
+		}
+	}
+	l.askCode = "1234"
+	if s := answer(`{"answer":"y"}`); s != 403 || got() != "" {
+		t.Errorf("yes without the number: %d", s)
+	}
+	if s := answer(`{"answer":"y","code":"0000"}`); s != 403 || got() != "" {
+		t.Errorf("yes with a wrong number: %d", s)
+	}
+	if s := answer(`{"answer":"y","code":"1234"}`); s != 204 || got() != "y" {
+		t.Errorf("yes with the number: %d", s)
+	}
+	if s := answer(`{"answer":"n"}`); s != 204 || got() != "n" {
+		t.Errorf("no: %d", s)
+	}
+	// 3 回間違えたら、正しい番号でももう答えられない
+	l.askCode, l.askTries = "5678", 0
+	for i := 0; i < 3; i++ {
+		answer(`{"answer":"y","code":"0000"}`)
+	}
+	if s := answer(`{"answer":"y","code":"5678"}`); s != 403 || got() != "" {
+		t.Errorf("after 3 wrong numbers: %d", s)
+	}
+	if c := newAskCode(); len(c) != 4 || strings.Trim(c, "0123456789") != "" {
+		t.Errorf("code %q", c)
 	}
 
 	// 画面への出来事がスマホに流れる

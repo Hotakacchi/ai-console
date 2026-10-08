@@ -137,7 +137,14 @@ $("sound").onclick = () => {
   if (soundOn && window.speechSynthesis) speechSynthesis.speak(new SpeechSynthesisUtterance("")); // iPhone は押したときに一度鳴らすと、あとで喋れる
   if (!soundOn && window.speechSynthesis) speechSynthesis.cancel();
 };
-for (const b of $("ask").querySelectorAll("button")) b.onclick = () => post("/api/answer", { answer: b.dataset.a });
+// 「実行」には、PC の画面に出ている 4 桁の番号が要る (この URL を知った人に勝手に実行させないように)
+for (const b of $("ask").querySelectorAll("button")) b.onclick = () => {
+  const answer = b.dataset.a;
+  if (answer === "n") { post("/api/answer", { answer }); return; }
+  const code = prompt(t("phone.page.code"));
+  if (code === null) return;
+  post("/api/answer", { answer, code: code.trim() });
+};
 </script>
 </body>
 </html>

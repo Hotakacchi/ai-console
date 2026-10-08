@@ -68,6 +68,9 @@ type Lumi struct {
 	shellOn   bool            // シェルモード (打った行をそのままコマンドとして実行)
 	shellDir  string          // コマンドを実行する場所 (cd で変わる)
 	lastUsed  time.Time       // 最後に返事などをした時刻 (使っていないローカルAIを外すため)
+	tainted   bool            // この会話で、外から来た文章を AI に読ませた (automode.go)
+	askCode   string          // 今の質問にスマホから「はい」と答えるための番号 (PC の画面にだけ出す)
+	askTries  int             // その番号を間違えた回数
 	cli       *cliUI         // ターミナル版 (--cli) のときの画面。窓はない
 }
 
@@ -85,16 +88,21 @@ func newLumi(app *application.App, muted, noMic bool) *Lumi {
 // ---- 画面への出力 ----
 
 func (l *Lumi) emit(name string, data any) {
+	l.emitLocal(name, data)
+	if phone.running() {
+		phone.publish(name, data) // スマホでも見られるように
+	}
+	discord.observe(name, data) // Discord のステータス用
+}
+
+// PC の画面 (窓かターミナル) にだけ送る。スマホには送らない
+func (l *Lumi) emitLocal(name string, data any) {
 	if l.win != nil {
 		l.win.EmitEvent(name, data)
 	}
 	if l.cli != nil {
 		l.cli.event(name, data)
 	}
-	if phone.running() {
-		phone.publish(name, data) // スマホでも見られるように
-	}
-	discord.observe(name, data) // Discord のステータス用
 }
 
 func (l *Lumi) write(text, color string) { l.emit("write", map[string]any{"text": text, "color": color}) }
@@ -311,6 +319,7 @@ func (l *Lumi) submit(text string) {
 		l.quit()
 	case "/cls", "/clear":
 		l.ai.Clear()
+		l.untaint() // 新しい会話
 		l.takePending()
 		clearHistory()
 		l.emit("clear", nil)
@@ -714,6 +723,9 @@ const maxToolRounds = 5
 // screenFirst: /screen のとき、最初に画面を撮って一緒に見せる
 func (l *Lumi) respond(userText string, screenFirst bool) {
 	attached := l.takePending()
+	if len(attached) > 0 {
+		l.taint() // 付けたファイルの中身も、外から来た文章
+	}
 	keep := l.s.On("keep_history", "on")
 	if keep {
 		saved := userText
@@ -803,14 +815,19 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 			report.WriteString("\n$ " + r.Command + admin + "\n")
 			// 自動モードなら確認せずに実行する (管理者権限と、危ない操作はこれまでどおり確認する)
 			var answer string
-			if l.autoRun() && !r.Admin && !riskyCommand(r.Command) {
+			// (外から来た文章を読んだあとは、それに仕込まれた指示かもしれないので確認に戻す)
+			if l.autoRun() && !r.Admin && !riskyCommand(r.Command) && !l.isTainted() {
 				l.write("\n"+T("auto.running")+"\n", "cyan")
 				for _, line := range strings.Split(r.Command, "\n") {
 					l.write("  "+strings.TrimRight(line, "\r")+"\n", "white")
 				}
 				answer = "y"
 			} else {
-				if l.autoRun() && !r.Admin {
+				switch {
+				case !l.autoRun() || r.Admin:
+				case l.isTainted():
+					l.write("\n"+T("auto.tainted")+"\n", "yellow")
+				default:
 					l.write("\n"+T("auto.risky")+"\n", "yellow")
 				}
 				answer = l.confirm(r)
@@ -1058,6 +1075,19 @@ func (l *Lumi) ask(question string) string {
 	for len(l.answers) > 0 {
 		<-l.answers
 	}
+	// スマホから「はい」と答えるには、PC の画面にだけ出す番号が要る (鍵を知った人に勝手に実行させないように)
+	code := newAskCode()
+	l.mu.Lock()
+	l.askCode, l.askTries = code, 0
+	l.mu.Unlock()
+	defer func() {
+		l.mu.Lock()
+		l.askCode = ""
+		l.mu.Unlock()
+	}()
+	if phone.running() {
+		l.emitLocal("write", map[string]any{"text": T("phone.codeHint", code) + "\n", "color": "dim"})
+	}
 	l.emit("ask", question)
 	select {
 	case a := <-l.answers:
@@ -1120,6 +1150,8 @@ func (l *Lumi) webTool(r toolRequest) string {
 	}
 	if err != nil {
 		result = T("web.failed", err.Error())
+	} else {
+		l.taint() // 検索結果やページの文章は、外から来たもの
 	}
 	// 画面には要点だけ (検索ならタイトル、ページなら先頭数行) を出す
 	lines := strings.Split(result, "\n")

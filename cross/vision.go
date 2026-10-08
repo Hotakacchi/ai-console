@@ -130,6 +130,7 @@ func (l *Lumi) screenTool() ([]byte, string) {
 		return nil, T("screen.failed", err.Error())
 	}
 	l.write(T("screen.taken", img.Bounds().Dx(), img.Bounds().Dy())+"\n\n", "cyan")
+	l.taint() // 画面に映っている文章も、外から来たもの
 	return encodeJPEG(img), ""
 }
 

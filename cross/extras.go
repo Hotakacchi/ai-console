@@ -99,6 +99,7 @@ func (l *Lumi) clipboardTool() string {
 		text = string(r[:4000]) + "\n" + T("run.truncated")
 	}
 	l.write(T("clip.read", len([]rune(text)))+"\n\n", "cyan")
+	l.taint() // 外から来た文章
 	return head + text + "\n"
 }
 

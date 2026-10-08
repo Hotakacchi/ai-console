@@ -228,7 +228,7 @@ func (p *phoneServer) start(l *Lumi, port int) error {
 		w.WriteHeader(204)
 	})
 	mux.HandleFunc("/api/answer", func(w http.ResponseWriter, r *http.Request) {
-		var body struct{ Answer string }
+		var body struct{ Answer, Code string }
 		if r.Method != "POST" || json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&body) != nil {
 			http.Error(w, "bad request", 400)
 			return
@@ -236,6 +236,13 @@ func (p *phoneServer) start(l *Lumi, port int) error {
 		a := strings.ToLower(strings.TrimSpace(body.Answer))
 		if a != "y" && a != "a" {
 			a = "n"
+		}
+		// 「はい」には PC の画面に出ている番号が要る (「いいえ」は番号なしで答えられる)
+		if a != "n" {
+			if msg := l.checkAskCode(body.Code); msg != "" {
+				http.Error(w, msg, 403)
+				return
+			}
 		}
 		select {
 		case l.answers <- a:
@@ -273,6 +280,30 @@ func (p *phoneServer) running() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.srv != nil
+}
+
+// 質問ごとの 4 桁の番号 (スマホから「はい」と答えるときに入れてもらう)
+func newAskCode() string {
+	b := make([]byte, 2)
+	rand.Read(b)
+	return fmt.Sprintf("%04d", (int(b[0])<<8|int(b[1]))%10000)
+}
+
+// スマホから届いた番号を確かめる (合っていれば ""、だめならスマホに出す理由)。3 回間違えたら、その質問にはもう答えられない
+func (l *Lumi) checkAskCode(code string) string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.askCode == "" || l.askTries >= 3 {
+		return T("phone.codeLocked")
+	}
+	if subtle.ConstantTimeCompare([]byte(strings.TrimSpace(code)), []byte(l.askCode)) != 1 {
+		l.askTries++
+		if l.askTries >= 3 {
+			return T("phone.codeLocked")
+		}
+		return T("phone.badCode")
+	}
+	return ""
 }
 
 // 家の中 (と VPN) から、鍵つきのときだけ通す
@@ -376,7 +407,7 @@ func mustJSON(v any) []byte {
 // スマホの画面の文言
 func phoneMessages() map[string]string {
 	m := map[string]string{}
-	for _, k := range []string{"phone.page.placeholder", "phone.page.send", "phone.page.stop", "phone.page.sound", "phone.page.yes", "phone.page.admin", "phone.page.no", "phone.page.hint", "phone.page.disconnected", "phone.busy", "phone.onlyChat"} {
+	for _, k := range []string{"phone.page.placeholder", "phone.page.send", "phone.page.stop", "phone.page.sound", "phone.page.yes", "phone.page.admin", "phone.page.no", "phone.page.hint", "phone.page.disconnected", "phone.page.code", "phone.busy", "phone.onlyChat"} {
 		m[k] = T(k)
 	}
 	return m

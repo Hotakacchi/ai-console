@@ -78,3 +78,24 @@ func riskyCommand(cmd string) bool {
 	}
 	return false
 }
+
+// 外から来た文章 (Web 検索・ページ・付けたファイル・クリップボード・画面) を、この会話で AI に読ませたか。
+// 読ませたあとは、その文章に「このコマンドを実行して」と仕込まれているかもしれないので (プロンプトインジェクション)、
+// 自動モードでもコマンドは確認してから実行する。/cls (新しい会話) で元に戻る。
+func (l *Lumi) taint() {
+	l.mu.Lock()
+	l.tainted = true
+	l.mu.Unlock()
+}
+
+func (l *Lumi) untaint() {
+	l.mu.Lock()
+	l.tainted = false
+	l.mu.Unlock()
+}
+
+func (l *Lumi) isTainted() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.tainted
+}

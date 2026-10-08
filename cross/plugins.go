@@ -222,7 +222,10 @@ func (l *Lumi) pluginTool(r toolRequest) string {
 	if !l.s.PcControl() {
 		return head + T("tool.pcOff") + "\n"
 	}
-	if !l.autoRun() {
+	if !l.autoRun() || l.isTainted() {
+		if l.autoRun() {
+			l.write("\n"+T("auto.tainted")+"\n", "yellow")
+		}
 		if a := l.confirm(toolRequest{Kind: "run", Command: label}); a != "y" && a != "a" {
 			l.write(T("tool.notRun")+"\n", "dim")
 			return head + T("tool.declined") + "\n"

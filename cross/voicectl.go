@@ -6,7 +6,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 )
 
 // 起動時や設定を読み直したときに、設定どおり音声入力を始める (止める)
@@ -162,7 +161,7 @@ func (l *Lumi) voiceHeard(text string) {
 	if !l.win.IsVisible() {
 		l.show()
 	}
-	l.submit(voiceCommand(text))
+	l.submitVoice(text)
 }
 
 func (l *Lumi) voiceTimeout() {
@@ -171,16 +170,3 @@ func (l *Lumi) voiceTimeout() {
 	}
 }
 
-// 声で言われたアプリのコマンド (「ミュート」など) を / コマンドに置き換える
-func voiceCommand(text string) string {
-	t := strings.ToLower(strings.Trim(strings.TrimSpace(text), "。！？!?. "))
-	t = strings.NewReplacer(" ", "", "　", "").Replace(t)
-	for _, cmd := range []string{"mute", "cls", "mic", "exit"} {
-		for _, w := range TList("voice.cmd." + cmd) {
-			if t == strings.NewReplacer(" ", "", "　", "").Replace(strings.ToLower(w)) {
-				return "/" + cmd
-			}
-		}
-	}
-	return text
-}

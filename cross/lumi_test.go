@@ -125,6 +125,40 @@ func TestVoiceCommand(t *testing.T) {
 	if got := voiceCommand("Clear the screen"); got != "/cls" {
 		t.Errorf("en cls = %q", got)
 	}
+
+	// 「コマンド …」で、どのコマンドも呼べる (引数も)。危ないものは確認つき
+	setLanguage("ja")
+	for _, c := range []struct {
+		said, cmd string
+		confirm   bool
+	}{
+		{"コマンド ミュート", "/mute", false},
+		{"コマンド、設定。", "/settings", false},
+		{"スラッシュ 自動モード オン", "/auto on", true},
+		{"コマンド 自動モード オフ", "/auto off", true},
+		{"コマンド ローカルAI 一覧", "/install-local list", true},
+		{"コマンド 画面 このエラーは何？", "/screen このエラーは何", false},
+		{"コマンド 画面クリア", "/cls", false}, // 「画面」より長い「画面クリア」が勝つ
+		{"コマンド アップデート", "/update", true},
+		{"コマンド 終了", "/exit", true},
+		{"コマンド 一覧", "/help", false},
+		{"command shell", "/shell", false},
+	} {
+		cmd, confirm, ok := parseVoiceCommand(c.said)
+		if !ok || cmd != c.cmd || confirm != c.confirm {
+			t.Errorf("%q → %q confirm=%v ok=%v, want %q confirm=%v", c.said, cmd, confirm, ok, c.cmd, c.confirm)
+		}
+	}
+	// 合図の言葉がなければ、普段の話しかけ
+	for _, said := range []string{"設定を変えたいんだけど", "コマンド", "コマンドって何？", "アップデートある？"} {
+		if cmd, _, ok := parseVoiceCommand(said); ok {
+			t.Errorf("%q became %q", said, cmd)
+		}
+	}
+	setLanguage("en")
+	if cmd, confirm, ok := parseVoiceCommand("Command auto mode on."); !ok || cmd != "/auto on" || !confirm {
+		t.Errorf("en auto = %q %v %v", cmd, confirm, ok)
+	}
 }
 
 // 壊れた settings.json は Set で上書きしない

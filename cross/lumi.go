@@ -424,6 +424,7 @@ func (l *Lumi) submit(text string) {
 		}
 		b.WriteString("\n  " + T("help.wake", l.wakeWord()) + "\n  " + T("help.tab") + "\n")
 		b.WriteString("  " + T("help.shell") + "\n")
+		b.WriteString("  " + T("help.voiceCmd") + "\n")
 		b.WriteString("  " + T("help.keys"))
 		l.info(b.String())
 	case "/plugins", "/plugin":

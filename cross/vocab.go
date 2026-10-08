@@ -27,6 +27,9 @@ func (l *Lumi) voiceVocab() string {
 		}
 	}
 	add(l.s.WakeWord())
+	for _, w := range TList("voice.cmdPrefix") { // 「コマンド ミュート」などの合図の言葉
+		add(w)
+	}
 	if data, err := os.ReadFile(wordsPath()); err == nil {
 		for _, line := range strings.Split(parseUserCommands(string(data)), "\n") {
 			add(line)

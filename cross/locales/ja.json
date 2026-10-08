@@ -143,6 +143,7 @@
   "run.noOutput": "(出力なし)",
   "run.exitCode": "終了コード %d",
   "voice.wakeWord": "ルミ",
+  "voice.wakePrefixes": "ねえ,ねー,ねぇ",
   "voice.wakeAliases": "ルミ,るみ,留美,ルミちゃん,ルミさん",
   "voice.yes": "実行,お願い,はい,オッケー,イエス",
   "voice.no": "やめ,いいえ,キャンセル,ストップ",

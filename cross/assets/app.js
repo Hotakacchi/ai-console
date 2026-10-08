@@ -652,6 +652,7 @@ function termMain() {
   on("clear", () => clear());
   on("busy", b => {
     busy = b;
+    voice.setBusy(b);   // 返事の最中に聞こえた声は、終わったあとに入力しない
     if (!b) {
       thinking = false; askPrompt = null;
       // 声で話しかけられていたら、返事のあと呼びかけなしで続けて話せるようにする

@@ -148,7 +148,7 @@ func (l *Lumi) voiceWoke() {
 	if l.s.Get("voice_debug", "off") == "on" {
 		l.write(fmt.Sprintf("  [voice] woke (window visible: %v)\n", l.win.IsVisible()), "dim")
 	}
-	if !l.win.IsVisible() {
+	if !l.win.IsVisible() && !l.peek.popped { // もう出ていれば出し直さない
 		l.peek.pop(T("peek.hey"))
 	}
 }

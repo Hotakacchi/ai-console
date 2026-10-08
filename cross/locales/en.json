@@ -144,6 +144,7 @@
   "run.noOutput": "(no output)",
   "run.exitCode": "Exit code %d",
   "voice.wakeWord": "Lumi",
+  "voice.wakePrefixes": "hey",
   "voice.wakeAliases": "lumi,leumi,loomi,loomy,lumie,lumy,lumee,lou me,loo me,lu me,hey lumi",
   "voice.yes": "run,yes,do it,okay,go ahead",
   "voice.no": "stop,no,cancel,don't",

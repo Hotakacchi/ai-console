@@ -47,6 +47,7 @@ export class Voice {
     const raw = key => (msgs[key] || "").split(",").map(s => s.trim()).filter(Boolean);
     const phrases = [...new Set([wake, ...raw("voice.wakeAliases")].filter(Boolean))];
     this.aliases = [...new Set(phrases.map(p => this.norm(p)))].sort((a, b) => b.length - a.length);
+    this.prefixes = raw("voice.wakePrefixes").map(p => this.norm(p));
     this.yes = raw("voice.yes").map(s => this.norm(s));
     this.no = raw("voice.no").map(s => this.norm(s));
     // y / a / n をアルファベットの読みで答える (「ワイ」など。発言全体がその読みのときだけ)
@@ -63,8 +64,15 @@ export class Voice {
       this.free.setWords(true);
       this.free.on("result", m => this.onFree(m.result));
       this.free.on("partialresult", m => this.onPartial(m.result.partial));
-      // 呼びかけ用は、呼びかけの言葉と「それ以外」だけを聞き分ける
-      this.wake = new this.model.KaldiRecognizer(rate, JSON.stringify([...phrases, "[unk]"]));
+      // 呼びかけ用は、呼びかけの言葉と「それ以外」だけを聞き分ける。
+      // 書き方の違い (ルミ・るみ・留美) は同じ音なので、全部入れると確からしさが 3 つに割れて
+      // いつも 0.33 くらいになり、一度も反応しなかった。呼びかけの言葉 1 つだけにする
+      // (書き方の違いは、書き起こしの文から探すときに使う)
+      // 「ねえ ルミ」のような前置きつきの言い方も入れる (別の言葉の並びなので確からしさは割れない)。
+      // 2 語で聞こえたら呼びかけの証拠として十分なので、onWake で必ず受け付ける
+      const name = wake || phrases[0];
+      const grammar = [name, ...raw("voice.wakePrefixes").map(p => p + " " + name), "[unk]"];
+      this.wake = new this.model.KaldiRecognizer(rate, JSON.stringify(grammar));
       this.wake.setWords(true);
       this.wake.on("result", m => this.onWake(m.result));
       this.wake.on("error", m => this.h.debug && this.h.debug("(wake error) " + JSON.stringify(m)));
@@ -99,9 +107,24 @@ export class Voice {
     if (this.whisper) {
       // 認識に渡した音を時刻つきで覚えておく (Vosk の単語の時刻は、渡した音の通算の秒)
       this.chunks.push({ t0: this.fedSec, rate, data: data.slice() });
-      this.fedSec += data.length / rate;
       while (this.chunks.length && this.chunks[0].t0 < this.fedSec - KEEP_SEC) this.chunks.shift();
     }
+    this.fedSec += data.length / rate;
+  }
+
+  // 返事やコマンドの最中かどうか (画面から)。最中に聞こえた声 (ルミ自身の読み上げも) は、
+  // 終わったあとに話しかけとして使わない。確認の質問 (実行しますか？) への答えは受け付ける
+  setBusy(on) {
+    this.busy = on;
+    if (!on) this.ignoreBefore = this.fedSec;
+  }
+
+  // 最中、または最中に聞こえた音だけからできた結果か
+  stale(words) {
+    if (this.mode === "confirm") return false;
+    if (this.busy) return true;
+    if (!words || !words.length || this.ignoreBefore === undefined) return false;
+    return words[words.length - 1].end <= this.ignoreBefore + 0.1;
   }
 
   // 覚えている音のうち from〜to 秒を 16kHz にして返す
@@ -244,9 +267,12 @@ export class Voice {
   // 呼びかけなしで、しばらく話しかけを受け付ける
   listen() {
     if (this.mode === "off") return;
+    const already = this.mode === "listening";
     this.mode = "listening";
     this.listenUntil = performance.now() + FOLLOW_UP_MS;
-    this.h.woke();
+    // 途中の書き起こしと呼びかけ用の認識の両方が気づくことがあるので、知らせるのは 1 回だけ
+    // (2 回知らせると、小窓が 2 回飛び出していた)
+    if (!already) this.h.woke();
   }
 
   confirming(on) {
@@ -258,7 +284,7 @@ export class Voice {
     if (this.mode === "listening" && performance.now() > this.listenUntil) {
       this.mode = "wake";
       this.wakeEnd = null;
-      this.partialWake = false;
+      this.partialWake = this.wakePrefixed = false;
       this.h.timeout();
     }
   }
@@ -276,7 +302,7 @@ export class Voice {
     this.mode = "wake";
     this.wakeEnd = null;
     this.pending = null;
-    this.partialWake = false;
+    this.partialWake = this.wakePrefixed = false;
     if (!this.whisper) { this.h.heard(text); return; }
     const gen = this.gen;
     this.transcribe(text, words).then(t => { if (gen === this.gen) this.h.heard(t); });
@@ -296,6 +322,7 @@ export class Voice {
   // 書き起こしの途中で呼びかけに気づいたら、すぐ聞く顔にする
   // (確定した文では呼びかけが聞き間違えられていることがあるので、印を付けておく)
   onPartial(text) {
+    if (this.busy) return;   // 返事の最中 (ルミ自身の声で「ルミ」と聞こえても反応しない)
     if (this.mode === "wake" && this.findAlias(this.norm(text))) {
       this.partialWake = true;
       this.listen();
@@ -306,10 +333,17 @@ export class Voice {
   onWake(result) {
     if (this.mode === "off" || this.mode === "confirm") return;
     const words = (result.result || []).filter(w => w.word !== "[unk]");
-    if (!words.length || !this.findAlias(this.norm(this.join(words)))) return;
-    if (Math.min(...words.map(w => w.conf)) < WAKE_MIN_CONF) return;
+    if (!words.length || this.stale(words) || !this.findAlias(this.norm(this.join(words)))) return;
+    // 「ねえ ルミ」のように前置きつきで聞こえたら、それだけで呼びかけとして受け付ける
+    const prefixed = words.length >= 2 && this.prefixes.includes(this.norm(words[0].word));
+    if (!prefixed && Math.min(...words.map(w => w.conf)) < WAKE_MIN_CONF) return;
+    // 同じところを書き起こしがはっきり別の言葉 (「ルビー」など) と聞いていたら、呼びかけではない
+    const start = words[0].start, end = words[words.length - 1].end;
+    if (!prefixed && this.pending && performance.now() - this.pending.at < 3000 && this.conflicts(this.pending.words, start, end)) return;
+    this.wakePrefixed = prefixed;
     if (this.h.debug) this.h.debug("(wake) " + this.join(words));
-    this.wakeEnd = words[words.length - 1].end;
+    this.wakeStart = start;
+    this.wakeEnd = end;
     // 同じ発言の書き起こしが先に届いていれば、呼びかけより後ろを話しかけた内容にする
     if (this.pending && performance.now() - this.pending.at < 3000) {
       const words = this.afterWake(this.pending.words);
@@ -318,6 +352,11 @@ export class Voice {
       if (rest) { this.heard(rest, words); return; }
     }
     this.listen();
+  }
+
+  // 呼びかけと同じ時間に、書き起こしが自信を持って別の言葉を聞いているか
+  conflicts(words, start, end) {
+    return words.some(w => w.end > start + 0.05 && w.start < end - 0.05 && w.conf >= 0.95 && !this.findAlias(this.norm(w.word)));
   }
 
   // 書き起こしのうち、呼びかけが終わった後の単語だけ
@@ -345,6 +384,11 @@ export class Voice {
     const t = this.norm(result.text);
     const words = result.result || [];
     if (!t || this.mode === "off") return;
+    if (this.stale(words)) {   // 返事の最中に聞こえたもの: あとから話しかけとして使わない
+      if (this.h.debug) this.h.debug("(ignored while busy) " + t);
+      this.partialWake = false;
+      return;
+    }
     if (this.h.debug) this.h.debug(t);
     if (this.mode === "confirm") {
       const bare = t.replace(/[\s、,。.!！?？]/g, "");
@@ -363,10 +407,26 @@ export class Voice {
       if (rest) this.heard(rest, this.wordsAfter(words, found.i + found.a.length)); else this.listen();
       return;
     }
+    if (fromPartial && !this.wakePrefixed && words.length && words[0].conf >= 0.95 && !this.findAlias(this.norm(words[0].word))) {
+      // 途中では「るみ」に聞こえたが、確定でははっきり別の言葉 (「ルビー」など) だった: 呼びかけではなかった
+      if (this.h.debug) this.h.debug("(wake cancelled)");
+      this.wakeEnd = null;
+      this.wakePrefixed = false;
+      if (this.mode === "listening") { this.mode = "wake"; this.h.timeout(); }
+      return;
+    }
     if (fromPartial) {
       // 途中では呼びかけだったのに確定で別の言葉になった: 最初の単語を呼びかけとみなし、残りを内容にする
       const rest = this.text(words.slice(1));
       if (rest) this.heard(rest, words.slice(1)); else this.listen();
+      return;
+    }
+    if (this.wakeEnd !== null && !this.wakePrefixed && this.conflicts(words, this.wakeStart, this.wakeEnd)) {
+      // 呼びかけ用の認識は「ルミ」と言ったが、書き起こしははっきり別の言葉 (「ルビー」など): 呼びかけではなかった
+      if (this.h.debug) this.h.debug("(wake cancelled)");
+      this.wakeEnd = null;
+      this.wakePrefixed = false;
+      if (this.mode === "listening") { this.mode = "wake"; this.h.timeout(); }
       return;
     }
     if (this.wakeEnd !== null) {

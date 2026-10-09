@@ -2,7 +2,7 @@
 ; 最初に「自分だけ (管理者権限なし、%LOCALAPPDATA%\Programs\Lumi)」か
 ; 「すべてのユーザー (管理者権限が必要、Program Files\Lumi)」かを選ぶ。新しい版で実行すれば上書き更新になる。
 ; 設定とダウンロードしたものは、どちらでもユーザーごとの %LOCALAPPDATA%\Lumi に置かれる。
-; ビルド: iscc /DAppVersion=1.5.10 /DSourceExe=..\..\lumi.exe /DSourceCliExe=..\..\lumi-cli.exe lumi.iss
+; ビルド: iscc /DAppVersion=1.5.11 /DSourceExe=..\..\lumi.exe /DSourceCliExe=..\..\lumi-cli.exe lumi.iss
 ; ターミナル版 (lumi-cli.exe) も入れて、Windows ターミナルの新しいタブのメニューに「Lumi」を出す (プロファイルの断片)。
 
 #ifndef AppVersion

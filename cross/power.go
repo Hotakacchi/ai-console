@@ -11,6 +11,7 @@ func (l *Lumi) watchPower() {
 		now, okNow := onACPower()
 		if ok && okNow && now && !prev {
 			l.fx("charge", 3)
+			l.fireTrigger("charge", nil) // 自動化 (@充電)
 		}
 		prev, ok = now, okNow
 	}

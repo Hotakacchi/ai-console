@@ -266,6 +266,8 @@ func (l *Lumi) ready() {
 		go l.watchPC()
 		go l.runProcWatch()
 		go l.watchClipboard()
+		go l.watchTriggers()
+		go l.fireTrigger("startup", nil) // 自動化 (@起動)
 		go l.unloadIdle()
 		if l.scriptPath != "" {
 			l.runScript(l.scriptPath)
@@ -888,6 +890,9 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 				continue
 			case "recall":
 				report.WriteString(l.recallTool(r))
+				continue
+			case "automation":
+				report.WriteString(l.automationTool(r))
 				continue
 			}
 			if r.Kind == "watch" {

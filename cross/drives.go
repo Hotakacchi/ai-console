@@ -26,6 +26,7 @@ func (l *Lumi) watchDrives() {
 		for _, id := range added {
 			l.fx("surprised", 2.5)
 			l.info(T("drive.added", driveName(id), id))
+			l.fireTrigger("drive", map[string]string{"drive": id}) // 自動化 (@USB)
 		}
 		known = now
 	}

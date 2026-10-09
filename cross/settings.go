@@ -241,6 +241,7 @@ func (s *Settings) SystemPrompt() string {
 	p += "\n\n" + T("prompt.face")
 	p += "\n\n" + T("prompt.remind")
 	p += "\n\n" + T("prompt.watch")
+	p += "\n\n" + T("prompt.automation")
 	if s.On("long_memory", "on") {
 		p += "\n\n" + T("prompt.recall")
 	}

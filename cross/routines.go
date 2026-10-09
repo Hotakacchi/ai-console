@@ -34,12 +34,13 @@ type routineStep struct {
 type routine struct {
 	Name  string
 	At    string // "07:30" (毎日その時刻に動く。空なら動かない)
+	When  string // 時刻以外のきっかけ (drive / charge / startup / exit:名前 / start:名前 / folder:パス。automation.go)
 	Steps []routineStep
 }
 
 func routinesPath() string { return filepath.Join(dataDir(), "routines.txt") }
 
-var routineHeadRe = regexp.MustCompile(`^\[(.+?)(?:\s*@\s*(\d{1,2}:\d{2}))?\]$`)
+var routineHeadRe = regexp.MustCompile(`^\[(.+?)(?:\s*@\s*(.+?))?\]$`)
 
 // routines.txt の中身 (なければ標準のもの)
 func loadRoutines() []routine {
@@ -59,15 +60,15 @@ func parseRoutines(text string) []routine {
 			continue
 		}
 		if m := routineHeadRe.FindStringSubmatch(line); m != nil {
-			at := m[2]
+			at, when := strings.TrimSpace(m[2]), ""
 			if at != "" {
 				if t, err := time.Parse("15:04", at); err == nil {
 					at = t.Format("15:04")
 				} else {
-					at = ""
+					at, when = "", parseTrigger(m[2]) // @USB・@充電 などのきっかけ
 				}
 			}
-			list = append(list, routine{Name: strings.TrimSpace(m[1]), At: at})
+			list = append(list, routine{Name: strings.TrimSpace(m[1]), At: at, When: when})
 			cur = &list[len(list)-1]
 			continue
 		}
@@ -126,7 +127,10 @@ func (l *Lumi) findRoutine(text string) (routine, bool) {
 }
 
 // ルーティンを動かす (呼ぶ前に begin で忙しい状態にしておく。最後に忙しい状態を解く)
-func (l *Lumi) runRoutine(r routine) {
+func (l *Lumi) runRoutine(r routine) { l.runRoutineWith(r, nil) }
+
+// vars: 手順の {drive}・{file}・{app} に入れるもの (自動化のきっかけから)
+func (l *Lumi) runRoutineWith(r routine, vars map[string]string) {
 	l.write("  "+T("routine.start", r.Name)+"\n", "cyan")
 	l.emit("flash", map[string]any{"expr": "happy", "seconds": 2})
 	var info []string // AI に渡す材料
@@ -134,6 +138,9 @@ func (l *Lumi) runRoutine(r routine) {
 	for _, st := range r.Steps {
 		if l.cancelled() {
 			break
+		}
+		for k, v := range vars {
+			st.Arg = strings.ReplaceAll(st.Arg, "{"+k+"}", v)
 		}
 		switch st.Kind {
 		case "weather":
@@ -324,6 +331,8 @@ func (l *Lumi) routinesCommand(arg string) {
 		at := ""
 		if r.At != "" {
 			at = "  @" + r.At
+		} else if r.When != "" {
+			at = "  @" + r.When // 自動化のきっかけ
 		}
 		fmt.Fprintf(&b, "  [%s]%s  %s\n", r.Name, at, T("routine.steps", len(r.Steps)))
 	}

@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -38,11 +37,6 @@ type releaseInfo struct {
 }
 
 func (r releaseInfo) version() string { return strings.TrimPrefix(r.Tag, "v") }
-
-var (
-	latestMu sync.Mutex
-	latest   *releaseInfo // 見つけた新しい版 (なければ nil)
-)
 
 func fetchLatestRelease() (releaseInfo, error) {
 	var r releaseInfo
@@ -130,9 +124,6 @@ func (l *Lumi) checkUpdate() {
 		if err != nil || !newerVersion(r.version(), version) {
 			return
 		}
-		latestMu.Lock()
-		latest = &r
-		latestMu.Unlock()
 		l.write(T("update.available", r.Tag)+"\n\n", "yellow")
 	}()
 }

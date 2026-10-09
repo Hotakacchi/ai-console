@@ -290,6 +290,8 @@
   "automation.addAsk": "足しますか？ [y/N] ",
   "automation.added": "自動化「%s」を足しました (/routines で一覧・編集)。",
   "prompt.automation": "「USB をつないだら写真をコピーして」「Chrome が落ちたら立ち上げ直して」「ダウンロードにファイルが来たら教えて」のように、何かが起きたら自動でしてほしいと頼まれたら、次の形で <automation> を書きます (ユーザーが確認してから登録されます):\n<automation>[名前 @きっかけ]\n実行: コマンド\n開く: パスやURL\n言う: 文</automation>\nきっかけ: @USB (ドライブをつないだ。{drive} がドライブ)、@充電、@起動 (ルミの起動)、@終了:アプリ名 / @開始:アプリ名 ({app})、@フォルダ:フォルダのパス (新しいファイル。{file} がそのファイル)、@07:30 (毎日その時刻)。",
+  "settings.busy": "ルミが返事をしている最中です。終わってからもう一度変えてください。",
+  "voice.arg.window": "ウィンドウ,画面",
   "voice.name.discord": "ディスコード",
   "voice.name.memory": "メモリー,覚えていること,記憶",
   "voice.name.reminders": "リマインダー",

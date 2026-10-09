@@ -30,9 +30,17 @@ func (l *Lumi) watchClipboard() {
 	if !l.gui() {
 		return
 	}
+	var lastSeq uint32
 	for range time.Tick(time.Second) {
 		if l.s.Get("clipboard", "ask") == "off" {
 			continue
+		}
+		// Windows は、変わったときだけ読む (毎秒クリップボードを開くと、ほかのアプリのコピーとぶつかることがある)
+		if seq := clipboardSeq(); seq != 0 {
+			if seq == lastSeq {
+				continue
+			}
+			lastSeq = seq
 		}
 		text, ok := l.app.Clipboard.Text()
 		if !ok || strings.TrimSpace(text) == "" {

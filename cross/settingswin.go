@@ -109,6 +109,12 @@ func (l *Lumi) saveSettingFromWindow(key, value string) {
 		reply(false, T("settings.broken"))
 		return
 	}
+	// 返事の最中に AI を作り直すと返事が崩れるので、終わってから
+	if l.isBusy() {
+		reply(false, T("settings.busy"))
+		l.sendSettingsData() // 画面の値を元に戻す
+		return
+	}
 	stored, shown, msg := checkSetting(def, value)
 	if msg != "" {
 		reply(false, msg)

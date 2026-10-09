@@ -82,7 +82,7 @@ func voiceArg(rest, original string) string {
 	if rest == "" {
 		return ""
 	}
-	for _, a := range []string{"on", "off", "list", "open", "move", "reset"} {
+	for _, a := range []string{"on", "off", "list", "open", "move", "reset", "window"} {
 		for _, w := range append(TList("voice.arg."+a), a) {
 			if rest == voiceNorm(w) {
 				return a

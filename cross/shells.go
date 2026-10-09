@@ -21,8 +21,6 @@ type shellSpec struct {
 	Label string
 }
 
-var shellKinds = []string{"powershell", "pwsh", "cmd", "gitbash", "wsl", "bash", "zsh", "fish", "sh"}
-
 // この PC で使えるシェル (使える順)
 func availableShells() []shellSpec {
 	var list []shellSpec

@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -190,15 +191,13 @@ func (l *Lumi) docContext(question string) string {
 	if l.usingLocal() {
 		limit = 2000
 	}
-	// 「新機能」「最新」などは、最新のリリースノート (何が増えたかの一覧) のほうが合っている
-	if asksWhatsNew(question) {
-		if notes, tag, err := latestReleaseNotes(); err == nil && notes != "" {
-			if r := []rune(notes); len(r) > limit {
-				notes = string(r[:limit]) + "…"
-			}
-			l.write(T("doc.readingNotes", tag)+"\n", "cyan")
-			return "\n\n" + T("doc.notesSource", tag) + "\n" + notes + "\n" + T("doc.answerHint")
+	// 版 (v1.6.0 など) を聞かれたらその版の、「新機能」「最新」ならいちばん新しい版のリリースノートを添える
+	if notes, tags := releaseNotesFor(question); notes != "" {
+		if r := []rune(notes); len(r) > limit {
+			notes = string(r[:limit]) + "…"
 		}
+		l.write(T("doc.readingNotes", tags)+"\n", "cyan")
+		return "\n\n" + T("doc.notesSource", tags) + "\n" + notes + "\n" + T("doc.answerHint")
 	}
 	md, err := lumiReadme()
 	if err != nil {
@@ -224,23 +223,72 @@ func asksWhatsNew(q string) bool {
 
 var releaseNotesCache struct {
 	sync.Mutex
-	text, tag string
-	at        time.Time
+	body map[string]string // タグ ("" は最新) → リリースノート
+	tag  map[string]string // "" → 最新のタグ
+	at   map[string]time.Time
 }
 
-// 最新のリリースノートの、今の言語の部分 (1 時間は覚えておく)
-func latestReleaseNotes() (string, string, error) {
+var versionRe = regexp.MustCompile(`(?i)v?(\d+)\.(\d+)(?:\.(\d+))?`)
+
+// リリースノート (1 時間は覚えておく)。tag が "" なら最新
+func releaseBody(tag string) (string, string, error) {
 	c := &releaseNotesCache
 	c.Lock()
 	defer c.Unlock()
-	if c.text == "" || time.Since(c.at) > time.Hour {
-		r, err := fetchLatestRelease()
-		if err != nil {
-			return "", "", err
-		}
-		c.text, c.tag, c.at = r.Body, r.Tag, time.Now()
+	if c.body == nil {
+		c.body, c.tag, c.at = map[string]string{}, map[string]string{}, map[string]time.Time{}
 	}
-	return notesForLang(c.text), c.tag, nil
+	if b, ok := c.body[tag]; ok && time.Since(c.at[tag]) < time.Hour {
+		return b, c.tag[tag], nil
+	}
+	var r releaseInfo
+	var err error
+	if tag == "" {
+		r, err = fetchLatestRelease()
+	} else {
+		r, err = fetchReleaseByTag(tag)
+	}
+	if err != nil {
+		return "", "", err
+	}
+	c.body[tag], c.tag[tag], c.at[tag] = r.Body, r.Tag, time.Now()
+	return r.Body, r.Tag, nil
+}
+
+// 質問に合うリリースノート (今の言語の部分) と、その版の名前 ("" なら合うものなし)。
+// 版が書いてあればその版。なければ「新機能」などのとき最新の版で、修正だけの版 (1.6.1 など) なら元の版 (1.6.0) も
+func releaseNotesFor(question string) (string, string) {
+	var tags []string
+	for _, m := range versionRe.FindAllStringSubmatch(question, 3) {
+		patch := m[3]
+		if patch == "" {
+			patch = "0"
+		}
+		tags = append(tags, "v"+m[1]+"."+m[2]+"."+patch)
+	}
+	if len(tags) == 0 {
+		if !asksWhatsNew(question) {
+			return "", ""
+		}
+		_, latest, err := releaseBody("")
+		if err != nil {
+			return "", ""
+		}
+		tags = []string{latest}
+		if m := versionRe.FindStringSubmatch(latest); m != nil && m[3] != "" && m[3] != "0" {
+			tags = append(tags, "v"+m[1]+"."+m[2]+".0")
+		}
+	}
+	var parts, names []string
+	for _, tag := range tags {
+		body, name, err := releaseBody(tag)
+		if err != nil || strings.TrimSpace(body) == "" {
+			continue
+		}
+		parts = append(parts, "### "+name+"\n"+notesForLang(body))
+		names = append(names, name)
+	}
+	return strings.Join(parts, "\n\n"), strings.Join(names, ", ")
 }
 
 // リリースノートは日本語のあとに英語 (## New など) が続き、最後にインストールの表がある。今の言語の部分だけ

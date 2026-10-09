@@ -93,3 +93,20 @@ func TestNotesForLang(t *testing.T) {
 		t.Error("asksWhatsNew")
 	}
 }
+
+func TestCleanHTMLAndVersions(t *testing.T) {
+	for in, want := range map[string]string{
+		"答えです。<br<br":         "答えです。",
+		"一行目<br>二行目<br/>三行目":  "一行目 二行目 三行目",
+		"<p>段落</p>":           "段落",
+		"<plugin> という言葉はそのまま": "<plugin という言葉はそのまま", // HTML でないものは消さない
+	} {
+		if got := cleanForSpeech(in); got != want {
+			t.Errorf("cleanForSpeech(%q) = %q, want %q", in, got, want)
+		}
+	}
+	got := versionRe.FindAllStringSubmatch("ルミの v1.6.0 と 1.5 の違いは？", 3)
+	if len(got) != 2 || got[0][1] != "1" || got[0][2] != "6" || got[0][3] != "0" || got[1][3] != "" {
+		t.Errorf("versions: %q", got)
+	}
+}

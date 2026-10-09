@@ -704,6 +704,10 @@ var urlRe = regexp.MustCompile(`https?://\S+`)
 var markRe = regexp.MustCompile("[*#`_>|\\[\\]]")
 
 // 読み上げに向かない URL や記号を取る
+// AI がたまに書く HTML のかけら (<br> など)。Markdown の記号を消す前に取る (先に > を消すと「<br」が残る)
+var htmlTagRe = regexp.MustCompile(`(?i)</?\s*(br|p|div|span|b|i|u|strong|em|li|ul|ol)\b[^<>]*/?>?`)
+
 func cleanForSpeech(s string) string {
+	s = htmlTagRe.ReplaceAllString(s, " ")
 	return strings.TrimSpace(markRe.ReplaceAllString(urlRe.ReplaceAllString(s, ""), ""))
 }

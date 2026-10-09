@@ -39,9 +39,16 @@ type releaseInfo struct {
 
 func (r releaseInfo) version() string { return strings.TrimPrefix(r.Tag, "v") }
 
-func fetchLatestRelease() (releaseInfo, error) {
+func fetchLatestRelease() (releaseInfo, error) { return fetchRelease(latestReleaseAPI) }
+
+// タグ (v1.6.0 など) のリリース
+func fetchReleaseByTag(tag string) (releaseInfo, error) {
+	return fetchRelease("https://api.github.com/repos/Hotakacchi/ai-console/releases/tags/" + tag)
+}
+
+func fetchRelease(api string) (releaseInfo, error) {
 	var r releaseInfo
-	req, _ := http.NewRequest("GET", latestReleaseAPI, nil)
+	req, _ := http.NewRequest("GET", api, nil)
 	req.Header.Set("User-Agent", "Lumi/"+version)
 	req.Header.Set("Accept", "application/vnd.github+json")
 	res, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)

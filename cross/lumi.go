@@ -791,9 +791,13 @@ func (l *Lumi) begin() bool {
 		l.mu.Unlock()
 		return false
 	}
+	// 確かめるのと印を付けるのを、同じ鍵の中で (前は間にすき間があり、ほぼ同時に 2 回呼ばれると両方通って、
+	// 同じ質問に 2 つの返事が同時に走ることがあった)
+	l.busy = true
+	l.lastUsed = time.Now()
 	l.cancel = make(chan struct{})
 	l.mu.Unlock()
-	l.setBusy(true)
+	l.emit("busy", true)
 	return true
 }
 
@@ -844,9 +848,33 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 		turn.Images = append(turn.Images, img)
 	}
 	declined := false // 一度断られたら、この返事の間はもうコマンドを聞かない
+	used := map[string]bool{} // この返事で使った道具 (同じものを何度も使って堂々巡りしないように)
+	var said []string         // 往復ごとに言った文
 	for round := 0; round < l.maxRounds() && turn.Text != "" && !l.cancelled(); round++ {
+		before := l.replyText.Len()
 		requests := l.replyOnce(turn)
 		turn = Turn{}
+		// 小さいモデルは、道具の結果を受け取るたびに同じ答えと同じ道具を繰り返すことがある。
+		// 前とほとんど同じことを言ったか、同じ道具をまた使おうとしたら、そこで終える (作業モードは除く)
+		if l.currentTask() == nil {
+			text := l.replyText.String()[before:]
+			if repeatsEarlier(said, text) {
+				break
+			}
+			said = append(said, text)
+			fresh := requests[:0]
+			for _, r := range requests {
+				key := r.Kind + "\x00" + strings.TrimSpace(r.Command) + "\x00" + r.Attrs["name"] + r.Attrs["ext"] + r.Attrs["days"]
+				if !used[key] {
+					used[key] = true
+					fresh = append(fresh, r)
+				}
+			}
+			if len(requests) > 0 && len(fresh) == 0 {
+				break
+			}
+			requests = fresh
+		}
 		if declined {
 			kept := requests[:0]
 			for _, r := range requests {

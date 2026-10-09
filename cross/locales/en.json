@@ -99,7 +99,7 @@
   "set.allowed": "Allowed values for %s: %s",
   "set.saveFailed": "Couldn't save: %s",
   "set.done": "Set %s to %s.",
-  "tool.results": "[Tool results]",
+  "tool.results": "[Tool results] (Do not repeat what you already said; write only a short follow-up based on these results. There is no need to use the same tool again.)",
   "tool.pcOff": "(PC control is turned off)",
   "tool.adminTag": "(admin)",
   "tool.notRun": "Not run.",

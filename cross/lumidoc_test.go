@@ -45,3 +45,18 @@ func TestLumiDoc(t *testing.T) {
 		}
 	}
 }
+
+func TestRepeatsEarlier(t *testing.T) {
+	a := "ほたかっち、ルミの機能は「/help」コマンドを言ってくださいね！最新バージョンがあるかも「/update」で確認できますよ。"
+	b := "ほたかっち、PC の名前が「ASUS-YUTO」って確認できましたね！ルミの新機能はさっき言った通り /help と言って教えてあげてください。"
+	c := "ほたかっち、PC の名前はやっぱり「ASUS-YUTO」ですね！ルミの最新機能は /help で教えてもらうのが一番早いですよ。"
+	if !repeatsEarlier([]string{a, b}, b) || !repeatsEarlier([]string{b}, c) {
+		t.Error("repeated answers were not noticed")
+	}
+	if repeatsEarlier([]string{"Cドライブの空き容量を調べますね。"}, "空き容量は 22GB でした。少なめなので、いらないファイルを消すと安心です。") {
+		t.Error("a real follow-up was treated as a repeat")
+	}
+	if repeatsEarlier(nil, a) || repeatsEarlier([]string{a}, "はい") {
+		t.Error("short or first answers are never repeats")
+	}
+}

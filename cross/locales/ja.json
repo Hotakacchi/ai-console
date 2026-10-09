@@ -99,7 +99,7 @@
   "set.allowed": "%s に使える値: %s",
   "set.saveFailed": "保存できませんでした: %s",
   "set.done": "%s を %s にしました。",
-  "tool.results": "[ツールの結果]",
+  "tool.results": "[ツールの結果] (前に言ったことは繰り返さず、この結果をふまえた続きだけを短く書いてください。同じ道具をもう一度使う必要はありません)",
   "tool.pcOff": "(PC の操作はオフになっています)",
   "tool.adminTag": "(管理者)",
   "tool.notRun": "実行しませんでした。",

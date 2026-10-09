@@ -197,3 +197,27 @@ func (l *Lumi) lumiDocTool(query string) string {
 	l.write("\n", "fg")
 	return head + T("doc.source", lumiRepoURL) + "\n" + strings.Join(picked, "\n") + "\n"
 }
+
+// text が、前に言ったどれかとほとんど同じか (2 文字ずつのかたまりが 45% 以上重なる。言い回しを変えた繰り返しで 5 割、ふつうの続きの返事は 2 割ほど)
+func repeatsEarlier(earlier []string, text string) bool {
+	b := bigrams(text)
+	if len(b) < 10 {
+		return false
+	}
+	for _, e := range earlier {
+		a := bigrams(e)
+		if len(a) < 10 {
+			continue
+		}
+		both := 0
+		for g := range b {
+			if a[g] {
+				both++
+			}
+		}
+		if float64(both)/float64(min(len(a), len(b))) >= 0.45 {
+			return true
+		}
+	}
+	return false
+}

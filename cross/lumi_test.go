@@ -292,3 +292,23 @@ func TestSettingsWindowSave(t *testing.T) {
 		}
 	}
 }
+
+// ほぼ同時に 2 回呼ばれても、返事を始められるのは 1 つだけ
+func TestBeginOnce(t *testing.T) {
+	for i := 0; i < 50; i++ {
+		l := &Lumi{s: &Settings{vals: map[string]any{}}}
+		ok := make(chan bool, 8)
+		for j := 0; j < 8; j++ {
+			go func() { ok <- l.begin() }()
+		}
+		n := 0
+		for j := 0; j < 8; j++ {
+			if <-ok {
+				n++
+			}
+		}
+		if n != 1 {
+			t.Fatalf("%d replies started at once", n)
+		}
+	}
+}

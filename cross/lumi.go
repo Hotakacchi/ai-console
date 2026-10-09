@@ -21,7 +21,7 @@ import (
 )
 
 // ビルド時に -ldflags "-X main.version=..." で上書きされる
-var version = "1.6.0"
+var version = "1.6.1"
 
 // タグのない CI ビルド (テスト版) は "1" (-X main.testBuild=1)。バージョンの横に「(テスト)」を付ける
 var testBuild = ""

@@ -19,7 +19,7 @@ var settingGroups = []struct {
 	id   string
 	keys []string
 }{
-	{"general", []string{"language", "background", "startup", "hotkey", "update_check", "keep_history", "idle_unload"}},
+	{"general", []string{"language", "background", "startup", "hotkey", "update_check", "keep_history", "long_memory", "idle_unload"}},
 	{"ai", []string{"provider", "model", "endpoint", "api_key_env", "command", "max_tokens", "effort", "local_gpu", "system_prompt"}},
 	{"pc", []string{"pc_control", "auto_run", "shell", "web_search", "search_url", "clipboard", "screen", "pc_watch"}},
 	{"voice", []string{"voice_input", "wake_word", "wake_mode", "voice_debug", "stt", "whisper_model", "tts", "voice", "voice_rate", "voicevox_voice"}},

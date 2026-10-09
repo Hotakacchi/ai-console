@@ -23,7 +23,7 @@ type toolRequest struct {
 	Attrs   map[string]string // <remind in="300"> などの属性
 }
 
-var toolTags = []string{"run", "search", "fetch", "face", "remind", "remember", "forget", "clipboard", "screen", "plugin", "lumidoc", "watch", "note", "media", "findfile", "cliphistory"}
+var toolTags = []string{"run", "search", "fetch", "face", "remind", "remember", "forget", "clipboard", "screen", "plugin", "lumidoc", "watch", "note", "media", "findfile", "cliphistory", "recall"}
 
 // 中身が空でも意味のあるタグ
 var emptyOK = map[string]bool{"clipboard": true, "screen": true, "plugin": true, "cliphistory": true}

@@ -459,6 +459,8 @@ func (l *Lumi) submit(text string) {
 		l.mediaCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/find":
 		l.findCommand(parts[1:])
+	case "/recall":
+		l.recallCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/clips":
 		l.clipsCommand(parts[1:])
 	case "/watch":
@@ -484,7 +486,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", "cmd.settings.args"}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", "cmd.install-local.args"}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/watch", "cmd.watch.args"}, {"/notes", "cmd.notes.args"}, {"/media", "cmd.media.args"}, {"/find", "cmd.find.args"}, {"/clips", "cmd.clips.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/watch", "cmd.watch.args"}, {"/notes", "cmd.notes.args"}, {"/media", "cmd.media.args"}, {"/find", "cmd.find.args"}, {"/clips", "cmd.clips.args"}, {"/recall", "cmd.recall.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", "cmd.peek.args"}, {"/cls", ""}, {"/exit", ""},
 }
@@ -521,7 +523,7 @@ var settingKeys = []settingKey{
 	{"hotkey", ""},
 	{"clipboard", "ask,on,off"},
 	{"screen", "ask,on,off"},
-	{"keep_history", "on,off"},
+	{"keep_history", "on,off"}, {"long_memory", "on,off"},
 	{"update_check", "on,off"},
 	{"weather_location", ""},
 	{"peek_position", "bottom-right,bottom-left,bottom-center,top-right,top-left,top-center,custom"},
@@ -782,18 +784,24 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 	if len(attached) > 0 {
 		l.taint() // 付けたファイルの中身も、外から来た文章
 	}
-	keep := l.s.On("keep_history", "on")
+	keep, archive := l.s.On("keep_history", "on"), l.longMemory()
+	saved := userText
+	for _, a := range attached {
+		saved += "  [" + a.Name + "]"
+	}
 	if keep {
-		saved := userText
-		for _, a := range attached {
-			saved += "  [" + a.Name + "]"
-		}
 		appendHistory("user", saved)
+	}
+	if archive {
+		appendArchive("user", saved) // 長期の記憶 (/cls でも消えない)
 	}
 	l.replyText.Reset()
 	defer func() {
 		if keep {
 			appendHistory("assistant", l.replyText.String())
+		}
+		if archive {
+			appendArchive("assistant", l.replyText.String())
 		}
 	}()
 	// 今の日時は発言の先頭に付ける (指示文に入れると毎分変わり、ローカルAIが前の会話を読み直すことになる)
@@ -866,6 +874,9 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 				continue
 			case "cliphistory":
 				report.WriteString(l.clipHistoryTool())
+				continue
+			case "recall":
+				report.WriteString(l.recallTool(r))
 				continue
 			}
 			if r.Kind == "watch" {

@@ -48,6 +48,7 @@ func settingsTemplate(provider string) string {
   "phone": "off",
   "discord": "off",
   "keep_history": "on",
+  "long_memory": "on",
   "search_url": "",
   "voice_input": "on",
   "wake_word": "",
@@ -240,6 +241,9 @@ func (s *Settings) SystemPrompt() string {
 	p += "\n\n" + T("prompt.face")
 	p += "\n\n" + T("prompt.remind")
 	p += "\n\n" + T("prompt.watch")
+	if s.On("long_memory", "on") {
+		p += "\n\n" + T("prompt.recall")
+	}
 	p += "\n\n" + T("prompt.memory") + "\n" + memories.prompt()
 	return p
 }

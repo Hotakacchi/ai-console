@@ -84,3 +84,28 @@ func TestMediaAndClips(t *testing.T) {
 	}
 	clips.list = nil
 }
+
+func TestRecall(t *testing.T) {
+	loadLocales()
+	setLanguage("ja")
+	tempDataDir(t)
+	day := func(d int) time.Time { return time.Date(2026, 9, d, 12, 0, 0, 0, time.Local) }
+	add := func(d int, role, text string) {
+		nowFunc = func() time.Time { return day(d) }
+		appendArchive(role, text)
+	}
+	defer func() { nowFunc = time.Now }()
+	add(1, "user", "駅前のラーメン屋の名前覚えておいて")
+	add(1, "assistant", "「麺屋ほたる」ですね、覚えました。")
+	add(3, "user", "明日の天気は？")
+	add(3, "assistant", "晴れの予報です。")
+	add(5, "user", "Python の仮想環境の作り方")
+	add(5, "assistant", "python -m venv .venv で作れます。")
+	got := strings.Join(recall("前に話したラーメン屋の名前なんだっけ", 2000), "\n")
+	if !strings.Contains(got, "麺屋ほたる") || !strings.HasPrefix(got, "2026-09-01") || strings.Contains(got, "venv") {
+		t.Errorf("ramen:\n%s", got)
+	}
+	if got := strings.Join(recall("仮想環境", 2000), "\n"); !strings.Contains(got, ".venv") {
+		t.Errorf("venv:\n%s", got)
+	}
+}

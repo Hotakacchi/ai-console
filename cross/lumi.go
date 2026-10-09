@@ -38,6 +38,8 @@ type Lumi struct {
 	app   *application.App
 	win   *application.WebviewWindow
 	peek  *Peek
+	// 設定画面 (/settings window)。開いている間だけある
+	settingsWin *application.WebviewWindow
 	mu    sync.Mutex
 	s     *Settings
 	ai    Provider
@@ -378,7 +380,11 @@ func (l *Lumi) submit(text string) {
 		openFile(l.s.Path)
 		l.info(T("config.opened"))
 	case "/settings":
-		l.showSettings()
+		if strings.EqualFold(arg(1), "window") || strings.EqualFold(arg(1), "open") {
+			l.openSettingsWindow()
+		} else {
+			l.showSettings()
+		}
 	case "/set":
 		// 値には空白を含められる (例: /set system_prompt あなたは…)
 		value := ""
@@ -475,7 +481,7 @@ type command struct{ name, args string }
 func (c command) help() string { return T("cmd." + strings.TrimPrefix(c.name, "/")) }
 
 var commands = []command{
-	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
+	{"/help", ""}, {"/settings", "cmd.settings.args"}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", "cmd.install-local.args"}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
 	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/watch", "cmd.watch.args"}, {"/notes", "cmd.notes.args"}, {"/media", "cmd.media.args"}, {"/find", "cmd.find.args"}, {"/clips", "cmd.clips.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
@@ -553,6 +559,53 @@ func (l *Lumi) showSettings() {
 	l.info(b.String())
 }
 
+// 設定の値を確かめて、保存する形にする (だめなら msg に理由)。/set と設定画面で使う
+func checkSetting(def *settingKey, value string) (stored any, shown string, msg string) {
+	if value == `""` {
+		value = ""
+	}
+	stored = value
+	rule := def.choices()
+	if strings.HasPrefix(rule, "#") {
+		r := strings.Split(rule, ":")
+		lo, _ := strconv.ParseFloat(r[1], 64)
+		hi, _ := strconv.ParseFloat(r[2], 64)
+		n, err := strconv.ParseFloat(value, 64)
+		if err != nil || n < lo || n > hi || (r[0] == "#int" && n != math.Floor(n)) {
+			kind := T("set.num")
+			if r[0] == "#int" {
+				kind = T("set.int")
+			}
+			return nil, value, T("set.range", def.key, r[1], r[2], kind)
+		}
+		if r[0] == "#int" {
+			stored = int(n)
+		} else {
+			stored = n
+		}
+	} else if rule != "" {
+		value = strings.ToLower(value)
+		ok := false
+		for _, v := range strings.Split(rule, ",") {
+			ok = ok || v == value
+		}
+		if !ok {
+			return nil, value, T("set.allowed", def.key, strings.ReplaceAll(strings.Trim(rule, ","), ",", " / "))
+		}
+		stored = value
+	}
+	return stored, value, ""
+}
+
+func findSettingKey(key string) *settingKey {
+	for i := range settingKeys {
+		if settingKeys[i].key == strings.ToLower(strings.TrimSpace(key)) {
+			return &settingKeys[i]
+		}
+	}
+	return nil
+}
+
 func (l *Lumi) setCommand(key, value string, hasValue bool) {
 	if key == "" {
 		l.showSettings()
@@ -584,40 +637,10 @@ func (l *Lumi) setCommand(key, value string, hasValue bool) {
 		l.errorText(T("settings.broken"))
 		return
 	}
-	if value == `""` {
-		value = ""
-	}
-	var stored any = value
-	rule := def.choices()
-	if strings.HasPrefix(rule, "#") {
-		r := strings.Split(rule, ":")
-		lo, _ := strconv.ParseFloat(r[1], 64)
-		hi, _ := strconv.ParseFloat(r[2], 64)
-		n, err := strconv.ParseFloat(value, 64)
-		if err != nil || n < lo || n > hi || (r[0] == "#int" && n != math.Floor(n)) {
-			kind := T("set.num")
-			if r[0] == "#int" {
-				kind = T("set.int")
-			}
-			l.errorText(T("set.range", def.key, r[1], r[2], kind))
-			return
-		}
-		if r[0] == "#int" {
-			stored = int(n)
-		} else {
-			stored = n
-		}
-	} else if rule != "" {
-		value = strings.ToLower(value)
-		ok := false
-		for _, v := range strings.Split(rule, ",") {
-			ok = ok || v == value
-		}
-		if !ok {
-			l.errorText(T("set.allowed", def.key, strings.ReplaceAll(strings.Trim(rule, ","), ",", " / ")))
-			return
-		}
-		stored = value
+	stored, value, msg := checkSetting(def, value)
+	if msg != "" {
+		l.errorText(msg)
+		return
 	}
 	if err := l.s.Set(def.key, stored); err != nil {
 		l.errorText(T("set.saveFailed", err.Error()))

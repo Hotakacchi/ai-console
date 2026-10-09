@@ -109,6 +109,7 @@ func main() {
 		tray.SetTooltip(T("app.title"))
 		menu := application.NewMenu()
 		menu.Add(T("tray.show")).OnClick(func(*application.Context) { lumi.show() })
+		menu.Add(T("tray.settings")).OnClick(func(*application.Context) { lumi.openSettingsWindow() })
 		menu.Add(T("tray.mic")).OnClick(func(*application.Context) {
 			// 返事やダウンロードの最中は、画面からの入力と同じく受け付けない
 			if !lumi.isBusy() {
@@ -138,6 +139,12 @@ func main() {
 	app.Event.On("interrupt", func(*application.CustomEvent) { lumi.interrupt() })
 	// 話しかけた内容の音を whisper.cpp で書き起こす (Windows・Linux)
 	app.Event.On("whisperNative", func(e *application.CustomEvent) { go lumi.nativeWhisper(e.Data) })
+	// 設定画面 (/settings window)
+	app.Event.On("settingsGet", func(*application.CustomEvent) { lumi.sendSettingsData() })
+	app.Event.On("settingsSet", func(e *application.CustomEvent) {
+		m, _ := e.Data.(map[string]any)
+		lumi.saveSettingFromWindow(asString(m["key"]), asString(m["value"]))
+	})
 	app.Event.On("spoken", func(e *application.CustomEvent) {
 		if f, ok := e.Data.(float64); ok {
 			select {

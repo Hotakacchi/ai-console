@@ -53,7 +53,9 @@ function palette(color, dim) {
 // 管理者権限で動いている間の色 (ふだんの色がオレンジならかぶらないよう赤)
 function adminColor(base) { return base === COLORS.amber ? COLORS.red : COLORS.amber; }
 
-if (location.hash === "#peek") peekMain(); else termMain();
+if (location.hash === "#peek") peekMain();
+else if (location.hash === "#settings") import("./settings.js").then(m => m.settingsMain(emit, on));   // 設定画面 (/settings window)
+else termMain();
 
 // ================= メインの窓 =================
 

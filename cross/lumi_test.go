@@ -252,3 +252,43 @@ func TestVoiceSettingChange(t *testing.T) {
 		t.Error("stt change was not noticed")
 	}
 }
+
+// 設定画面から変えた値も /set と同じように確かめて保存する
+func TestSettingsWindowSave(t *testing.T) {
+	loadLocales()
+	setLanguage("ja")
+	tempDataDir(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "settings.json")
+	os.WriteFile(path, []byte(`{"provider": "offline"}`), 0o644)
+	s := &Settings{Path: path, vals: map[string]any{}}
+	s.parse([]byte(`{"provider": "offline"}`))
+	if def := findSettingKey("idle_unload"); def == nil {
+		t.Fatal("no idle_unload")
+	} else if _, _, msg := checkSetting(def, "abc"); msg == "" {
+		t.Error("non-number accepted")
+	} else if v, _, msg := checkSetting(def, "3"); msg != "" || v != 3 {
+		t.Errorf("3 → %v %q", v, msg)
+	}
+	if _, _, msg := checkSetting(findSettingKey("wake_mode"), "HEY"); msg != "" {
+		t.Errorf("choices are case-insensitive: %q", msg)
+	}
+	if _, _, msg := checkSetting(findSettingKey("wake_mode"), "loud"); msg == "" {
+		t.Error("bad choice accepted")
+	}
+	// どのまとまりにも、存在しない項目が入っていない / 全部の項目がどこかにある
+	inGroup := map[string]bool{}
+	for _, g := range settingGroups {
+		for _, k := range g.keys {
+			if findSettingKey(k) == nil {
+				t.Errorf("group %s has unknown key %s", g.id, k)
+			}
+			inGroup[k] = true
+		}
+	}
+	for _, k := range settingKeys {
+		if !inGroup[k.key] {
+			t.Errorf("%s is not in any group of the settings window", k.key)
+		}
+	}
+}

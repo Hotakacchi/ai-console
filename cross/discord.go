@@ -201,9 +201,11 @@ func (d *discordRPC) dropLocked() {
 	}
 }
 
+// 終わるときに。on も落として、終わりきるまでの間に runDiscord がつなぎ直さないようにする
 func (d *discordRPC) stop() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	d.on = false
 	if d.conn != nil {
 		d.clearLocked()
 		d.dropLocked()

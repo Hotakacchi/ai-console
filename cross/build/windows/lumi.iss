@@ -39,8 +39,8 @@ UninstallDisplayName=Lumi
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-; 起動中のルミは閉じてから更新する
-CloseApplications=yes
+; 起動中のルミは閉じてから更新する (閉じられないときは止める。止めないと古い exe が残ったままになる)
+CloseApplications=force
 RestartApplications=no
 
 [Languages]

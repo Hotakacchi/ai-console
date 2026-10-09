@@ -231,8 +231,8 @@ func applyUpdate(kind installKind, exe, file string) error {
 			mode = "/ALLUSERS" // すべてのユーザー用に入っていれば、同じ形で (OS の確認が出る)
 		}
 		// /RELAUNCH: 入れ終わったらルミを起動し直す (インストーラーの [Run] で)。
-		// ルミが動いたままでも、インストーラーが閉じるのを待ってから入れ替える
-		return startDetached(file, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", mode, "/RELAUNCH")
+		// ルミが終わるのを待ってからインストーラーを動かす (動いたままだと exe を入れ替えられず、古い版のまま残る)
+		return startAfterExit(file, "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", mode, "/RELAUNCH")
 	case kindWinPortable:
 		// 動いている exe は消せないが名前は変えられるので、古いほうを .old にして新しいものを置く
 		old := exe + ".old"
@@ -348,6 +348,23 @@ func lastLine(s string) string {
 }
 
 // ルミが終わっても動き続けるように起動する
+// ルミが終わってから (30 秒待っても終わらなければ止めてから) プログラムを起動する。
+// PowerShell の Start-Process で起動するので、管理者の確認が要るインストーラーも動く
+func startAfterExit(name string, args ...string) error {
+	return startDetached("powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", afterExitScript(os.Getpid(), name, args))
+}
+
+func afterExitScript(pid int, name string, args []string) string {
+	q := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+	quoted := make([]string, len(args))
+	for i, a := range args {
+		quoted[i] = q(a)
+	}
+	return fmt.Sprintf("Wait-Process -Id %d -Timeout 30 -ErrorAction SilentlyContinue; "+
+		"Stop-Process -Id %d -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500; "+
+		"Start-Process -FilePath %s -ArgumentList %s", pid, pid, q(name), strings.Join(quoted, ","))
+}
+
 func startDetached(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	detach(cmd)

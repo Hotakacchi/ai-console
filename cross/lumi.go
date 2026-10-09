@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math"
+	"os"
 	"os/exec"
 	"runtime"
 	"sort"
@@ -1364,6 +1365,11 @@ func (l *Lumi) quit() {
 		l.cli.exit()
 		return
 	}
+	// 窓の後始末が止まってもプロセスが残らないように (残ると更新で exe を入れ替えられない)
+	go func() {
+		time.Sleep(5 * time.Second)
+		os.Exit(0)
+	}()
 	l.app.Quit()
 }
 

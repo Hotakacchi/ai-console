@@ -4,8 +4,8 @@ package main
 
 import (
 	"embed"
-	"encoding/json"
 	_ "embed"
+	"encoding/json"
 	"log"
 	"os"
 	"runtime"
@@ -58,6 +58,7 @@ func main() {
 	})
 	lumi = newLumi(app, slices.Contains(args, "--mute"), slices.Contains(args, "--no-mic"))
 	lumi.installLocalOnStart = slices.Contains(args, "--install-local")
+	lumi.installWhisperOnStart = slices.Contains(args, "--install-whisper")
 	if i := slices.Index(args, "--script"); i >= 0 && i+1 < len(args) {
 		lumi.scriptPath = args[i+1]
 	}

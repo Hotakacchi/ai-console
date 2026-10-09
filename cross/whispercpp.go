@@ -71,6 +71,14 @@ func whisperCppInstalled(base, model string) bool {
 	return whisperCppExe(base) != "" && err == nil && st.Size() == whisperCppModels[model].Size
 }
 
+// 書き起こしに使える Whisper が入っているか (Windows・Linux は whisper.cpp、Mac は画面の中のもの)
+func whisperReady(base, model string) bool {
+	if whisperCppSupported() {
+		return whisperCppInstalled(base, model)
+	}
+	return whisperInstalled(base, model)
+}
+
 func whisperCppSize(base, model string) int64 {
 	n := whisperCppModels[model].Size
 	if whisperCppExe(base) == "" {

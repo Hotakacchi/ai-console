@@ -50,6 +50,8 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 [CustomMessages]
 ja.LocalAI=ローカルAIもダウンロードする (この PC の性能に合ったものを選びます。約0.6〜6GB、インターネットなしで会話できる)
 en.LocalAI=Also download the local AI (picks one that suits this PC; about 0.6-6 GB; chat without the internet)
+ja.Whisper=高精度な音声認識 (Whisper、約70MB) もダウンロードする (話しかけた内容を正確に書き起こす)
+en.Whisper=Also download accurate speech recognition (Whisper, about 70 MB; transcribes what you say more accurately)
 ja.Launch=ルミを起動する
 en.Launch=Launch Lumi
 ja.DeleteData=設定とダウンロードしたAI・音声認識モデルも削除しますか？
@@ -57,6 +59,7 @@ en.DeleteData=Also delete the settings and the downloaded AI and speech models?
 
 [Tasks]
 Name: "localai"; Description: "{cm:LocalAI}"
+Name: "whisper"; Description: "{cm:Whisper}"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
@@ -87,13 +90,24 @@ Name: "{autodesktop}\Lumi"; Filename: "{app}\lumi.exe"; Tasks: desktopicon; Chec
 ; 自動アップデート (/update) から /RELAUNCH 付きで動かされたときは、入れ終わったらルミを起動し直す
 ; (すべてのユーザー用に管理者として入れたときも、ルミは普段のユーザーとして起動する)
 Filename: "{app}\lumi.exe"; Flags: nowait runasoriginaluser; Check: RelaunchRequested
-Filename: "{app}\lumi.exe"; Parameters: "--install-local"; Description: "{cm:Launch}"; Flags: postinstall nowait skipifsilent; Tasks: localai
-Filename: "{app}\lumi.exe"; Description: "{cm:Launch}"; Flags: postinstall nowait skipifsilent; Tasks: not localai
+; 選んだもの (ローカルAI・高精度な音声認識) を、初回の起動でダウンロードする
+Filename: "{app}\lumi.exe"; Parameters: "{code:FirstRunArgs}"; Description: "{cm:Launch}"; Flags: postinstall nowait skipifsilent
 
 [Code]
 function RelaunchRequested: Boolean;
 begin
   Result := Pos('/RELAUNCH', UpperCase(GetCmdTail)) > 0;
+end;
+
+// 初回の起動に渡す引数 (インストーラーで選んだものをダウンロードさせる)
+function FirstRunArgs(Param: String): String;
+begin
+  Result := '';
+  if WizardIsTaskSelected('localai') then
+    Result := Result + ' --install-local';
+  if WizardIsTaskSelected('whisper') then
+    Result := Result + ' --install-whisper';
+  Result := Trim(Result);
 end;
 
 function DesktopIconMissing: Boolean;

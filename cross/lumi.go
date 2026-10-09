@@ -45,10 +45,11 @@ type Lumi struct {
 	ai          Provider
 	muted       bool
 
-	installLocalOnStart bool   // --install-local: 起動したらローカルAIをダウンロードする
-	elevated            bool   // ルミ自体が管理者 (root) として動いている
-	scriptPath          string // --script: テスト用に入力を流し込むファイル
-	dumpPath            string // --script の "#tab dump <ファイル>" で画面の様子を書く先
+	installLocalOnStart   bool   // --install-local: 起動したらローカルAIをダウンロードする
+	installWhisperOnStart bool   // --install-whisper: 起動したら Whisper (高精度な音声認識) をダウンロードする
+	elevated              bool   // ルミ自体が管理者 (root) として動いている
+	scriptPath            string // --script: テスト用に入力を流し込むファイル
+	dumpPath              string // --script の "#tab dump <ファイル>" で画面の様子を書く先
 
 	micOn     bool // 音声入力をこのセッションで使うか (--no-mic や /mic で切り替え)
 	listening bool // 画面側で聞き取りが動いているか
@@ -274,10 +275,25 @@ func (l *Lumi) ready() {
 		}
 	})
 	l.emit("flash", map[string]any{"expr": "happy", "seconds": 2.5})
-	// インストーラーで「ローカルAIも入れる」を選んだときは、初回にダウンロードする
-	if l.installLocalOnStart && !localInstalled(dataDir(), l.s.Get("model", "")) {
+	// インストーラーで「ローカルAIも入れる」「高精度な音声認識も入れる」を選んだときは、初回にダウンロードする
+	// (小さい Whisper を先に入れて、終わってからローカルAIを入れる)
+	needWhisper := l.installWhisperOnStart && !whisperReady(dataDir(), whisperModel(l.s))
+	needLocal := l.installLocalOnStart && !localInstalled(dataDir(), l.s.Get("model", ""))
+	switch {
+	case needWhisper:
+		l.installWhisperCmd()
+		if needLocal {
+			go func() {
+				time.Sleep(time.Second)
+				for l.isBusy() {
+					time.Sleep(time.Second)
+				}
+				l.installLocalCommand("")
+			}()
+		}
+	case needLocal:
 		l.installLocalCommand("")
-	} else {
+	default:
 		l.warmupLocal()
 	}
 	l.applyVoice(true)

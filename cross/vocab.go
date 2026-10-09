@@ -40,6 +40,20 @@ func (l *Lumi) voiceVocab() string {
 			add(task)
 		}
 	}
+	// ルーティン・自動化の名前、自作コマンドの名前、見張っているアプリの名前 (言い間違えられやすい固有の言葉)
+	for _, r := range loadRoutines() {
+		add(r.Name)
+	}
+	for _, p := range listPlugins() {
+		add(p.Name)
+	}
+	procWatch.Lock()
+	for _, w := range procWatch.items {
+		if w.PID == 0 {
+			add(w.label)
+		}
+	}
+	procWatch.Unlock()
 	for _, m := range memories.list() {
 		add(m.Text)
 	}

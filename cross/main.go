@@ -92,6 +92,7 @@ func main() {
 		if lumi.s.On("background", "on") {
 			e.Cancel()
 			win.Hide()
+			setDockVisible(false) // Mac: Dock からも消えて、メニューバーだけに
 			if !toldAboutTray {
 				toldAboutTray = true
 				log.Println("Lumi keeps running in the tray")
@@ -210,6 +211,9 @@ func main() {
 
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		lumi.applyStartup()
+		if !win.IsVisible() {
+			setDockVisible(false) // 隠れたまま起動した (ログイン時の自動起動など)
+		}
 	})
 
 	if err := app.Run(); err != nil {
@@ -231,6 +235,7 @@ func (l *Lumi) show() {
 	if !l.gui() {
 		return
 	}
+	setDockVisible(true) // Mac: Dock に戻す
 	l.win.Show()
 	l.win.Restore()
 	l.win.Focus()

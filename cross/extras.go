@@ -70,6 +70,7 @@ func (l *Lumi) applyHotkey() {
 func (l *Lumi) toggleWindow() {
 	if l.win.IsVisible() && l.win.IsFocused() {
 		l.win.Hide()
+		setDockVisible(false)
 	} else {
 		l.show()
 	}

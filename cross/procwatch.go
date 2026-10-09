@@ -69,6 +69,7 @@ func saveWatches() {
 		}
 	}
 	b, _ := json.MarshalIndent(names, "", "  ")
+	os.MkdirAll(filepath.Dir(watchFile()), 0o755)
 	os.WriteFile(watchFile(), b, 0o644)
 }
 

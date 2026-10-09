@@ -262,6 +262,7 @@ func (l *Lumi) ready() {
 		go l.watchPower()
 		go l.watchPC()
 		go l.runProcWatch()
+		go l.watchClipboard()
 		go l.unloadIdle()
 		if l.scriptPath != "" {
 			l.runScript(l.scriptPath)
@@ -446,6 +447,14 @@ func (l *Lumi) submit(text string) {
 		b.WriteString("  " + T("help.voiceCmd") + "\n")
 		b.WriteString("  " + T("help.keys"))
 		l.info(b.String())
+	case "/notes", "/note":
+		l.notesCommand(parts[1:])
+	case "/media":
+		l.mediaCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
+	case "/find":
+		l.findCommand(parts[1:])
+	case "/clips":
+		l.clipsCommand(parts[1:])
 	case "/watch":
 		l.watchCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/plugins", "/plugin":
@@ -469,7 +478,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", ""}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", "cmd.install-local.args"}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/watch", "cmd.watch.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/watch", "cmd.watch.args"}, {"/notes", "cmd.notes.args"}, {"/media", "cmd.media.args"}, {"/find", "cmd.find.args"}, {"/clips", "cmd.clips.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", "cmd.peek.args"}, {"/cls", ""}, {"/exit", ""},
 }
@@ -825,6 +834,17 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 				report.WriteString(l.lumiDocTool(r.Command))
 				continue
 			}
+			switch r.Kind {
+			case "media":
+				report.WriteString(l.mediaTool(r))
+				continue
+			case "findfile":
+				report.WriteString(l.findFileTool(r))
+				continue
+			case "cliphistory":
+				report.WriteString(l.clipHistoryTool())
+				continue
+			}
 			if r.Kind == "watch" {
 				report.WriteString(l.watchTool(r))
 				continue
@@ -987,6 +1007,8 @@ func (l *Lumi) replyOnce(turn Turn) []toolRequest {
 				sentences <- faceMarker + r.Command
 			case "remember", "forget":
 				l.memoryTag(r)
+			case "note":
+				l.noteTag(r)
 			case "remind":
 				l.remindTag(r)
 			default:

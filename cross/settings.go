@@ -228,7 +228,11 @@ func (s *Settings) SystemPrompt() string {
 	}
 	if s.Get("clipboard", "ask") != "off" {
 		p += "\n\n" + T("prompt.clipboard")
+		p += "\n" + T("prompt.cliphistory")
 	}
+	p += "\n\n" + T("prompt.media")
+	p += "\n\n" + T("prompt.findfile")
+	p += "\n\n" + notesPrompt()
 	if s.Get("screen", "ask") != "off" {
 		p += "\n\n" + T("prompt.screen")
 	}

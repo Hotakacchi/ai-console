@@ -369,3 +369,10 @@ func repeatsEarlier(earlier []string, text string) bool {
 	}
 	return false
 }
+
+// 文の最後がユーザーへの質問か (「〜しましょうか？」「Shall I …?」など)
+func asksUser(text string) bool {
+	t := strings.TrimSpace(htmlTagRe.ReplaceAllString(text, " "))
+	t = strings.TrimRight(t, " \t\n。.!！~〜…♪😊🙂")
+	return strings.HasSuffix(t, "？") || strings.HasSuffix(t, "?")
+}

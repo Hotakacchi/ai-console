@@ -705,7 +705,8 @@ var markRe = regexp.MustCompile("[*#`_>|\\[\\]]")
 
 // 読み上げに向かない URL や記号を取る
 // AI がたまに書く HTML のかけら (<br> など)。Markdown の記号を消す前に取る (先に > を消すと「<br」が残る)
-var htmlTagRe = regexp.MustCompile(`(?i)</?\s*(br|p|div|span|b|i|u|strong|em|li|ul|ol)\b[^<>]*/?>?`)
+// (属性は「英字の名前="値"」だけ。前は > のない「<br次は…」で、後ろの文まで消していた)
+var htmlTagRe = regexp.MustCompile(`(?i)</?\s*(br|p|div|span|b|i|u|strong|em|li|ul|ol)\b(?:\s+[a-z\-:]+(?:\s*=\s*"[^"<>]*")?)*\s*/?>?`)
 
 func cleanForSpeech(s string) string {
 	s = htmlTagRe.ReplaceAllString(s, " ")

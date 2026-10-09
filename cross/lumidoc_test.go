@@ -110,3 +110,27 @@ func TestCleanHTMLAndVersions(t *testing.T) {
 		t.Errorf("versions: %q", got)
 	}
 }
+
+func TestAsksUser(t *testing.T) {
+	for text, want := range map[string]bool{
+		"音楽操作の結果も自然な日本語に変えられました。<br<br次は、ユーザーフォルダの中身も見てみましょうか？": true,
+		"Shall I check the Downloads folder too?": true,
+		"調べてみますね。":                                false,
+		"Cドライブの空き容量を調べます":                         false,
+		"どれを開きますか？ 😊":                             true,
+	} {
+		if got := asksUser(text); got != want {
+			t.Errorf("asksUser(%q) = %v", text, got)
+		}
+	}
+}
+
+func TestCleanKeepsTextAfterBrokenTag(t *testing.T) {
+	in := "変えられました。<br<br次は、ユーザーフォルダの中身も見てみましょうか？"
+	if got := cleanForSpeech(in); got != "変えられました。  次は、ユーザーフォルダの中身も見てみましょうか？" {
+		t.Errorf("cleanForSpeech = %q", got)
+	}
+	if got := cleanForSpeech(`a<br class="x"/>b<p style="c">d`); got != "a b d" {
+		t.Errorf("attributes: %q", got)
+	}
+}

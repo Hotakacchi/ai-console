@@ -862,6 +862,11 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 			if repeatsEarlier(said, text) {
 				break
 			}
+			// 「次は○○も見てみましょうか？」のように、ユーザーに聞いておきながら道具も書いてきたら、
+			// 実行せずに答えを待つ (自動モードで頼んでいないことを次々に実行してしまわないように)
+			if len(requests) > 0 && asksUser(text) {
+				break
+			}
 			said = append(said, text)
 			fresh := requests[:0]
 			for _, r := range requests {

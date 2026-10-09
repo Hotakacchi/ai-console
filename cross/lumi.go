@@ -833,6 +833,7 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 	message := userText
 	if _, offline := l.ai.(offlineProvider); !offline {
 		message = "[" + time.Now().Format("2006-01-02 15:04 (Mon)") + "] " + userText
+		message += l.docContext(userText) // ルミの機能・使い方の質問なら、説明書の関係するところを添える
 	}
 	turn := withAttachments(message, attached)
 	if screenFirst {

@@ -60,3 +60,36 @@ func TestRepeatsEarlier(t *testing.T) {
 		t.Error("short or first answers are never repeats")
 	}
 }
+
+func TestAskingAboutLumi(t *testing.T) {
+	for q, want := range map[string]bool{
+		"ルミの新機能を教えて": true, "ルミってどんなことができるの？": true, "ルミの設定の変え方": true,
+		"What can Lumi do? features": true, "今日の天気は？": false, "ルミ、こんにちは": false, "PC の設定を開いて": false,
+	} {
+		if got := askingAboutLumi(q); got != want {
+			t.Errorf("askingAboutLumi(%q) = %v", q, got)
+		}
+	}
+}
+
+func TestNotesForLang(t *testing.T) {
+	b, err := os.ReadFile("../release-notes/v1.6.0.md")
+	if err != nil {
+		t.Skip("no release notes")
+	}
+	loadLocales()
+	setLanguage("ja")
+	ja := notesForLang(string(b))
+	setLanguage("en")
+	en := notesForLang(string(b))
+	setLanguage("ja")
+	if !strings.Contains(ja, "設定画面") || strings.Contains(ja, "Settings window") || strings.Contains(ja, "インストール / Install") {
+		t.Errorf("ja part:\n%s", ja)
+	}
+	if !strings.Contains(en, "Settings window") || strings.Contains(en, "設定画面") || strings.Contains(en, "Lumi-Windows-Setup") {
+		t.Errorf("en part:\n%s", en)
+	}
+	if !asksWhatsNew("ルミの新機能を教えて") || asksWhatsNew("ルミの使い方") {
+		t.Error("asksWhatsNew")
+	}
+}

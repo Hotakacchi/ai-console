@@ -167,6 +167,106 @@ func pickDoc(items []string, query string, limit int) []string {
 	return out
 }
 
+// ルミの機能や使い方についての質問か (「ルミ」と「機能・使い方・できること」などが両方ある)
+func askingAboutLumi(q string) bool {
+	if !aboutLumi(q) {
+		return false
+	}
+	low := strings.ToLower(q)
+	for _, w := range []string{"機能", "使い方", "できる", "新し", "コマンド", "設定", "やり方", "方法", "どうやって", "feature", "how", "can you", "command", "setting", "new"} {
+		if strings.Contains(low, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// 小さいモデルは道具を使わずに答えがちなので、ルミについての質問には、先に説明書の関係するところを添える
+func (l *Lumi) docContext(question string) string {
+	if !askingAboutLumi(question) {
+		return ""
+	}
+	limit := 4000
+	if l.usingLocal() {
+		limit = 2000
+	}
+	// 「新機能」「最新」などは、最新のリリースノート (何が増えたかの一覧) のほうが合っている
+	if asksWhatsNew(question) {
+		if notes, tag, err := latestReleaseNotes(); err == nil && notes != "" {
+			if r := []rune(notes); len(r) > limit {
+				notes = string(r[:limit]) + "…"
+			}
+			l.write(T("doc.readingNotes", tag)+"\n", "cyan")
+			return "\n\n" + T("doc.notesSource", tag) + "\n" + notes + "\n" + T("doc.answerHint")
+		}
+	}
+	md, err := lumiReadme()
+	if err != nil {
+		return ""
+	}
+	picked := pickDoc(docItems(md), question, limit)
+	if len(picked) == 0 {
+		return ""
+	}
+	l.write(T("doc.reading")+"\n", "cyan")
+	return "\n\n" + T("doc.source", lumiRepoURL) + "\n" + strings.Join(picked, "\n") + "\n" + T("doc.answerHint")
+}
+
+func asksWhatsNew(q string) bool {
+	low := strings.ToLower(q)
+	for _, w := range []string{"新機能", "新しい", "最新", "アップデート", "変わった", "増えた", "what's new", "whats new", "new feature", "latest", "update"} {
+		if strings.Contains(low, w) {
+			return true
+		}
+	}
+	return false
+}
+
+var releaseNotesCache struct {
+	sync.Mutex
+	text, tag string
+	at        time.Time
+}
+
+// 最新のリリースノートの、今の言語の部分 (1 時間は覚えておく)
+func latestReleaseNotes() (string, string, error) {
+	c := &releaseNotesCache
+	c.Lock()
+	defer c.Unlock()
+	if c.text == "" || time.Since(c.at) > time.Hour {
+		r, err := fetchLatestRelease()
+		if err != nil {
+			return "", "", err
+		}
+		c.text, c.tag, c.at = r.Body, r.Tag, time.Now()
+	}
+	return notesForLang(c.text), c.tag, nil
+}
+
+// リリースノートは日本語のあとに英語 (## New など) が続き、最後にインストールの表がある。今の言語の部分だけ
+func notesForLang(body string) string {
+	lines := strings.Split(strings.ReplaceAll(body, "\r", ""), "\n")
+	english := -1
+	end := len(lines)
+	for i, line := range lines {
+		if strings.HasPrefix(line, "## インストール") {
+			end = i
+			break
+		}
+		if english < 0 && strings.HasPrefix(line, "## ") && isASCII(line) {
+			english = i
+		}
+	}
+	if english < 0 {
+		english = end
+	}
+	part := lines[:english]
+	if currentLang() == "en" && english < end {
+		part = lines[english:end]
+	}
+	return strings.TrimSpace(strings.Join(part, "\n"))
+}
+
 // AI の <lumidoc> (と、ルミについての <search>): 説明書から関係するところを返す
 func (l *Lumi) lumiDocTool(query string) string {
 	l.write(T("doc.reading")+"\n", "cyan")

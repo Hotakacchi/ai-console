@@ -28,6 +28,7 @@ const latestReleaseAPI = "https://api.github.com/repos/Hotakacchi/ai-console/rel
 type releaseInfo struct {
 	Tag    string `json:"tag_name"`
 	URL    string `json:"html_url"`
+	Body   string `json:"body"` // リリースノート (ルミの新機能を聞かれたときに使う)
 	Assets []struct {
 		Name   string `json:"name"`
 		URL    string `json:"browser_download_url"`

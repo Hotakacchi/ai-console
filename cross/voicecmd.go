@@ -15,7 +15,7 @@ var voiceCommands = []string{
 	"help", "settings", "voices", "config", "reload", "mute", "mic",
 	"install-local", "install-voice", "install-voicevox", "install-whisper", "install-vision",
 	"detach", "screen", "commands", "words", "shell", "auto", "routines", "plugins",
-	"phone", "discord", "watch", "notes", "media", "find", "clips", "recall", "memory", "reminders", "history", "update", "peek", "cls", "exit",
+	"phone", "discord", "watch", "notes", "media", "find", "clips", "recall", "task", "memory", "reminders", "history", "update", "peek", "cls", "exit",
 }
 
 // 声で言われたときは確認してから実行するもの

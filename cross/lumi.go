@@ -35,15 +35,15 @@ func versionLabel() string {
 }
 
 type Lumi struct {
-	app   *application.App
-	win   *application.WebviewWindow
-	peek  *Peek
+	app  *application.App
+	win  *application.WebviewWindow
+	peek *Peek
 	// 設定画面 (/settings window)。開いている間だけある
 	settingsWin *application.WebviewWindow
-	mu    sync.Mutex
-	s     *Settings
-	ai    Provider
-	muted bool
+	mu          sync.Mutex
+	s           *Settings
+	ai          Provider
+	muted       bool
 
 	installLocalOnStart bool   // --install-local: 起動したらローカルAIをダウンロードする
 	elevated            bool   // ルミ自体が管理者 (root) として動いている
@@ -73,6 +73,7 @@ type Lumi struct {
 	tainted           bool            // この会話で、外から来た文章を AI に読ませた (automode.go)
 	voiceApplied      string          // 最後に聞き取りを始めた (止めた) ときの音声の設定 (voiceKey)
 	askCode           string          // 今の質問にスマホから「はい」と答えるための番号 (PC の画面にだけ出す)
+	task              *taskState      // /task の作業中
 	askTries          int             // その番号を間違えた回数
 	cli               *cliUI          // ターミナル版 (--cli) のときの画面。窓はない
 }
@@ -459,6 +460,8 @@ func (l *Lumi) submit(text string) {
 		l.mediaCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/find":
 		l.findCommand(parts[1:])
+	case "/task":
+		l.taskCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/recall":
 		l.recallCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/clips":
@@ -486,7 +489,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", "cmd.settings.args"}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", "cmd.install-local.args"}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", ""}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/watch", "cmd.watch.args"}, {"/notes", "cmd.notes.args"}, {"/media", "cmd.media.args"}, {"/find", "cmd.find.args"}, {"/clips", "cmd.clips.args"}, {"/recall", "cmd.recall.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/watch", "cmd.watch.args"}, {"/notes", "cmd.notes.args"}, {"/media", "cmd.media.args"}, {"/find", "cmd.find.args"}, {"/clips", "cmd.clips.args"}, {"/recall", "cmd.recall.args"}, {"/task", "cmd.task.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", "cmd.peek.args"}, {"/cls", ""}, {"/exit", ""},
 }
@@ -823,7 +826,7 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 		turn.Images = append(turn.Images, img)
 	}
 	declined := false // 一度断られたら、この返事の間はもうコマンドを聞かない
-	for round := 0; round < maxToolRounds && turn.Text != "" && !l.cancelled(); round++ {
+	for round := 0; round < l.maxRounds() && turn.Text != "" && !l.cancelled(); round++ {
 		requests := l.replyOnce(turn)
 		turn = Turn{}
 		if declined {
@@ -835,7 +838,15 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 			}
 			requests = kept
 		}
-		if len(requests) == 0 || l.cancelled() {
+		if l.cancelled() {
+			break
+		}
+		if len(requests) == 0 {
+			// 作業モード (/task) で手順が残っていれば、続きを促す
+			if nudge := l.taskNudge(); nudge != "" {
+				turn = Turn{Text: nudge}
+				continue
+			}
 			break
 		}
 		// 1 つずつ処理して (コマンドは必ず確認してから実行)、結果をまとめて AI に返す
@@ -1043,6 +1054,12 @@ func (l *Lumi) replyOnce(turn Turn) []toolRequest {
 				l.memoryTag(r)
 			case "note":
 				l.noteTag(r)
+			case "plan":
+				l.planTag(r)
+			case "step":
+				l.stepTag(r)
+			case "done":
+				l.doneTag(r)
 			case "remind":
 				l.remindTag(r)
 			default:

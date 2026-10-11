@@ -1,0 +1,76 @@
+# whisper.cpp の GPU (Vulkan) 版をビルドする。公式の配布物には Windows の Vulkan 版がないため。
+# 手で動かす (Actions → whisper-vulkan → Run workflow)。publish にチェックすると、このリポジトリの
+# リリース whisper-vulkan-<tag> に載せる (ルミはそこから、ハッシュを確かめてダウンロードする)
+name: whisper-vulkan
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: whisper.cpp のタグ
+        default: b5454
+      publish:
+        description: リリースに載せる
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  VULKAN_VERSION: 1.4.321.1
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ggml-org/whisper.cpp
+          ref: ${{ inputs.tag }}
+      - name: Vulkan SDK を入れる
+        shell: pwsh
+        run: |
+          curl.exe -fsSL -o vulkan.exe "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          ./vulkan.exe --accept-licenses --default-answer --confirm-command install | Out-Null
+          "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION" >> $env:GITHUB_ENV
+          "C:\VulkanSDK\$env:VULKAN_VERSION\Bin" >> $env:GITHUB_PATH
+      - name: ビルド
+        shell: pwsh
+        # CPU の部分は公式の配布物と同じく、CPU ごとに最適なものを実行時に選ぶ
+        run: |
+          cmake -B build -DGGML_VULKAN=ON -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DBUILD_SHARED_LIBS=ON -DWHISPER_BUILD_TESTS=OFF -DWHISPER_SDL2=OFF
+          cmake --build build --config Release -j 4 --target whisper-cli whisper-server ggml-vulkan
+      - name: まとめる
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory pkg | Out-Null
+          Copy-Item build\bin\Release\*.exe, build\bin\Release\*.dll pkg\
+          Copy-Item LICENSE pkg\LICENSE-whisper.cpp.txt
+          Compress-Archive pkg\* whisper-vulkan-bin-x64.zip
+          (Get-FileHash whisper-vulkan-bin-x64.zip -Algorithm SHA256).Hash.ToLower() + "  " + (Get-Item whisper-vulkan-bin-x64.zip).Length
+          Get-ChildItem pkg | Format-Table Name, Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-vulkan-windows
+          path: whisper-vulkan-bin-x64.zip
+
+  publish:
+    if: inputs.publish
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: whisper-vulkan-windows
+      - name: リリースに載せる
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="whisper-vulkan-${{ inputs.tag }}"
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --prerelease --title "whisper.cpp ${{ inputs.tag }} (Vulkan)" \
+              --notes "ルミが使う whisper.cpp (${{ inputs.tag }}) の GPU (Vulkan) 版。ggml-org/whisper.cpp をそのままビルドしたもの (MIT License)。"
+          gh release upload "$tag" whisper-vulkan-bin-x64.zip --repo "$GITHUB_REPOSITORY" --clobber

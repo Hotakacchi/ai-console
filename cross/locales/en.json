@@ -164,6 +164,7 @@
   "voice.wakeAliases": "lumi,leumi,loomi,loomy,lumie,lumy,lumee,lou me,loo me,lu me,hey lumi",
   "voice.yes": "run,yes,do it,okay,go ahead",
   "voice.no": "stop,no,cancel,don't",
+  "voice.stop": "stop,cancel,abort,halt,never mind,nevermind",
   "voice.listening": "(listening...)",
   "voice.installed": "Voice input is ready.",
   "voice.on": "Voice input is on. Say \"%s\" to call me.",

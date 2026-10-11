@@ -54,6 +54,7 @@ export class Voice {
     this.aliases = [...new Set(look)].sort((a, b) => b.length - a.length);
     this.yes = raw("voice.yes").map(s => this.norm(s));
     this.no = raw("voice.no").map(s => this.norm(s));
+    this.stopWords = raw("voice.stop").map(s => this.norm(s));
     // y / a / n をアルファベットの読みで答える (「ワイ」など。発言全体がその読みのときだけ)
     this.letters = { y: raw("voice.letterY"), a: raw("voice.letterA"), n: raw("voice.letterN") };
     for (const k in this.letters) this.letters[k] = this.letters[k].map(s => this.norm(s));
@@ -118,10 +119,21 @@ export class Voice {
   }
 
   // 返事やコマンドの最中かどうか (画面から)。最中に聞こえた声 (ルミ自身の読み上げも) は、
-  // 終わったあとに話しかけとして使わない。確認の質問 (実行しますか？) への答えは受け付ける
+  // 終わったあとに話しかけとして使わない。確認の質問 (実行しますか？) への答えは受け付ける。
+  // 最中でも「ねえルミ、止めて」のような止める頼みだけは聞く (h.stop)
   setBusy(on) {
     this.busy = on;
+    this.busyWakeAt = 0;
     if (!on) this.ignoreBefore = this.fedSec;
+  }
+
+  // 最中に聞こえた文が、止める頼みか: 呼びかけ + 止める言葉 (「ねえルミ、止めて」)、
+  // または呼びかけてすぐ (6 秒以内) の短い止める言葉 (「ねえルミ」…「キャンセル」)
+  isStopRequest(t) {
+    const has = s => this.stopWords.some(w => s.includes(w));
+    const found = this.findAlias(t);
+    if (found) return has(t.slice(found.i + found.a.length));
+    return this.busyWakeAt > 0 && performance.now() - this.busyWakeAt < 6000 && t.length <= 12 && has(t);
   }
 
   // 最中、または最中に聞こえた音だけからできた結果か
@@ -338,6 +350,15 @@ export class Voice {
   onWake(result) {
     if (this.mode === "off" || this.mode === "confirm") return;
     const words = (result.result || []).filter(w => w.word !== "[unk]");
+    if (this.busy) {
+      // 最中の呼びかけ: このあと少しの間、止める言葉だけを聞く
+      const prefixed = words.length >= 2 && this.prefixes.includes(this.norm(words[0].word));
+      if (words.length && this.findAlias(this.norm(this.join(words))) && (prefixed || !this.heyOnly)) {
+        this.busyWakeAt = performance.now();
+        if (this.h.debug) this.h.debug("(wake while busy) " + this.join(words));
+      }
+      return;
+    }
     if (!words.length || this.stale(words) || !this.findAlias(this.norm(this.join(words)))) return;
     // 「ねえ ルミ」のように前置きつきで聞こえたら、それだけで呼びかけとして受け付ける
     const prefixed = words.length >= 2 && this.prefixes.includes(this.norm(words[0].word));
@@ -390,6 +411,12 @@ export class Voice {
     const t = this.norm(result.text);
     const words = result.result || [];
     if (!t || this.mode === "off") return;
+    if (this.busy && this.mode !== "confirm" && this.isStopRequest(t)) {
+      if (this.h.debug) this.h.debug("(stop) " + t);
+      this.busyWakeAt = 0;
+      this.h.stop();
+      return;
+    }
     if (this.stale(words)) {   // 返事の最中に聞こえたもの: あとから話しかけとして使わない
       if (this.h.debug) this.h.debug("(ignored while busy) " + t);
       this.partialWake = false;

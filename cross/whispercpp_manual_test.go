@@ -44,7 +44,7 @@ func TestWhisperCpp(t *testing.T) {
 	}
 	for _, prompt := range []string{"", "会議 リマインダー ルミ"} {
 		start = time.Now()
-		text, err := transcribeCpp(base, model, pcm, "ja", prompt)
+		text, err := transcribeCpp(base, model, pcm, "ja", prompt, os.Getenv("WHISPER_GPU") == "1")
 		if err != nil {
 			t.Fatal(err)
 		}

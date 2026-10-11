@@ -3,7 +3,10 @@ package main
 // この PC に合ったローカルAIを選ぶ: メモリと GPU のメモリを調べて、重すぎないモデルをすすめる。
 // インストーラーの「ローカルAIもダウンロードする」と、名前なしの /install-local は、おすすめのものを入れる。
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const gb = 1 << 30
 
@@ -31,6 +34,12 @@ func (s pcSpec) gpuMemory() uint64 {
 		return s.RAM / 3 * 2
 	}
 	return s.VRAM
+}
+
+// 専用の GPU (グラフィックボード) があるか。内蔵 GPU (Intel / AMD の「… Graphics」) は数えない
+func (s pcSpec) dedicatedGPU() bool {
+	name := strings.ToLower(s.GPU)
+	return !s.Unified && s.VRAM >= 4*gb && (strings.Contains(name, "nvidia") || !strings.Contains(name, "graphics"))
 }
 
 // おすすめのモデル (分からないときは標準)

@@ -47,6 +47,10 @@ func (l *Lumi) applyVoice(announce bool) {
 			// whisper.cpp で (速い)。音は Go に送ってもらう
 			start["whisper"] = model
 			start["whisperNative"] = true
+			// グラフィックボードがあるのに、前に入れた base / small のままなら turbo をすすめる
+			if rec := recommendWhisper(thisPC()); announce && model != rec && rec == "whisper-turbo" && l.s.Get("whisper_model", "auto") == "auto" {
+				l.write(T("whisper.turboHint", float64(whisperCppSize(base, rec))/1e6)+"\n\n", "yellow")
+			}
 		case whisperInstalled(base, model):
 			start["whisper"] = whisperClientModel(model)
 			if announce && whisperCppSupported() {

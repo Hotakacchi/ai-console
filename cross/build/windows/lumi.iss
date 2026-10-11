@@ -50,8 +50,8 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 [CustomMessages]
 ja.LocalAI=ローカルAIもダウンロードする (この PC の性能に合ったものを選びます。約0.6〜6GB、インターネットなしで会話できる)
 en.LocalAI=Also download the local AI (picks one that suits this PC; about 0.6-6 GB; chat without the internet)
-ja.Whisper=高精度な音声認識 (Whisper、約70MB) もダウンロードする (話しかけた内容を正確に書き起こす)
-en.Whisper=Also download accurate speech recognition (Whisper, about 70 MB; transcribes what you say more accurately)
+ja.Whisper=高精度な音声認識 (Whisper) もダウンロードする (話しかけた内容を正確に書き起こす。PC に合わせて約80〜600MB)
+en.Whisper=Also download accurate speech recognition (Whisper; transcribes what you say more accurately. About 80-600 MB depending on the PC)
 ja.Launch=ルミを起動する
 en.Launch=Launch Lumi
 ja.DeleteData=設定とダウンロードしたAI・音声認識モデルも削除しますか？

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -56,11 +57,54 @@ func whisperLocal(base string, f whisperFile) string {
 	return filepath.Join(whisperDir(base), "models", "onnx-community", f.group, filepath.FromSlash(f.path))
 }
 
+// 使う Whisper のモデル。auto (既定) は、この PC に合ったもの (入っていなければ、入っているいちばん正確なもの)
 func whisperModel(s *Settings) string {
-	if s.Get("whisper_model", "base") == "small" {
+	switch s.Get("whisper_model", "auto") {
+	case "base":
+		return "whisper-base"
+	case "small":
+		return "whisper-small"
+	case "turbo":
+		if whisperCppSupported() {
+			return "whisper-turbo"
+		}
+		return "whisper-small" // 画面の中の Whisper (Mac) では turbo は重すぎる
+	}
+	rec := recommendWhisper(thisPC())
+	if whisperReady(dataDir(), rec) {
+		return rec
+	}
+	for _, m := range []string{"whisper-turbo", "whisper-small", "whisper-base"} {
+		if (m != "whisper-turbo" || whisperCppSupported()) && whisperReady(dataDir(), m) {
+			return m
+		}
+	}
+	return rec
+}
+
+// この PC に合った Whisper のモデル: 専用の GPU があれば turbo (Windows)、メモリ 8GB 以上なら small、それ以外は base。
+// Mac は画面の中で動かすので (遅い) base
+func recommendWhisper(s pcSpec) string {
+	switch {
+	case !whisperCppSupported():
+		return "whisper-base"
+	case runtime.GOOS == "windows" && s.dedicatedGPU():
+		return "whisper-turbo"
+	case s.RAM >= 8*gb:
 		return "whisper-small"
 	}
 	return "whisper-base"
+}
+
+// whisper.cpp で GPU を使うか (whisper_gpu: auto は専用の GPU があるときだけ)
+func whisperUseGPU(s *Settings) bool {
+	switch s.Get("whisper_gpu", "auto") {
+	case "on":
+		return true
+	case "off":
+		return false
+	}
+	return thisPC().dedicatedGPU()
 }
 
 func whisperNeeded(model string) []whisperFile {
@@ -122,9 +166,23 @@ func whisperClientModel(model string) string {
 	return "onnx-community/" + strings.TrimPrefix(model, "onnx-community/")
 }
 
-// /install-whisper: Whisper のランタイムと今のモデルを入れて、話しかけた内容を Whisper で書き起こすようにする
-func (l *Lumi) installWhisperCmd() {
+// /install-whisper [base|small|turbo]: Whisper のランタイムとモデルを入れて、話しかけた内容を Whisper で書き起こすようにする。
+// モデルを指定しなければ、whisper_model のもの (auto ならこの PC に合ったもの)
+func (l *Lumi) installWhisperCmd(arg string) {
+	switch arg = strings.ToLower(strings.TrimSpace(arg)); arg {
+	case "base", "small", "turbo":
+		if l.s.Err == nil {
+			l.s.Set("whisper_model", arg)
+		}
+	case "":
+	default:
+		l.errorText(T("whisper.unknownModel", arg))
+		return
+	}
 	model := whisperModel(l.s)
+	if l.s.Get("whisper_model", "auto") == "auto" {
+		model = recommendWhisper(thisPC())
+	}
 	l.setBusy(true)
 	cancel := make(chan struct{})
 	l.mu.Lock()

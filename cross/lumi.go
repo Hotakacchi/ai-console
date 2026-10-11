@@ -188,7 +188,7 @@ func (l *Lumi) loadSettings() {
 func (l *Lumi) wakeWord() string { return l.s.WakeWord() }
 
 func (l *Lumi) voiceKey() string {
-	return currentLang() + "|" + l.s.WakeWord() + "|" + l.s.Get("voice_input", "on") + "|" + l.s.Get("stt", "vosk") + "|" + l.s.Get("whisper_model", "base") + "|" + l.s.Get("wake_mode", "hey")
+	return currentLang() + "|" + l.s.WakeWord() + "|" + l.s.Get("voice_input", "on") + "|" + l.s.Get("stt", "vosk") + "|" + l.s.Get("whisper_model", "auto") + "|" + l.s.Get("whisper_gpu", "auto") + "|" + l.s.Get("wake_mode", "hey")
 }
 
 // 「ねえルミ」だけで反応するか (wake_mode が hey。誤って反応しにくい)
@@ -278,11 +278,11 @@ func (l *Lumi) ready() {
 	l.emit("flash", map[string]any{"expr": "happy", "seconds": 2.5})
 	// インストーラーで「ローカルAIも入れる」「高精度な音声認識も入れる」を選んだときは、初回にダウンロードする
 	// (小さい Whisper を先に入れて、終わってからローカルAIを入れる)
-	needWhisper := l.installWhisperOnStart && !whisperReady(dataDir(), whisperModel(l.s))
+	needWhisper := l.installWhisperOnStart && !whisperReady(dataDir(), recommendWhisper(thisPC()))
 	needLocal := l.installLocalOnStart && !localInstalled(dataDir(), l.s.Get("model", ""))
 	switch {
 	case needWhisper:
-		l.installWhisperCmd()
+		l.installWhisperCmd("")
 		if needLocal {
 			go func() {
 				time.Sleep(time.Second)
@@ -421,7 +421,7 @@ func (l *Lumi) submit(text string) {
 	case "/install-voicevox":
 		l.installVoicevoxCmd()
 	case "/install-whisper":
-		l.installWhisperCmd()
+		l.installWhisperCmd(arg(1))
 	case "/install-vision":
 		l.installVisionCmd()
 	case "/commands":
@@ -507,7 +507,7 @@ func (c command) help() string { return T("cmd." + strings.TrimPrefix(c.name, "/
 var commands = []command{
 	{"/help", ""}, {"/settings", "cmd.settings.args"}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", "cmd.install-local.args"}, {"/install-voice", ""}, {"/install-voicevox", ""},
-	{"/install-whisper", ""}, {"/install-vision", ""},
+	{"/install-whisper", "base,small,turbo"}, {"/install-vision", ""},
 	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/watch", "cmd.watch.args"}, {"/notes", "cmd.notes.args"}, {"/media", "cmd.media.args"}, {"/find", "cmd.find.args"}, {"/clips", "cmd.clips.args"}, {"/recall", "cmd.recall.args"}, {"/task", "cmd.task.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", "cmd.peek.args"}, {"/cls", ""}, {"/exit", ""},
@@ -534,7 +534,8 @@ var settingKeys = []settingKey{
 	{"wake_word", ""}, {"wake_mode", "hey,name"},
 	{"voice_debug", "off,on"},
 	{"stt", "vosk,whisper"},
-	{"whisper_model", "base,small"},
+	{"whisper_model", "auto,base,small,turbo"},
+	{"whisper_gpu", "auto,on,off"},
 	{"system_prompt", ""},
 	{"voice", ""},
 	{"voice_rate", "#int:-10:10"},

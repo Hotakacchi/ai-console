@@ -57,7 +57,7 @@
 | `/install-local [list\|名前]` | ローカルAIをダウンロードする。`list` でモデルの一覧、名前でそのモデルを入れて切り替える。標準は Qwen3.5 (0.8B / 2B / 4B / 9B)。ほかに Phi-4 mini、Gemma 3 (1B / 4B / 12B)、gpt-oss 20B、Llama 3.2 3B / 3.1 8B、Mistral Small 3.2 24B、DeepSeek-R1 8B、Llama 3.1 Swallow 8B、Sarashina2.2 3B、LLM-jp-3.1 1.8B も選べる |
 | `/install-voice` | 音声認識モデルをダウンロードする |
 | `/install-voicevox` | より自然な声 (VOICEVOX、約330MB) を入れる |
-| `/install-whisper` | より正確な音声認識 (Whisper) を入れる (Windows・Linux は whisper.cpp で約70MB、Mac は約110MB) |
+| `/install-whisper [base\|small\|turbo]` | より正確な音声認識 (Whisper) を入れる。モデルを付けなければ PC に合ったもの (base 約80MB、small 約210MB、turbo 約590MB。Mac は約110MB) |
 | `/install-vision` | ローカルAIが画像を読めるようにする (約670MB) |
 | `/attach [パス]` / `/detach` | ファイルを付ける / 外す (窓にドラッグ＆ドロップでも付けられる) |
 | `/screen [質問]` | 画面を撮って見せる (例: `/screen このエラーは何？`) |
@@ -109,7 +109,7 @@ AI の提案は間違っていることもあります。内容を確かめて�
 - **ルーティン** — 「おはよう」と言うと、今日の天気とリマインダーをまとめて話します。`/routines` で開く `routines.txt` に、「仕事モード」でアプリやフォルダをまとめて開く、などを自分で書けます。`[名前 @07:30]` のように時刻を付けると毎日自動で動きます。
 - **スマホから** — `/phone` で出る QR コードを同じ Wi-Fi のスマホで読むと、スマホのブラウザから話しかけたり、返事を読み上げてもらったり、コマンドの確認に答えたりできます (家の中からだけ、鍵つきの URL でだけつながります。スマホから「実行」するときは、PC の画面に出る 4 桁の番号が必要です)。
 - **自動アップデート** — 新しい版が出ると起動時に知らせ、`/update` でダウンロードから入れ替え・再起動まで行います。
-- **正確な聞き取り** — `/install-whisper` で、話しかけた内容を [Whisper](https://github.com/openai/whisper) で書き起こします (呼びかけは Vosk のまま)。Windows・Linux では [whisper.cpp](https://github.com/ggml-org/whisper.cpp) で動かすので、話し終えてから 1 秒ほどで文字になります。`/set whisper_model small` でさらに正確に (少し遅くなります)。
+- **正確な聞き取り** — `/install-whisper` で、話しかけた内容を [Whisper](https://github.com/openai/whisper) で書き起こします (呼びかけは Vosk のまま)。Windows・Linux では [whisper.cpp](https://github.com/ggml-org/whisper.cpp) で動かすので、話し終えてから 1 秒ほどで文字になります。モデルは PC に合わせて選びます (`whisper_model auto`)。Windows でグラフィックボードがある PC は、いちばん正確な **turbo** (large-v3-turbo) を GPU (Vulkan) で動かし、PowerShell・Git・VS Code のような英単語まじりの言葉も約1秒で書き起こします。ほかの PC は small か base です。`/install-whisper turbo` のようにモデルを選んで入れることもできます (GPU を使うかは `whisper_gpu`)。
 - **ドライブ** — USB メモリなどをつなぐと、驚いた顔をして知らせます。
 - **充電** — ノート PC を電源につなぐと、口が電池になって満ちていくアニメーションをします。
 - **自動化** — ルーティンの `[名前 @きっかけ]` に、時刻のほか `@USB` (ドライブをつないだ)・`@充電`・`@起動`・`@終了:chrome`・`@開始:chrome`・`@フォルダ:パス` (新しいファイル) を書くと、そのときに自動で動きます (`{drive}`・`{app}`・`{file}` で中身を使える)。「USB をつないだら写真をコピーして」と頼むと、AI が書いて、確認してから登録します。
@@ -139,7 +139,7 @@ AI の提案は間違っていることもあります。内容を確かめて�
 | `voice_input` / `wake_word` | 音声入力 / 呼びかけの言葉 (空なら言語ごとの既定) |
 | `voice` / `voice_rate` | 読み上げの声 / 速さ |
 | `tts` / `voicevox_voice` | 読み上げ (`system` / `voicevox`) / VOICEVOX の声の番号 |
-| `stt` / `whisper_model` | 書き起こし (`vosk` / `whisper`) / Whisper のモデル (`base` / `small`) |
+| `stt` / `whisper_model` / `whisper_gpu` | 書き起こし (`vosk` / `whisper`) / Whisper のモデル (`auto` / `base` / `small` / `turbo`) / Whisper で GPU を使うか (`auto` / `on` / `off`) |
 | `clipboard` / `hotkey` | クリップボードを読む / ウィンドウを出し入れするショートカット |
 | `screen` | 画面を撮って AI に見せる (`ask` / `on` / `off`) |
 | `keep_history` / `update_check` | 会話を保存して続きから話す / 起動時に新しい版を確かめる |
@@ -180,7 +180,7 @@ Windows では `CGO_ENABLED=0` で、Linux では `libgtk-4-dev` と `libwebkitg
 
 ## ライセンス
 
-[MIT License](LICENSE)。ダウンロードして使う llama.cpp は MIT、Qwen3.5-4B は Apache 2.0、Vosk とその認識モデルは Apache 2.0、Whisper は MIT、Qwen3.5-4B の画像用の部品は Apache 2.0、transformers.js は Apache 2.0、ONNX Runtime は MIT です。
+[MIT License](LICENSE)。ダウンロードして使う llama.cpp は MIT、Qwen3.5-4B は Apache 2.0、Vosk とその認識モデルは Apache 2.0、Whisper と whisper.cpp は MIT、Qwen3.5-4B の画像用の部品は Apache 2.0、transformers.js は Apache 2.0、ONNX Runtime は MIT です。
 VOICEVOX はそれぞれのキャラクターの利用規約に従ってください (VOICEVOX の声を使うと、画面に「VOICEVOX:キャラクター名」のクレジットを出します)。
 
 ---
@@ -191,6 +191,6 @@ VOICEVOX はそれぞれのキャラクターの利用規約に従ってくだ�
 
 Lumi is a console-style assistant with an animated face in the background that answers out loud. It runs on **Windows, macOS and Linux**, ships with a **local AI** (llama.cpp + Qwen3.5-4B, downloaded on first use), listens for its **wake word** ("Lumi") with on-device speech recognition (Vosk), can **search the web**, and can **run commands on your PC — after asking you first** (or without asking in auto mode, `/auto`; administrator and risky commands always ask). The UI and the conversation are available in Japanese and English (`/set language en`).
 
-It also changes its expression to match what it says, sets **timers and reminders** ("remind me in 5 minutes"), **remembers** things you tell it (`/memory`), keeps the **conversation history** across restarts, can read your **clipboard** when asked, reads **files you drop onto the window** (text, PDF, Word, Excel, PowerPoint, images), can **look at your screen** when you ask (`/screen`, always after asking), toggles with a **global hotkey** (`Ctrl+Alt+L`), lets you change its **colors, size and fonts**, checks for and installs **updates** (`/update`), runs **routines** ("good morning" → weather and reminders; `/routines`), and lets you **talk from your phone** on the same Wi-Fi (`/phone`). Optional downloads: `/install-voicevox` for natural Japanese voices with lip-sync ([VOICEVOX](https://voicevox.hiroshiba.jp/)) and `/install-whisper` for more accurate speech recognition ([Whisper](https://github.com/openai/whisper)).
+It also changes its expression to match what it says, sets **timers and reminders** ("remind me in 5 minutes"), **remembers** things you tell it (`/memory`), keeps the **conversation history** across restarts, can read your **clipboard** when asked, reads **files you drop onto the window** (text, PDF, Word, Excel, PowerPoint, images), can **look at your screen** when you ask (`/screen`, always after asking), toggles with a **global hotkey** (`Ctrl+Alt+L`), lets you change its **colors, size and fonts**, checks for and installs **updates** (`/update`), runs **routines** ("good morning" → weather and reminders; `/routines`), and lets you **talk from your phone** on the same Wi-Fi (`/phone`). Optional downloads: `/install-voicevox` for natural Japanese voices with lip-sync ([VOICEVOX](https://voicevox.hiroshiba.jp/)) and `/install-whisper` for more accurate speech recognition ([Whisper](https://github.com/openai/whisper); on Windows PCs with a graphics card it uses large-v3-turbo on the GPU).
 
 Download `Lumi-Windows-Setup-<version>.exe` (Windows), `lumi-mac-<version>.dmg` (macOS) or the `.deb` / `.tar.gz` (Linux) from [Releases](https://github.com/Hotakacchi/ai-console/releases/latest), then type `/help`.

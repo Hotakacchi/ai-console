@@ -3,6 +3,8 @@ package main
 // Whisper を whisper.cpp で動かす (Windows x64 と Linux)。画面の中 (WebAssembly・1 スレッド) より数倍速い。
 // 書き起こすたびに whisper-cli を起動するので、使っていない間はメモリを使わない。
 // Mac は whisper.cpp の配布物がないので、今までどおり画面の中で動かす (whisper.go)。
+// Windows x64 は GPU (Vulkan) 版 (公式の配布物にないので、このリポジトリの whisper-vulkan.yml でビルドしたもの)。
+// GPU は専用の GPU があるときだけ使う (内蔵 GPU では CPU より遅かったので)。
 //   画面 → Go: whisperNative {id, pcm (16kHz・16bit の base64), lang, prompt}
 //   Go → 画面: whisperResult {id, text | error}
 
@@ -25,7 +27,7 @@ import (
 const whisperCppBase = "https://github.com/ggml-org/whisper.cpp/releases/download/b5454/"
 
 var whisperCppAssets = map[string]asset{
-	"windows/amd64": {whisperCppBase + "whisper-bin-x64.zip", 8928640, "6ba69e3482d7826214f90a6a9c84ca07782aec1e1d0c6a7c30c994fd5d816ccb"},
+	"windows/amd64": {"https://github.com/Hotakacchi/ai-console/releases/download/whisper-vulkan-b5454/whisper-vulkan-bin-x64.zip", 18052207, "002c6d2296fc761d941d2d8e79116f7de18064ec0aa8abf6d42329b7feb0d20e"},
 	"linux/amd64":   {whisperCppBase + "whisper-bin-ubuntu-x64.tar.gz", 10364195, "a72becf15d7917f990f6313867a52638b82b7f9ef237fb0c980dac56a135781c"},
 	"linux/arm64":   {whisperCppBase + "whisper-bin-ubuntu-arm64.tar.gz", 4608377, "6b95ebfc60447df48e70ef00a73bdc3f41679ed2d01ef465827206a2ff325149"},
 }
@@ -36,6 +38,14 @@ const whisperGGML = "https://huggingface.co/ggerganov/whisper.cpp/resolve/535986
 var whisperCppModels = map[string]asset{
 	"whisper-base":  {whisperGGML + "ggml-base-q5_1.bin", 59707625, "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898"},
 	"whisper-small": {whisperGGML + "ggml-small-q5_1.bin", 190085487, "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb"},
+	// large-v3-turbo: いちばん正確 (固有名詞・英単語まじりに強い)。GPU なら 1 秒ほど、CPU だけだと数秒かかる
+	"whisper-turbo": {whisperGGML + "ggml-large-v3-turbo-q5_0.bin", 574041195, "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2"},
+}
+
+// 入っている whisper.cpp が今の配布物か (前の版の CPU だけのものなら、次に入れるときに入れ替える)
+func whisperCppBinCurrent(base string) bool {
+	b, _ := os.ReadFile(filepath.Join(whisperCppDir(base), "bin", "source.txt"))
+	return strings.TrimSpace(string(b)) == whisperCppAssets[runtime.GOOS+"/"+runtime.GOARCH].URL
 }
 
 // この PC で whisper.cpp を使えるか
@@ -81,7 +91,10 @@ func whisperReady(base, model string) bool {
 
 func whisperCppSize(base, model string) int64 {
 	n := whisperCppModels[model].Size
-	if whisperCppExe(base) == "" {
+	if st, err := os.Stat(whisperCppModelPath(base, model)); err == nil && st.Size() == n {
+		n = 0
+	}
+	if whisperCppExe(base) == "" || !whisperCppBinCurrent(base) {
 		n += whisperCppAssets[runtime.GOOS+"/"+runtime.GOARCH].Size
 	}
 	return n
@@ -95,7 +108,7 @@ func installWhisperCpp(base, model string, progress func(string, float64), cance
 	}
 	total := float64(whisperCppSize(base, model))
 	var done int64
-	if whisperCppExe(base) == "" {
+	if whisperCppExe(base) == "" || !whisperCppBinCurrent(base) {
 		archive := filepath.Join(whisperCppDir(base), filepath.Base(bin.URL))
 		os.MkdirAll(filepath.Dir(archive), 0o755)
 		if err := download(bin, archive, func(n int64) { progress("whisper.cpp", float64(n)/total) }, cancelled, nil); err != nil {
@@ -106,6 +119,7 @@ func installWhisperCpp(base, model string, progress func(string, float64), cance
 			return err
 		}
 		os.Remove(archive)
+		os.WriteFile(filepath.Join(whisperCppDir(base), "bin", "source.txt"), []byte(bin.URL), 0o644)
 		done = bin.Size
 	}
 	dest := whisperCppModelPath(base, model)
@@ -145,7 +159,7 @@ func whisperThreads() int {
 }
 
 // pcm (16kHz・16bit) を書き起こす。prompt は単語帳 (前に話した文として見せ、その言葉を書き起こしやすくする)
-func transcribeCpp(base, model string, pcm []byte, lang, prompt string) (string, error) {
+func transcribeCpp(base, model string, pcm []byte, lang, prompt string, gpu bool) (string, error) {
 	exe := whisperCppExe(base)
 	if exe == "" {
 		return "", errors.New("whisper.cpp is not installed")
@@ -166,6 +180,9 @@ func transcribeCpp(base, model string, pcm []byte, lang, prompt string) (string,
 	ctx, stop := context.WithTimeout(context.Background(), 30*time.Second)
 	defer stop()
 	args := []string{"-m", whisperCppModelPath(base, model), "-l", lang, "-t", strconv.Itoa(whisperThreads()), "-nt", "-np", "-f", f.Name()}
+	if !gpu {
+		args = append(args, "-ng")
+	}
 	if p := strings.TrimSpace(prompt); p != "" {
 		if r := []rune(p); len(r) > 400 {
 			p = string(r[len(r)-400:]) // 長すぎると逆効果なので後ろの方だけ
@@ -212,6 +229,6 @@ func (l *Lumi) nativeWhisper(data any) {
 		reply("", err)
 		return
 	}
-	text, err := transcribeCpp(dataDir(), whisperModel(l.s), pcm, asString(m["lang"]), asString(m["prompt"]))
+	text, err := transcribeCpp(dataDir(), whisperModel(l.s), pcm, asString(m["lang"]), asString(m["prompt"]), whisperUseGPU(l.s))
 	reply(text, err)
 }

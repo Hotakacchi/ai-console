@@ -525,7 +525,7 @@ func (k settingKey) help() string { return T("set." + k.key) }
 
 var settingKeys = []settingKey{
 	{"language", "#lang"},
-	{"provider", "local,offline,anthropic,openai,command"},
+	{"provider", "local,offline,anthropic,openai,claude-code,command"},
 	{"model", ""}, {"endpoint", ""}, {"api_key_env", ""}, {"command", ""},
 	{"max_tokens", "#int:0:1000000"},
 	{"effort", ",low,medium,high,xhigh,max"},

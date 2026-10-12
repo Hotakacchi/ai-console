@@ -316,6 +316,11 @@ func aiLabel(s *Settings) string {
 		return T("self.openai", model)
 	case "command":
 		return T("self.command")
+	case "codex":
+		if model == "" {
+			return "ChatGPT (Codex)"
+		}
+		return "ChatGPT (Codex, " + model + ")"
 	case "claude-code":
 		if model == "" {
 			return "Claude (Claude Code)"

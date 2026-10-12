@@ -92,6 +92,8 @@ func newProvider(s *Settings) Provider {
 		return &commandProvider{s: s}
 	case "claude-code":
 		return &claudeCodeProvider{s: s}
+	case "codex":
+		return &codexProvider{s: s}
 	}
 	return offlineProvider{}
 }

@@ -139,7 +139,7 @@ AI の提案は間違っていることもあります。内容を確かめて�
 | 項目 | 内容 |
 |---|---|
 | `language` | `auto` (OS に合わせる) / `ja` / `en` |
-| `provider` | `local` / `offline` / `anthropic` / `openai` / `claude-code` / `command` |
+| `provider` | `local` / `offline` / `anthropic` / `openai` / `claude-code` / `codex` / `command` |
 | `model` / `endpoint` / `api_key_env` | モデル名・API の URL・API キーが入っている**環境変数の名前** |
 | `pc_control` / `web_search` | PC の操作 / Web 検索 |
 | `voice_input` / `wake_word` | 音声入力 / 呼びかけの言葉 (空なら言語ごとの既定) |
@@ -173,6 +173,8 @@ API キーは設定ファイルに書かず、環境変数に入れて `api_key_
 { "provider": "claude-code", "model": "sonnet" }
 ```
 
+**ChatGPT Plus / Pro で使う (`codex`)** — [Codex CLI](https://developers.openai.com/codex) を入れて `codex login` で ChatGPT のアカウントでログインしておくと、`/set provider codex` で ChatGPT のモデルが答えます (API キー不要、契約の使用量の範囲で)。Codex は読み取り専用のサンドボックス・空の作業フォルダで動かし、ブラウザや PC の操作などの機能は切っています (PC の操作はいつもどおり、ルミが確認してから実行します)。返事は文ごとにまとめて出ます (1 回あたり 5 秒ほど)。
+
 自作スクリプト (`command`) は、発言のたびに起動され、stdin に `{"system": ..., "messages": [...]}` の JSON を受け取り、stdout に書いた文字が返事になります。[examples/echo_bot.py](examples/echo_bot.py) を見てください。
 
 ### 言語を増やす
@@ -203,7 +205,7 @@ VOICEVOX はそれぞれのキャラクターの利用規約に従ってくだ�
 
 <p align="center"><img src="screenshots/05-running.png" width="720" alt="Lumi running a command"></p>
 
-Lumi is a console-style assistant with an animated face in the background that answers out loud. It runs on **Windows, macOS and Linux**, ships with a **local AI** (llama.cpp + Qwen3.5-4B, downloaded on first use), listens for its **wake word** ("Lumi") with on-device speech recognition (Vosk), can **search the web**, and can **run commands on your PC — after asking you first** (or without asking in auto mode, `/auto`; administrator and risky commands always ask). With a Claude Pro / Max plan you can also use **Claude through Claude Code** (`/set provider claude-code`, no API key needed). The UI and the conversation are available in Japanese and English (`/set language en`).
+Lumi is a console-style assistant with an animated face in the background that answers out loud. It runs on **Windows, macOS and Linux**, ships with a **local AI** (llama.cpp + Qwen3.5-4B, downloaded on first use), listens for its **wake word** ("Lumi") with on-device speech recognition (Vosk), can **search the web**, and can **run commands on your PC — after asking you first** (or without asking in auto mode, `/auto`; administrator and risky commands always ask). With a Claude Pro / Max plan you can also use **Claude through Claude Code** (`/set provider claude-code`), and with a ChatGPT Plus / Pro plan **ChatGPT through Codex** (`/set provider codex`), no API key needed. The UI and the conversation are available in Japanese and English (`/set language en`).
 
 It also changes its expression to match what it says, sets **timers and reminders** ("remind me in 5 minutes"), **remembers** things you tell it (`/memory`), keeps the **conversation history** across restarts, can read your **clipboard** when asked, reads **files you drop onto the window** (text, PDF, Word, Excel, PowerPoint, images), can **look at your screen** when you ask (`/screen`, always after asking; it also reads the text on screen, so even AIs that can't see images can read error messages), **copies its last reply** (`/copy`), **tells you when a long command finishes**, **stays quiet while a game or video is fullscreen** (Windows), looks **cheerful in the morning and sleepy at night**, toggles with a **global hotkey** (`Ctrl+Alt+L`), lets you change its **colors, size and fonts**, checks for and installs **updates** (`/update`), runs **routines** ("good morning" → weather and reminders; `/routines`), and lets you **talk from your phone** on the same Wi-Fi (`/phone`). Optional downloads: `/install-voicevox` for natural Japanese voices with lip-sync ([VOICEVOX](https://voicevox.hiroshiba.jp/)) and `/install-whisper` for more accurate speech recognition ([Whisper](https://github.com/openai/whisper); on Windows PCs with a graphics card it uses large-v3-turbo on the GPU).
 

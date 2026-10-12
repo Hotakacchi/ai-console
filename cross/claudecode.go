@@ -90,7 +90,8 @@ func claudeCodeArgs(promptFile, model string) []string {
 }
 
 // それまでの会話と今の発言を、1 つの発言にまとめる
-func claudeCodeMessage(history []Message, t Turn) []byte {
+// それまでの会話と今の発言を、1 つの文章にまとめる (Claude Code・Codex に渡す)
+func conversationText(history []Message, text string) string {
 	var b strings.Builder
 	if len(history) > 0 {
 		b.WriteString(T("claudecode.historyStart") + "\n")
@@ -99,13 +100,17 @@ func claudeCodeMessage(history []Message, t Turn) []byte {
 			if m["role"] == "assistant" {
 				who = T("claudecode.assistant")
 			}
-			text, _ := m["content"].(string)
-			b.WriteString(who + ": " + strings.TrimSpace(text) + "\n")
+			t, _ := m["content"].(string)
+			b.WriteString(who + ": " + strings.TrimSpace(t) + "\n")
 		}
 		b.WriteString(T("claudecode.historyEnd") + "\n\n")
 	}
-	b.WriteString(t.Text)
-	content := []map[string]any{{"type": "text", "text": b.String()}}
+	b.WriteString(text)
+	return b.String()
+}
+
+func claudeCodeMessage(history []Message, t Turn) []byte {
+	content := []map[string]any{{"type": "text", "text": conversationText(history, t.Text)}}
 	for _, img := range t.Images {
 		content = append(content, map[string]any{"type": "image", "source": map[string]any{
 			"type": "base64", "media_type": "image/jpeg", "data": base64.StdEncoding.EncodeToString(img)}})

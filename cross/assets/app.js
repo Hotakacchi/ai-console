@@ -480,6 +480,8 @@ function termMain() {
   }
 
   let speaking = null;   // 今喋っている文 { id, text, shown, done }
+  let held = false;      // 「ねえルミ」と呼ばれて、喋るのを一時停止しているところ
+  let holdTimer = null;
   function speak(id, text) {
     face.speaking = true;
     const s = { id, text, shown: 0, finished: false };
@@ -497,6 +499,8 @@ function termMain() {
       emit("spoken", id);
     };
     s.stop = () => finish(true);
+    s.pause = () => {};
+    s.resume = () => {};
     const voice = muted || !synth ? null : pickVoice();
     if (voice) {
       const u = new SpeechSynthesisUtterance(text);
@@ -507,7 +511,11 @@ function termMain() {
       u.onend = () => finish(false);
       u.onerror = () => finish(false);
       synth.speak(u);
-      setTimeout(() => finish(false), text.length * 400 + 8000);   // 終わりの知らせが来ないときの保険
+      s.pause = () => synth.pause();
+      s.resume = () => synth.resume();
+      // 終わりの知らせが来ないときの保険 (一時停止している間は待つ)
+      const guard = () => { if (held && speaking === s) setTimeout(guard, 1000); else finish(false); };
+      setTimeout(guard, text.length * 400 + 8000);
     } else {
       // 声なし: 読み上げの速さに合わせて 1 文字ずつ出す
       const start = performance.now();
@@ -551,7 +559,20 @@ function termMain() {
     return btoa(s);
   }
 
-  const voice = new Voice({
+  // 一時停止を終える (resume: 続きを喋る)
+  function release(resume) {
+    clearTimeout(holdTimer);
+    if (!held) return;
+    held = false;
+    voice.setHolding(false);
+    hint = "";
+    if (face.expression === "listen") face.expression = "normal";
+    if (resume && speaking) speaking.resume();
+    else if (synth) synth.resume();   // やめるときも一時停止は解いておく (そのままだと次の読み上げが鳴らない)
+    if (audioCtx && audioCtx.state === "suspended" && !resume) audioCtx.resume();
+    render();
+  }
+  const handlers = {
     nativeWhisper(audio, lang, prompt) {
       const id = ++nativeId;
       return new Promise((resolve, reject) => {
@@ -588,21 +609,48 @@ function termMain() {
     confirm(answer) { if (askPrompt !== null) answerAsk(answer, answer, msgs["voice.mark"]); },
     // 「ねえルミ、止めて」: Ctrl+C と同じ
     stop() {
+      release(false);
       if (synth) synth.cancel();
       if (speaking) speaking.stop();
       if (busy) emit("interrupt");
     },
+    // 喋っている間に「ねえルミ」: 一時停止して聞く。何も言われなければ 6 秒で続きを喋る
+    hold() {
+      if (!speaking || held) return;
+      held = true;
+      speaking.pause();
+      voice.setHolding(true);
+      face.expression = "listen";
+      hint = msgs["voice.listening"] || "";
+      render();
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => release(true), 6000);
+    },
+    // 一時停止中に別の頼み: 今の返事をやめて、新しい頼みとして受け取る
+    bargeIn(text) {
+      release(false);
+      if (synth) synth.cancel();
+      if (speaking) speaking.stop();
+      if (busy) emit("interrupt");
+      const t0 = performance.now();
+      const send = () => {
+        if (busy && performance.now() - t0 < 5000) { setTimeout(send, 100); return; }
+        handlers.heard(text);
+      };
+      send();
+    },
     state(state, message) { emit("voiceState", { state, message: message || "" }); },
     debug(text) { emit("voiceDebug", text); },
     whisperError(message) { emit("voiceWhisperError", message); },
-  });
+  };
+  const voice = new Voice(handlers);
   // 喋っている間 (と、自分の声の残りを拾わないよう喋り終わった直後の少しの間) と、考えている間・コマンドの最中は、
   // 止める頼みだけを使う (voice.js の setSpeaking / setBusy)。喋っている間は「ねえルミ」が必ず要る
   let quietUntil = 0;
   setInterval(() => {
     const talking = !!speaking || (synth && synth.speaking);
     if (talking) quietUntil = performance.now() + 800;
-    voice.setSpeaking(talking || performance.now() < quietUntil);
+    voice.setSpeaking(!held && (talking || performance.now() < quietUntil));
   }, 100);
 
   // VOICEVOX の声 (WAV) を鳴らし、時刻表どおりに口を動かし、文字を出す
@@ -628,6 +676,8 @@ function termMain() {
       emit("spoken", id);
     };
     s.stop = () => finish(true);
+    s.pause = () => { if (audioCtx) audioCtx.suspend(); };
+    s.resume = () => { if (audioCtx) audioCtx.resume(); };
     try {
       audioCtx = audioCtx || new AudioContext();
       // 止まった状態で作られることがある (そのままだと音が出ず、終わりも来ない)
@@ -642,7 +692,8 @@ function termMain() {
       src.onended = () => finish(false);
       src.start();
       // 音が進まなくても、長さぶん待ったら終わりにする
-      guard = setTimeout(() => finish(false), (buffer.duration + 3) * 1000);
+      const check = () => { if (held && speaking === s) guard = setTimeout(check, 1000); else finish(false); };
+      guard = setTimeout(check, (buffer.duration + 3) * 1000);
       timer = setInterval(() => {
         const t = audioCtx.currentTime - start;
         let open = 0;
@@ -724,7 +775,7 @@ function termMain() {
   // テスト用: マイクの代わりに音声ファイルを聞かせる
   on("voiceTest", async d => { await voice.start(d, msgs, false); await voice.feedFile(d.file); });
   on("speak", d => speak(d.id, d.text));
-  on("stopSpeaking", () => { if (synth) synth.cancel(); if (speaking) speaking.stop(); });
+  on("stopSpeaking", () => { release(false); if (synth) synth.cancel(); if (speaking) speaking.stop(); });
   on("commands", list => { commands = list; });
   on("voiceSettings", d => { voiceName = d.voice || ""; rate = d.rate || 0; muted = !!d.muted; });
   on("listVoices", () => {

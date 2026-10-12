@@ -135,6 +135,17 @@ export class Voice {
     if (!on) this.ignoreBefore = this.fedSec;
   }
 
+  // 「ねえルミ」と呼ばれて、喋るのを一時停止しているか (画面から)。このあいだの発言は、止める頼みか新しい頼み
+  setHolding(on) { this.holding = on; }
+
+  // 新しい頼み: Whisper があれば書き起こし直してから渡す
+  bargeIn(text, words) {
+    if (this.h.debug) this.h.debug("(barge in) " + text);
+    if (!this.whisper) { this.h.bargeIn(text); return; }
+    const gen = this.gen;
+    this.transcribe(text, words).then(t => { if (gen === this.gen) this.h.bargeIn(t); });
+  }
+
   // 止める頼みだけを聞いているところか (確認の質問の答えは、喋り終わってから受け付ける)
   get guarded() { return this.speaking || (this.busy && this.mode !== "confirm"); }
 
@@ -366,9 +377,16 @@ export class Voice {
   onWake(result) {
     if (this.mode === "off" || (this.mode === "confirm" && !this.speaking)) return;
     const words = (result.result || []).filter(w => w.word !== "[unk]");
+    if (this.holding) return;
     if (this.guarded) {
       // 最中の呼びかけ: このあと少しの間、止める言葉だけを聞く (喋っている間は「ねえルミ」のときだけ)
       const prefixed = words.length >= 2 && this.prefixes.includes(this.norm(words[0].word));
+      if (prefixed && this.speaking && this.findAlias(this.norm(this.join(words)))) {
+        // 喋っている間の「ねえルミ」: 喋るのを一時停止して聞く
+        if (this.h.debug) this.h.debug("(hold) " + this.join(words));
+        this.h.hold();
+        return;
+      }
       if (words.length && this.findAlias(this.norm(this.join(words))) && (prefixed || (!this.heyOnly && !this.speaking))) {
         this.busyWakeAt = performance.now();
         if (this.h.debug) this.h.debug("(wake while busy) " + this.join(words));
@@ -427,6 +445,25 @@ export class Voice {
     const t = this.norm(result.text);
     const words = result.result || [];
     if (!t || this.mode === "off") return;
+    const has = s => this.stopWords.some(w => s.includes(w));
+    if (this.holding) {
+      // 一時停止中: 止める言葉なら止め、それ以外は新しい頼みにする (呼びかけの残りは取る)
+      const found = this.findAlias(t);
+      const rest = (found ? t.slice(found.i + found.a.length) : t).replace(/^[\s、,。.!！?？]+/, "");
+      if (!rest) return;
+      if (rest.length <= 12 && has(rest)) { this.h.stop(); return; }
+      this.bargeIn(rest, found ? this.wordsAfter(words, found.i + found.a.length) : words);
+      return;
+    }
+    if (this.speaking) {
+      // 喋っている間の「ねえルミ、〇〇して」(一息で): 止める頼みでなければ、新しい頼み。「ねえルミ」だけなら一時停止
+      const found = this.findAlias(t);
+      if (found && this.prefixed(found.a)) {
+        const rest = t.slice(found.i + found.a.length).replace(/^[\s、,。.!！?？]+/, "");
+        if (!rest) { this.h.hold(); return; }
+        if (!has(rest)) { this.bargeIn(rest, this.wordsAfter(words, found.i + found.a.length)); return; }
+      }
+    }
     if (this.guarded && this.isStopRequest(t)) {
       if (this.h.debug) this.h.debug("(stop) " + t);
       this.busyWakeAt = 0;

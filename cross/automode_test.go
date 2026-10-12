@@ -23,6 +23,18 @@ func TestRiskyCommand(t *testing.T) {
 		`Start-Process cmd -Verb RunAs`,
 		`dd if=/dev/zero of=/dev/sda`,
 		`chmod -R 777 /`,
+		// 電源は書き方によらず (ShutdownWindows() は前の判定をすり抜けていた)
+		`(New-Object -ComObject Shell.Application).ShutdownWindows()`,
+		`shutdown.exe -s -t 60`,
+		`Stop-Computer -Force`,
+		`rundll32.exe powrprof.dll,SetSuspendState 0,1,0`,
+		`rundll32.exe user32.dll,LockWorkStation`,
+		`logoff`,
+		`Add-Type -Name W -MemberDefinition '[DllImport("user32.dll")] public static extern bool ExitWindowsEx(uint f, uint r);'`,
+		`shutdown /h`,
+		`systemctl poweroff`,
+		`pmset sleepnow`,
+		`osascript -e 'tell application "System Events" to shut down'`,
 	}
 	safe := []string{
 		`Get-PSDrive -PSProvider FileSystem`,

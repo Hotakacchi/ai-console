@@ -343,6 +343,14 @@ func (l *Lumi) submit(text string) {
 		return
 	}
 	if !strings.HasPrefix(text, "/") {
+		// 「止めて」「ストップ」だけなら AI に渡さず、今していることを止める
+		// (AI が「PC を止めて」と取り違えて、シャットダウンしかけたことがあった)
+		if stopOnlyText(text) {
+			l.interrupt()
+			l.emit("stopSpeaking", nil)
+			l.info(T("stop.done"))
+			return
+		}
 		// ルーティンの名前 (「おはよう」など) なら、それを動かす
 		if r, ok := l.findRoutine(text); ok {
 			if l.begin() {

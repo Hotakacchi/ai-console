@@ -50,11 +50,13 @@ export class Voice {
     // 「ねえルミ」だけで反応する (heyOnly) ときは、書き起こしから探す言葉も「ねえるみ」などの組み合わせだけ
     this.heyOnly = !!heyOnly && this.prefixes.length > 0;
     const names = phrases.map(p => this.norm(p));
+    this.names = [...names].sort((a, b) => b.length - a.length);   // 呼び名 (「ねえ」なし)
     const look = this.heyOnly ? this.prefixes.flatMap(pre => names.map(n => pre + n)) : names;
     this.aliases = [...new Set(look)].sort((a, b) => b.length - a.length);
     this.yes = raw("voice.yes").map(s => this.norm(s));
     this.no = raw("voice.no").map(s => this.norm(s));
     this.stopWords = raw("voice.stop").map(s => this.norm(s));
+    this.stopOnlyWords = raw("voice.stopOnly").map(s => this.bare(s));
     // y / a / n をアルファベットの読みで答える (「ワイ」など。発言全体がその読みのときだけ)
     this.letters = { y: raw("voice.letterY"), a: raw("voice.letterA"), n: raw("voice.letterN") };
     for (const k in this.letters) this.letters[k] = this.letters[k].map(s => this.norm(s));
@@ -341,15 +343,38 @@ export class Voice {
     return null;
   }
 
+  // 記号と空白を除いた形 (比べる用)
+  bare(s) { return this.norm(s).replace(/[\s、,。.!！?？]/g, ""); }
+
+  // 「止めて」「ストップ」だけの発言か (呼びかけは除いて比べる)。
+  // これは AI への頼みにしない (「PC を止めて」と取り違えて、シャットダウンしかけたことがあった)
+  // (「ねえルミ」だけで反応する設定でも、「ルミ、止めて」の「ルミ」は除く)
+  stopOnly(text) {
+    let n = this.bare(text);
+    const pre = (this.prefixes || []).find(p => p && n.startsWith(p));
+    if (pre) n = n.slice(pre.length);
+    const name = (this.names || []).find(a => a && n.startsWith(a));
+    if (name) n = n.slice(name.length);
+    return n !== "" && (this.stopOnlyWords || []).includes(n);
+  }
+
   // words: 話しかけた内容の単語 (時刻つき)。Whisper で書き起こし直すのに使う
   heard(text, words) {
     this.mode = "wake";
     this.wakeEnd = null;
     this.pending = null;
     this.partialWake = this.wakePrefixed = false;
-    if (!this.whisper) { this.h.heard(text); return; }
+    const deliver = t => {
+      if (this.stopOnly(t)) {
+        if (this.h.debug) this.h.debug("(stop) " + t);
+        this.h.stop();
+        return;
+      }
+      this.h.heard(t);
+    };
+    if (!this.whisper || this.stopOnly(text)) { deliver(text); return; }
     const gen = this.gen;
-    this.transcribe(text, words).then(t => { if (gen === this.gen) this.h.heard(t); });
+    this.transcribe(text, words).then(t => { if (gen === this.gen) deliver(t); });
   }
 
   // 書き起こしの文の n 文字目より後ろの単語

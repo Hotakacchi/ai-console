@@ -339,6 +339,25 @@ function termMain() {
   keys.addEventListener("focus", () => term.classList.remove("blur"));
   keys.addEventListener("blur", () => term.classList.add("blur"));
   term.addEventListener("mouseup", () => { if (!window.getSelection().toString()) keys.focus(); });
+  // 右クリック (コンソールのように): 文字を選んでいればコピー、選んでいなければ貼り付け
+  term.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    const sel = window.getSelection().toString();
+    if (sel) {
+      emit("copyText", sel);
+      window.getSelection().removeAllRanges();
+    } else if (canType()) {
+      emit("pasteRequest");
+    }
+    keys.focus();
+  });
+  on("pasteText", text => {
+    if (!canType() || !text) return;
+    insert(text.replace(/\r?\n$/, "").replace(/\r?\n/g, " "));   // 改行は空白に (Ctrl+V と同じ)
+    tabPrefix = null;
+    lastKey = performance.now();
+    render();
+  });
 
   // 打った文字 (日本語変換の確定も含む)
   keys.addEventListener("input", e => {

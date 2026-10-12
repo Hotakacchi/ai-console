@@ -138,6 +138,13 @@ func main() {
 		}
 	})
 	app.Event.On("interrupt", func(*application.CustomEvent) { lumi.interrupt() })
+	// 右クリック (コンソールのように): 選んでいる文字があればコピー、なければ貼り付け
+	app.Event.On("copyText", func(e *application.CustomEvent) { app.Clipboard.SetText(asString(e.Data)) })
+	app.Event.On("pasteRequest", func(*application.CustomEvent) {
+		if text, ok := app.Clipboard.Text(); ok {
+			lumi.emitLocal("pasteText", text)
+		}
+	})
 	// 話しかけた内容の音を whisper.cpp で書き起こす (Windows・Linux)
 	app.Event.On("whisperNative", func(e *application.CustomEvent) { go lumi.nativeWhisper(e.Data) })
 	// 設定画面 (/settings window)

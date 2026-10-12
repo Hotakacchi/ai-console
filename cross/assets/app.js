@@ -587,18 +587,22 @@ function termMain() {
     // answer: y / a / n
     confirm(answer) { if (askPrompt !== null) answerAsk(answer, answer, msgs["voice.mark"]); },
     // 「ねえルミ、止めて」: Ctrl+C と同じ
-    stop() { if (busy) emit("interrupt"); },
+    stop() {
+      if (synth) synth.cancel();
+      if (speaking) speaking.stop();
+      if (busy) emit("interrupt");
+    },
     state(state, message) { emit("voiceState", { state, message: message || "" }); },
     debug(text) { emit("voiceDebug", text); },
     whisperError(message) { emit("voiceWhisperError", message); },
   });
-  // 喋っている間は聞かない。喋り終わった直後も自分の声の残りを拾わないよう少し待つ。
-  // 考えている間・コマンドの最中は聞くが、止める頼み (「ねえルミ、止めて」) だけを使う (voice.js の setBusy)
+  // 喋っている間 (と、自分の声の残りを拾わないよう喋り終わった直後の少しの間) と、考えている間・コマンドの最中は、
+  // 止める頼みだけを使う (voice.js の setSpeaking / setBusy)。喋っている間は「ねえルミ」が必ず要る
   let quietUntil = 0;
   setInterval(() => {
     const talking = !!speaking || (synth && synth.speaking);
     if (talking) quietUntil = performance.now() + 800;
-    voice.paused = talking || performance.now() < quietUntil;
+    voice.setSpeaking(talking || performance.now() < quietUntil);
   }, 100);
 
   // VOICEVOX の声 (WAV) を鳴らし、時刻表どおりに口を動かし、文字を出す

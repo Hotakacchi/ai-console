@@ -2,7 +2,7 @@
 //  - 呼びかけ用: 「ルミ」などの決まった言葉だけを聞き分ける (短い呼びかけでも聞き間違えにくい)
 //  - 書き起こし用: 話した内容を文字にする (単語ごとの時刻つき)
 // 呼びかけが聞こえたら、その後ろの言葉 (一息で続けた分も、少し間をあけた次の発言も) を受け取る。
-// 確認の質問中は「実行して」「やめて」などだけを受け付ける。ルミが喋っている間などは paused にして聞かない。
+// 確認の質問中は「実行して」「やめて」などだけを受け付ける。ルミが喋っている間・作業中は「ねえルミ、止めて」だけを受け付ける。
 // Whisper が入っていれば、話しかけた内容の部分の音だけを Whisper で書き起こし直す (より正確)。
 
 const FOLLOW_UP_MS = 6000;
@@ -127,17 +127,33 @@ export class Voice {
     if (!on) this.ignoreBefore = this.fedSec;
   }
 
+  // ルミが喋っているか (画面から 0.1 秒ごと)。喋っている間に聞こえた声は使わない (止める頼みだけ)
+  setSpeaking(on) {
+    if (this.speaking === on) return;
+    this.speaking = on;
+    this.busyWakeAt = 0;
+    if (!on) this.ignoreBefore = this.fedSec;
+  }
+
+  // 止める頼みだけを聞いているところか (確認の質問の答えは、喋り終わってから受け付ける)
+  get guarded() { return this.speaking || (this.busy && this.mode !== "confirm"); }
+
+  // 呼びかけが前置きつき (「ねえルミ」) か
+  prefixed(alias) { return this.prefixes.some(p => alias.startsWith(p)); }
+
   // 最中に聞こえた文が、止める頼みか: 呼びかけ + 止める言葉 (「ねえルミ、止めて」)、
   // または呼びかけてすぐ (6 秒以内) の短い止める言葉 (「ねえルミ」…「キャンセル」)
+  // ルミが喋っている間は、自分の声を聞き間違えないよう「ねえルミ」が必ず要る
   isStopRequest(t) {
     const has = s => this.stopWords.some(w => s.includes(w));
     const found = this.findAlias(t);
-    if (found) return has(t.slice(found.i + found.a.length));
+    if (found) return (!this.speaking || this.prefixed(found.a)) && has(t.slice(found.i + found.a.length));
     return this.busyWakeAt > 0 && performance.now() - this.busyWakeAt < 6000 && t.length <= 12 && has(t);
   }
 
   // 最中、または最中に聞こえた音だけからできた結果か
   stale(words) {
+    if (this.speaking) return true;
     if (this.mode === "confirm") return false;
     if (this.busy) return true;
     if (!words || !words.length || this.ignoreBefore === undefined) return false;
@@ -339,7 +355,7 @@ export class Voice {
   // 書き起こしの途中で呼びかけに気づいたら、すぐ聞く顔にする
   // (確定した文では呼びかけが聞き間違えられていることがあるので、印を付けておく)
   onPartial(text) {
-    if (this.busy) return;   // 返事の最中 (ルミ自身の声で「ルミ」と聞こえても反応しない)
+    if (this.busy || this.speaking) return;   // 返事の最中 (ルミ自身の声で「ルミ」と聞こえても反応しない)
     if (this.mode === "wake" && this.findAlias(this.norm(text))) {
       this.partialWake = true;
       this.listen();
@@ -348,12 +364,12 @@ export class Voice {
 
   // 呼びかけ用の認識の結果
   onWake(result) {
-    if (this.mode === "off" || this.mode === "confirm") return;
+    if (this.mode === "off" || (this.mode === "confirm" && !this.speaking)) return;
     const words = (result.result || []).filter(w => w.word !== "[unk]");
-    if (this.busy) {
-      // 最中の呼びかけ: このあと少しの間、止める言葉だけを聞く
+    if (this.guarded) {
+      // 最中の呼びかけ: このあと少しの間、止める言葉だけを聞く (喋っている間は「ねえルミ」のときだけ)
       const prefixed = words.length >= 2 && this.prefixes.includes(this.norm(words[0].word));
-      if (words.length && this.findAlias(this.norm(this.join(words))) && (prefixed || !this.heyOnly)) {
+      if (words.length && this.findAlias(this.norm(this.join(words))) && (prefixed || (!this.heyOnly && !this.speaking))) {
         this.busyWakeAt = performance.now();
         if (this.h.debug) this.h.debug("(wake while busy) " + this.join(words));
       }
@@ -396,7 +412,7 @@ export class Voice {
 
   // 確認の答え用の認識の結果: 発言全体がアルファベットの読み 1 つのときだけ答えにする
   onLetter(result) {
-    if (this.mode !== "confirm") return;
+    if (this.mode !== "confirm" || this.speaking) return;
     const words = result.result || [];
     // 決まった言葉の中から選ぶので、確からしさは低めでも受け付ける (それ以外の言葉は [unk] になる)
     if (words.length !== 1 || words[0].word === "[unk]" || words[0].conf < LETTER_MIN_CONF) return;
@@ -411,7 +427,7 @@ export class Voice {
     const t = this.norm(result.text);
     const words = result.result || [];
     if (!t || this.mode === "off") return;
-    if (this.busy && this.mode !== "confirm" && this.isStopRequest(t)) {
+    if (this.guarded && this.isStopRequest(t)) {
       if (this.h.debug) this.h.debug("(stop) " + t);
       this.busyWakeAt = 0;
       this.h.stop();

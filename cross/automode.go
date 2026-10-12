@@ -48,8 +48,10 @@ var riskyPatterns = []*regexp.Regexp{
 	// ディスク
 	regexp.MustCompile(`(?i)\b(format|format-volume|diskpart|clear-disk|initialize-disk|remove-partition|mkfs(\.\w+)?|fdisk|parted|wipefs)\b`),
 	regexp.MustCompile(`(?i)\bdd\b.*\bof=`),
-	// 電源
-	regexp.MustCompile(`(?i)\b(shutdown|stop-computer|restart-computer|reboot|poweroff|halt)\b`),
+	// 電源 (シャットダウン・再起動・ログオフ・スリープ。ShutdownWindows() のような書き方も)
+	regexp.MustCompile(`(?i)shutdown|stop-computer|restart-computer|reboot|poweroff|\bhalt\b|logoff|log\s*out|signout|sign-out`),
+	regexp.MustCompile(`(?i)setsuspendstate|suspend|hibernate|exitwindows|lockworkstation|pmset\s+\w*sleep|sleepnow|systemctl\s+(poweroff|reboot|suspend|hibernate|halt)|loginctl\s+(terminate|kill)`),
+	regexp.MustCompile(`(?i)(shut\s*down|restart|log\s*out|sleep)\b.*system events|system events.*(shut\s*down|restart|log\s*out|sleep)`),
 	// システムの設定
 	regexp.MustCompile(`(?i)\breg(\.exe)?\s+(delete|add|import)\b`),
 	regexp.MustCompile(`(?i)\b(remove-itemproperty|set-itemproperty|new-itemproperty)\b.*\bhk(lm|cu|cr|u)\b`),

@@ -7,6 +7,7 @@ package main
 // 近くの人の声やテレビの音で勝手に動かないよう、ダウンロード・アップデート・自動モード・スマホ・終了などは確認してから。
 
 import (
+	"sort"
 	"strings"
 )
 
@@ -136,4 +137,30 @@ func voiceCommand(text string) string {
 		return cmd
 	}
 	return text
+}
+
+// 「止めて」「ストップ」だけの発言か (呼びかけの「ルミ」などは除いて比べる)。
+// AI に渡すと「PC を止めて」と取り違えることがあるので (シャットダウンしかけた)、AI には渡さず、今していることを止める
+func stopOnlyText(text string) bool {
+	n := voiceNorm(text)
+	for _, p := range TList("voice.wakePrefixes") {
+		if p = voiceNorm(p); p != "" && strings.HasPrefix(n, p) {
+			n = n[len(p):]
+			break
+		}
+	}
+	names := append([]string{T("voice.wakeWord")}, TList("voice.wakeAliases")...)
+	sort.Slice(names, func(i, j int) bool { return len(names[i]) > len(names[j]) })
+	for _, a := range names {
+		if a = voiceNorm(a); a != "" && strings.HasPrefix(n, a) {
+			n = n[len(a):]
+			break
+		}
+	}
+	for _, w := range TList("voice.stopOnly") {
+		if n != "" && n == voiceNorm(w) {
+			return true
+		}
+	}
+	return false
 }

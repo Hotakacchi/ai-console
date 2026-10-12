@@ -61,6 +61,7 @@
 | `/install-vision` | ローカルAIが画像を読めるようにする (約670MB) |
 | `/attach [パス]` / `/detach` | ファイルを付ける / 外す (窓にドラッグ＆ドロップでも付けられる) |
 | `/screen [質問]` | 画面を撮って見せる (例: `/screen このエラーは何？`) |
+| `/copy` | 最後の返事をクリップボードにコピーする (「今のをコピーして」でも) |
 | `/words` | 音声の単語帳 (`words.txt`) を開く。名前や専門用語を書くと Whisper が聞き取りやすくなる |
 | `/auto [on\|off]` | 自動モード (Shift+Tab でも切り替え)。AI が提案したコマンドを確認せずに実行する。管理者権限が必要なものと、削除・フォーマット・シャットダウンなどの危ない操作は確認する。Web・ファイル・クリップボード・画面など外から来た文章を読んだあとも、仕込まれた指示かもしれないので確認する (`/cls` まで) |
 | タブの **+** / **×** | ターミナルのように、シェルのタブを開く / 閉じる (Ctrl+T / Ctrl+W、Ctrl+Tab で切り替え。**▾** でシェルを選んで開く)。最初の「ルミ」のタブは AI と話す |
@@ -103,9 +104,12 @@ AI の提案は間違っていることもあります。内容を確かめて�
 - **クリップボード** — 「コピーした文を要約して」のように頼むと、クリップボードの文章を読みます (`/set clipboard ask` で毎回確認、`on` / `off`)。
 - **ショートカット** — どこからでも `Ctrl+Alt+L` (Mac は `Cmd+Option+L`) でウィンドウを出し入れできます (`/set hotkey`)。
 - **見た目** — 顔の色・大きさ、文字の大きさ・フォントを変えられます (`/set face_color pink` など)。
-- **自然な声** — `/install-voicevox` で [VOICEVOX](https://voicevox.hiroshiba.jp/) の声で話し、声に合わせて口が動きます。`/voices` で声を選べます。
+- **自然な声** — `/install-voicevox` で [VOICEVOX](https://voicevox.hiroshiba.jp/) の声で話し、声に合わせて口が動きます。`/voices` で声を選べます。返事の気持ち (嬉しい・悲しい・驚き) に合わせて声色を変えます (キャラクターに「あまあま」「なみだめ」などのスタイルがあればそれを、なければ声の高さや抑揚で。夜遅くは小声。`voice_emotion`)。
+- **時間帯で変わる** — 朝はにっこり元気に、夜 (22時〜) は眠そうな目でときどきあくびをし、深夜 (2〜5時) はすぐ眠ります。深夜 1〜5 時に話しかけると、一晩に 1 回「そろそろ寝ようね」と声をかけます (`time_faces`)。
+- **ゲーム中は静かに** — ゲームや動画を全画面で使っている間は、喋らずに文字だけ出し、リマインダーなどで小窓も出しません (Windows。`game_quiet`)。
+- **長いコマンドが終わったら知らせる** — タブなどで 30 秒以上かかったコマンドが終わったとき、窓を見ていなければ顔を出して知らせます (`done_notice`)。
 - **ファイルを読ませる** — 窓にファイルをドラッグ＆ドロップして「要約して」「この表の合計は？」のように頼めます。テキスト・PDF・Word・Excel・PowerPoint・画像に対応しています (ローカルAIで長いファイルを読むときは先頭の一部だけになります)。
-- **画面を見せる** — 「この画面のエラーは何？」と聞くか `/screen` で、画面を撮って AI に見せます (撮る前に毎回確認します。`/set screen on` / `off`)。ローカルAIで画像を読むには `/install-vision` が必要です。
+- **画面を見せる** — 「この画面のエラーは何？」と聞くか `/screen` で、画面を撮って AI に見せます (撮る前に毎回確認します。`/set screen on` / `off`)。画面の文字も読み取って (OCR) 一緒に渡すので、画像を読めない AI でもエラーメッセージなどを読めます。OCR は OS に入っている仕組みを使います (Windows・Mac。Linux は tesseract が必要)。ローカルAIで画像そのものを読むには `/install-vision` が必要です。
 - **ルーティン** — 「おはよう」と言うと、今日の天気とリマインダーをまとめて話します。`/routines` で開く `routines.txt` に、「仕事モード」でアプリやフォルダをまとめて開く、などを自分で書けます。`[名前 @07:30]` のように時刻を付けると毎日自動で動きます。
 - **スマホから** — `/phone` で出る QR コードを同じ Wi-Fi のスマホで読むと、スマホのブラウザから話しかけたり、返事を読み上げてもらったり、コマンドの確認に答えたりできます (家の中からだけ、鍵つきの URL でだけつながります。スマホから「実行」するときは、PC の画面に出る 4 桁の番号が必要です)。
 - **自動アップデート** — 新しい版が出ると起動時に知らせ、`/update` でダウンロードから入れ替え・再起動まで行います。
@@ -143,6 +147,8 @@ AI の提案は間違っていることもあります。内容を確かめて�
 | `stt` / `whisper_model` / `whisper_gpu` | 書き起こし (`vosk` / `whisper`) / Whisper のモデル (`auto` / `base` / `small` / `turbo`) / Whisper で GPU を使うか (`auto` / `on` / `off`) |
 | `clipboard` / `hotkey` | クリップボードを読む / ウィンドウを出し入れするショートカット |
 | `screen` | 画面を撮って AI に見せる (`ask` / `on` / `off`) |
+| `done_notice` / `game_quiet` | 長いコマンドが終わったら知らせる / 全画面のときは静かにする (`on` / `off`) |
+| `time_faces` / `voice_emotion` | 時間帯で様子を変える / VOICEVOX の声色を気持ちに合わせる (`on` / `off`) |
 | `keep_history` / `update_check` | 会話を保存して続きから話す / 起動時に新しい版を確かめる |
 | `weather_location` | 天気の場所 (空ならつないでいる場所から自動) |
 | `phone` / `phone_port` | スマホから話しかけられるようにする / そのときのポート番号 |
@@ -192,6 +198,6 @@ VOICEVOX はそれぞれのキャラクターの利用規約に従ってくだ�
 
 Lumi is a console-style assistant with an animated face in the background that answers out loud. It runs on **Windows, macOS and Linux**, ships with a **local AI** (llama.cpp + Qwen3.5-4B, downloaded on first use), listens for its **wake word** ("Lumi") with on-device speech recognition (Vosk), can **search the web**, and can **run commands on your PC — after asking you first** (or without asking in auto mode, `/auto`; administrator and risky commands always ask). The UI and the conversation are available in Japanese and English (`/set language en`).
 
-It also changes its expression to match what it says, sets **timers and reminders** ("remind me in 5 minutes"), **remembers** things you tell it (`/memory`), keeps the **conversation history** across restarts, can read your **clipboard** when asked, reads **files you drop onto the window** (text, PDF, Word, Excel, PowerPoint, images), can **look at your screen** when you ask (`/screen`, always after asking), toggles with a **global hotkey** (`Ctrl+Alt+L`), lets you change its **colors, size and fonts**, checks for and installs **updates** (`/update`), runs **routines** ("good morning" → weather and reminders; `/routines`), and lets you **talk from your phone** on the same Wi-Fi (`/phone`). Optional downloads: `/install-voicevox` for natural Japanese voices with lip-sync ([VOICEVOX](https://voicevox.hiroshiba.jp/)) and `/install-whisper` for more accurate speech recognition ([Whisper](https://github.com/openai/whisper); on Windows PCs with a graphics card it uses large-v3-turbo on the GPU).
+It also changes its expression to match what it says, sets **timers and reminders** ("remind me in 5 minutes"), **remembers** things you tell it (`/memory`), keeps the **conversation history** across restarts, can read your **clipboard** when asked, reads **files you drop onto the window** (text, PDF, Word, Excel, PowerPoint, images), can **look at your screen** when you ask (`/screen`, always after asking; it also reads the text on screen, so even AIs that can't see images can read error messages), **copies its last reply** (`/copy`), **tells you when a long command finishes**, **stays quiet while a game or video is fullscreen** (Windows), looks **cheerful in the morning and sleepy at night**, toggles with a **global hotkey** (`Ctrl+Alt+L`), lets you change its **colors, size and fonts**, checks for and installs **updates** (`/update`), runs **routines** ("good morning" → weather and reminders; `/routines`), and lets you **talk from your phone** on the same Wi-Fi (`/phone`). Optional downloads: `/install-voicevox` for natural Japanese voices with lip-sync ([VOICEVOX](https://voicevox.hiroshiba.jp/)) and `/install-whisper` for more accurate speech recognition ([Whisper](https://github.com/openai/whisper); on Windows PCs with a graphics card it uses large-v3-turbo on the GPU).
 
 Download `Lumi-Windows-Setup-<version>.exe` (Windows), `lumi-mac-<version>.dmg` (macOS) or the `.deb` / `.tar.gz` (Linux) from [Releases](https://github.com/Hotakacchi/ai-console/releases/latest), then type `/help`.

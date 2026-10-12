@@ -178,7 +178,7 @@ func (l *Lumi) announce(text string) {
 	}
 	defer l.setBusy(false)
 	popped := false
-	if l.gui() && !l.win.IsVisible() {
+	if l.gui() && !l.win.IsVisible() && !l.quietNow() { // ゲーム中などは顔を出さない
 		l.peek.pop(text)
 		popped = true
 	}

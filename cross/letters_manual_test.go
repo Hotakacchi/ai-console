@@ -24,7 +24,7 @@ func TestLetterWavs(t *testing.T) {
 		"vocab_1": "ほたかっちのフォルダを開いて", "vocab_2": "ずんだもんの声に変えて", "vocab_3": "春日部つむぎで読み上げて",
 		"vocab_4": "ヴォイスボックスを再起動して", "vocab_5": "鳴海くんにメールを送る準備をして",
 	} {
-		wav, _, err := voicevox.Synthesize(text, style, 0)
+		wav, _, err := voicevox.Synthesize(text, style, 0, "")
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -403,11 +403,68 @@ type mouthKey struct {
 
 var vowelOpen = map[string]float64{"a": 1, "o": 0.8, "e": 0.6, "u": 0.5, "i": 0.4, "N": 0.2, "A": 0.6, "I": 0.3, "U": 0.3, "E": 0.4, "O": 0.5}
 
-// 文を WAV にし、口の動きの時刻表と一緒に返す。rate は -10〜10
-func (v *voicevoxServer) Synthesize(text string, style, rate int) ([]byte, []mouthKey, error) {
+// 気持ちに合うスタイルの名前 (同じキャラクターにあれば、そのスタイルで喋る)
+var moodStyles = map[string][]string{
+	"happy":     {"あまあま", "喜び", "楽々", "うきうき", "たのしい", "ハイテンション"},
+	"sad":       {"なみだめ", "悲しみ", "悲嘆", "しょんぼり", "かなしい", "泣き"},
+	"surprised": {"びっくり", "驚き"},
+	"whisper":   {"ささやき", "ヒソヒソ", "内緒話"},
+}
+
+// 同じキャラクターの、気持ちに合うスタイル (なければ元のまま)
+func (v *voicevoxServer) moodStyle(style int, mood string) (int, bool) {
+	names := moodStyles[mood]
+	if len(names) == 0 {
+		return style, false
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	for _, s := range v.speakers {
+		has := false
+		for _, st := range s.Styles {
+			has = has || st.ID == style
+		}
+		if !has {
+			continue
+		}
+		for _, n := range names {
+			for _, st := range s.Styles {
+				if strings.Contains(st.Name, n) {
+					return st.ID, true
+				}
+			}
+		}
+	}
+	return style, false
+}
+
+// 合うスタイルがないときは、声の高さ・抑揚・速さ・大きさで気持ちを出す
+func moodProsody(query map[string]any, mood string, speed float64) float64 {
+	add := func(key string, d float64) { query[key] = num(query[key]) + d }
+	switch mood {
+	case "happy":
+		add("pitchScale", 0.03)
+		query["intonationScale"] = num(query["intonationScale"]) * 1.25
+	case "sad":
+		add("pitchScale", -0.03)
+		query["intonationScale"] = num(query["intonationScale"]) * 0.85
+		speed *= 0.92
+	case "surprised":
+		add("pitchScale", 0.05)
+		query["intonationScale"] = num(query["intonationScale"]) * 1.3
+	case "whisper":
+		query["volumeScale"] = num(query["volumeScale"]) * 0.7
+		speed *= 0.95
+	}
+	return speed
+}
+
+// 文を WAV にし、口の動きの時刻表と一緒に返す。rate は -10〜10、mood は気持ち (happy / sad / surprised / whisper、"" はふつう)
+func (v *voicevoxServer) Synthesize(text string, style, rate int, mood string) ([]byte, []mouthKey, error) {
 	v.mu.Lock()
 	endpoint := v.endpoint
 	v.mu.Unlock()
+	style, styled := v.moodStyle(style, mood)
 	client := &http.Client{Timeout: time.Minute}
 	q := url.Values{"text": {text}, "speaker": {fmt.Sprint(style)}}
 	res, err := client.Post(endpoint+"/audio_query?"+q.Encode(), "application/json", nil)
@@ -421,6 +478,9 @@ func (v *voicevoxServer) Synthesize(text string, style, rate int) ([]byte, []mou
 		return nil, nil, fmt.Errorf("audio_query: HTTP %d", res.StatusCode)
 	}
 	speed := 1 + float64(rate)*0.05
+	if !styled {
+		speed = moodProsody(query, mood, speed)
+	}
 	query["speedScale"] = speed
 
 	// モーラごとの母音から口の動きを作る (長さは speedScale で割る)

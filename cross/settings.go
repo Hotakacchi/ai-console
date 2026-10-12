@@ -36,6 +36,8 @@ func settingsTemplate(provider string) string {
   "local_gpu": "auto",
   "idle_unload": 1,
   "pc_watch": "on",
+  "done_notice": "on",
+  "game_quiet": "on",
   "pc_control": "on",
   "auto_run": "off",
   "shell": "auto",
@@ -62,6 +64,8 @@ func settingsTemplate(provider string) string {
   "voice_rate": 1,
   "tts": "system",
   "voicevox_voice": -1,
+  "voice_emotion": "on",
+  "time_faces": "on",
   "background": "on",
   "startup": "off"
 }
@@ -232,6 +236,7 @@ func (s *Settings) SystemPrompt() string {
 		p += "\n\n" + T("prompt.clipboard")
 		p += "\n" + T("prompt.cliphistory")
 	}
+	p += "\n" + T("prompt.copy")
 	p += "\n\n" + T("prompt.media")
 	p += "\n\n" + T("prompt.findfile")
 	p += "\n\n" + notesPrompt()

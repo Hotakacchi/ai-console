@@ -40,7 +40,7 @@ func TestVVInstallAndSynthesize(t *testing.T) {
 	style := voicevox.pickStyle(-1)
 	name, styleName := voicevox.styleName(style)
 	t.Logf("voice: %d %s %s, speakers: %d", style, name, styleName, len(voicevox.speakers))
-	wav, keys, err := voicevox.Synthesize("こんにちは、ルミです。", style, 1)
+	wav, keys, err := voicevox.Synthesize("こんにちは、ルミです。", style, 1, "")
 	if err != nil {
 		t.Fatal(err)
 	}

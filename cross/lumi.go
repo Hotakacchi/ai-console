@@ -72,6 +72,8 @@ type Lumi struct {
 	shellOn           bool            // シェルモード (打った行をそのままコマンドとして実行)
 	shellDir          string          // コマンドを実行する場所 (cd で変わる)
 	lastUsed          time.Time       // 最後に返事などをした時刻 (使っていないローカルAIを外すため)
+	lastReply         string          // 最後の返事 (/copy で使う)
+	feeling           string          // 今の返事の気持ち (happy / sad / surprised。VOICEVOX の声色に使う)
 	tainted           bool            // この会話で、外から来た文章を AI に読ませた (automode.go)
 	voiceApplied      string          // 最後に聞き取りを始めた (止めた) ときの音声の設定 (voiceKey)
 	askCode           string          // 今の質問にスマホから「はい」と答えるための番号 (PC の画面にだけ出す)
@@ -98,7 +100,8 @@ func (l *Lumi) emit(name string, data any) {
 	if phone.running() {
 		phone.publish(name, data) // スマホでも見られるように
 	}
-	discord.observe(name, data) // Discord のステータス用
+	discord.observe(name, data)  // Discord のステータス用
+	l.observeRunning(name, data) // 長いコマンドが終わったら知らせる
 }
 
 // PC の画面 (窓かターミナル) にだけ送る。スマホには送らない
@@ -442,6 +445,8 @@ func (l *Lumi) submit(text string) {
 		l.attachCommand(strings.TrimSpace(strings.TrimPrefix(text, parts[0])))
 	case "/detach":
 		l.detach()
+	case "/copy":
+		l.copyCommand()
 	case "/screen":
 		// 画面を撮って、続けて書いた質問 (なければ「この画面について教えて」) と一緒に見せる
 		q := strings.TrimSpace(strings.TrimPrefix(text, parts[0]))
@@ -508,7 +513,7 @@ var commands = []command{
 	{"/help", ""}, {"/settings", "cmd.settings.args"}, {"/set", "cmd.set.args"}, {"/voices", ""}, {"/config", ""},
 	{"/reload", ""}, {"/mute", ""}, {"/mic", ""}, {"/install-local", "cmd.install-local.args"}, {"/install-voice", ""}, {"/install-voicevox", ""},
 	{"/install-whisper", "base,small,turbo"}, {"/install-vision", ""},
-	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/watch", "cmd.watch.args"}, {"/notes", "cmd.notes.args"}, {"/media", "cmd.media.args"}, {"/find", "cmd.find.args"}, {"/clips", "cmd.clips.args"}, {"/recall", "cmd.recall.args"}, {"/task", "cmd.task.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
+	{"/attach", "cmd.attach.args"}, {"/detach", ""}, {"/screen", "cmd.screen.args"}, {"/commands", ""}, {"/words", ""}, {"/shell", "cmd.shell.args"}, {"/auto", "cmd.auto.args"}, {"/routines", "cmd.routines.args"}, {"/plugins", "cmd.plugins.args"}, {"/watch", "cmd.watch.args"}, {"/notes", "cmd.notes.args"}, {"/media", "cmd.media.args"}, {"/find", "cmd.find.args"}, {"/clips", "cmd.clips.args"}, {"/copy", ""}, {"/recall", "cmd.recall.args"}, {"/task", "cmd.task.args"}, {"/phone", "cmd.phone.args"}, {"/discord", "cmd.discord.args"},
 	{"/memory", ""}, {"/reminders", ""}, {"/history", ""}, {"/update", ""},
 	{"/peek", "cmd.peek.args"}, {"/cls", ""}, {"/exit", ""},
 }
@@ -558,6 +563,7 @@ var settingKeys = []settingKey{
 	{"face_size", "#int:20:100"},
 	{"font_size", "#int:10:28"},
 	{"font", ""},
+	{"done_notice", "on,off"}, {"game_quiet", "on,off"}, {"time_faces", "on,off"}, {"voice_emotion", "on,off"},
 }
 
 // 言語は入っている翻訳から選ぶ
@@ -823,7 +829,15 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 		appendArchive("user", saved) // 長期の記憶 (/cls でも消えない)
 	}
 	l.replyText.Reset()
+	l.mu.Lock()
+	l.feeling = ""
+	l.mu.Unlock()
 	defer func() {
+		if r := plainReply(l.replyText.String()); r != "" {
+			l.mu.Lock()
+			l.lastReply = r
+			l.mu.Unlock()
+		}
 		if keep {
 			appendHistory("assistant", l.replyText.String())
 		}
@@ -839,8 +853,8 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 	}
 	turn := withAttachments(message, attached)
 	if screenFirst {
-		img, _ := l.screenTool() // 撮れなかった理由は screenTool が画面に出している
-		if img == nil {
+		img, text, _ := l.screenTool() // 撮れなかった理由は screenTool が画面に出している
+		if img == nil && text == "" {
 			l.mu.Lock()
 			l.pending = append(attached, l.pending...) // 付けていたファイルは次の発言に残す
 			l.mu.Unlock()
@@ -848,9 +862,14 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 			l.setBusy(false)
 			return
 		}
-		turn.Images = append(turn.Images, img)
+		if img != nil {
+			turn.Images = append(turn.Images, img)
+		}
+		if text != "" {
+			turn.Text += "\n\n[" + T("ocr.label") + "]\n" + text
+		}
 	}
-	declined := false // 一度断られたら、この返事の間はもうコマンドを聞かない
+	declined := false         // 一度断られたら、この返事の間はもうコマンドを聞かない
 	used := map[string]bool{} // この返事で使った道具 (同じものを何度も使って堂々巡りしないように)
 	var said []string         // 往復ごとに言った文
 	for round := 0; round < l.maxRounds() && turn.Text != "" && !l.cancelled(); round++ {
@@ -917,10 +936,15 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 			}
 			if r.Kind == "screen" {
 				report.WriteString("\n[" + T("screen.label") + "]\n")
-				if img, why := l.screenTool(); img != nil {
+				img, text, why := l.screenTool()
+				if img != nil {
 					images = append(images, img)
 					report.WriteString(T("screen.attached") + "\n")
-				} else {
+				}
+				if text != "" {
+					report.WriteString("[" + T("ocr.label") + "]\n" + text + "\n")
+				}
+				if why != "" {
 					report.WriteString(why + "\n")
 				}
 				continue
@@ -942,6 +966,9 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 				continue
 			case "recall":
 				report.WriteString(l.recallTool(r))
+				continue
+			case "copy":
+				report.WriteString(l.copyTool(r))
 				continue
 			case "automation":
 				report.WriteString(l.automationTool(r))
@@ -1024,6 +1051,7 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 		l.write("^C\n\n", "dim")
 	} else {
 		l.write("\n", "dim")
+		l.bedtimeNudge() // 夜遅くなら「そろそろ寝よう」(一晩に 1 回)
 	}
 	l.setBusy(false)
 }
@@ -1147,6 +1175,12 @@ const faceMarker = "\x00face:"
 func (l *Lumi) showFeeling(expr string) {
 	expr = strings.ToLower(strings.TrimSpace(expr))
 	switch expr {
+	case "happy", "sad", "surprised":
+		l.mu.Lock()
+		l.feeling = expr // このあとの文は、その気持ちの声色で (VOICEVOX)
+		l.mu.Unlock()
+	}
+	switch expr {
 	case "happy", "sad", "think":
 	case "surprised":
 		expr = "listen" // 目を大きく見開く
@@ -1166,8 +1200,12 @@ func (l *Lumi) speak(sentence string) {
 	l.speakID++
 	id := l.speakID
 	l.mu.Unlock()
-	// VOICEVOX が使えればその声で (口の動きの時刻表つき)、だめなら画面側の音声合成で
-	if wav, keys, ok := l.voicevoxSpeech(text); ok {
+	// ゲーム中・全画面のときは声を出さずに文字だけ (game_quiet)
+	if l.quietNow() {
+		l.emit("thinking", false)
+		l.emit("speak", map[string]any{"id": id, "text": text, "silent": true})
+	} else if wav, keys, ok := l.voicevoxSpeech(text); ok {
+		// VOICEVOX が使えればその声で (口の動きの時刻表つき)、だめなら画面側の音声合成で
 		l.emit("thinking", false)
 		l.emit("speakAudio", map[string]any{"id": id, "text": text, "wav": base64.StdEncoding.EncodeToString(wav), "keys": keys})
 	} else {
@@ -1199,7 +1237,16 @@ func (l *Lumi) voicevoxSpeech(text string) ([]byte, []mouthKey, bool) {
 		return nil, nil, false
 	}
 	style := voicevox.pickStyle(l.s.GetInt("voicevox_voice", -1))
-	wav, keys, err := voicevox.Synthesize(text, style, l.s.GetInt("voice_rate", 1))
+	mood := ""
+	if l.s.On("voice_emotion", "on") {
+		l.mu.Lock()
+		mood = l.feeling
+		l.mu.Unlock()
+		if mood == "" && lateNight(time.Now()) && l.s.On("time_faces", "on") {
+			mood = "whisper" // 夜遅くは小声で
+		}
+	}
+	wav, keys, err := voicevox.Synthesize(text, style, l.s.GetInt("voice_rate", 1), mood)
 	if err != nil {
 		l.reportTTSError(err)
 		return nil, nil, false

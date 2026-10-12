@@ -59,7 +59,7 @@ func (l *Lumi) fireTrigger(event string, vars map[string]string) {
 			for !l.begin() { // 返事の途中なら終わるまで待つ
 				time.Sleep(500 * time.Millisecond)
 			}
-			if l.gui() && !l.win.IsVisible() {
+			if l.gui() && !l.win.IsVisible() && !l.quietNow() { // ゲーム中などは顔を出さない
 				l.peek.pop(r.Name)
 				defer func() {
 					time.Sleep(2 * time.Second)

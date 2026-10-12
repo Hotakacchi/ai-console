@@ -482,7 +482,7 @@ function termMain() {
   let speaking = null;   // 今喋っている文 { id, text, shown, done }
   let held = false;      // 「ねえルミ」と呼ばれて、喋るのを一時停止しているところ
   let holdTimer = null;
-  function speak(id, text) {
+  function speak(id, text, silent) {
     face.speaking = true;
     const s = { id, text, shown: 0, finished: false };
     speaking = s;
@@ -501,7 +501,7 @@ function termMain() {
     s.stop = () => finish(true);
     s.pause = () => {};
     s.resume = () => {};
-    const voice = muted || !synth ? null : pickVoice();
+    const voice = muted || silent || !synth ? null : pickVoice();
     if (voice) {
       const u = new SpeechSynthesisUtterance(text);
       u.voice = voice;
@@ -762,6 +762,7 @@ function termMain() {
   // 見た目の設定 (顔の色・大きさ、文字の大きさ・フォント)
   on("appearance", d => {
     base = baseColor(d.faceColor);
+    face.timeMoods = d.timeFaces !== false;
     face.sizeRatio = Math.max(0.2, Math.min(1, (d.faceSize || 60) / 100));
     recolor();
     document.body.style.fontSize = Math.max(10, Math.min(28, d.fontSize || 15)) + "px";
@@ -774,7 +775,7 @@ function termMain() {
   on("voiceVocab", v => { voice.vocab = v || ""; });
   // テスト用: マイクの代わりに音声ファイルを聞かせる
   on("voiceTest", async d => { await voice.start(d, msgs, false); await voice.feedFile(d.file); });
-  on("speak", d => speak(d.id, d.text));
+  on("speak", d => speak(d.id, d.text, d.silent));
   on("stopSpeaking", () => { release(false); if (synth) synth.cancel(); if (speaking) speaking.stop(); });
   on("commands", list => { commands = list; });
   on("voiceSettings", d => { voiceName = d.voice || ""; rate = d.rate || 0; muted = !!d.muted; });
@@ -805,7 +806,7 @@ function peekMain() {
     bubble.style.borderColor = face.c.line;
   };
   on("admin", on => { admin = on; recolor(); });
-  on("appearance", d => { base = baseColor(d.faceColor); recolor(); });
+  on("appearance", d => { base = baseColor(d.faceColor); face.timeMoods = d.timeFaces !== false; recolor(); });
 
   let doneTimer = null;
   let moving = false;

@@ -4,7 +4,8 @@
 // activity: search (Web を調べている) / download (ダウンロード中、progress 0〜1)
 // effect(名前, 秒): しばらくだけの演出
 //   boot (起動) / off (終了) / glitch (エラー) / eat (ファイルを食べる) / shutter (画面を撮る) /
-//   bulb (覚えた) / bell (リマインダー) / sun・rain・snow・cloud (天気)
+//   bulb (覚えた) / bell (リマインダー) / sun・rain・snow・cloud (天気) / yawn (あくび)
+// timeMoods: 時間帯で様子が変わる (朝 5〜10 時は元気、夜 22 時〜は眠そう、2〜5 時はすぐ眠る)
 // lookAt(x, y): マウスのほうを見る。長く放っておくと、顔が窓の中を跳ね回る (スクリーンセーバー)
 
 const VISEME_OPEN = [0, .6, 1, .8, .5, .6, .4, .5, .7, .8, .7, .8, .3, .4, .3, .2, .3, .3, .2, .3, .4, 0];
@@ -33,6 +34,26 @@ export class Face {
     this.fx = null;                // { name, start, until }
     this.mouseX = 0; this.mouseY = 0; this.mouseUntil = 0;
     this.saver = false;            // スクリーンセーバーで跳ね回っている
+    this.timeMoods = true;
+    this.moodAt = -1e9; this.moodNow = "";
+    this.nextYawn = now + 60_000;
+  }
+
+  // 時間帯の様子: morning / night / late / "" (時計を見るのは 30 秒に 1 回)
+  mood(now) {
+    if (!this.timeMoods) return "";
+    if (now - this.moodAt > 30_000) {
+      const h = new Date().getHours();
+      this.moodNow = h >= 5 && h < 10 ? "morning" : h >= 22 || h < 2 ? "night" : h < 5 ? "late" : "";
+      this.moodAt = now;
+    }
+    return this.moodNow;
+  }
+
+  // 夜の、何もしていないときの眠そうな顔か
+  drowsy(now, ex) {
+    const m = this.mood(now);
+    return (m === "night" || m === "late") && ex === "normal" && !this.speaking && !this.running && !this.activity;
   }
 
   viseme(v) {
@@ -94,7 +115,8 @@ export class Face {
   current(now) {
     if (this.speaking || this.running || this.activity) this.lastActivity = now;
     if (now < this.flashUntil) return this.flashExpr;
-    if (this.expression === "normal" && now - this.lastActivity > SLEEP_AFTER) return "sleep";
+    // 夜中 (2〜5 時) は早く眠る
+    if (this.expression === "normal" && now - this.lastActivity > (this.mood(now) === "late" ? 30_000 : SLEEP_AFTER)) return "sleep";
     return this.expression;
   }
 
@@ -110,6 +132,11 @@ export class Face {
     if (now >= this.nextBlink) {
       this.blinkStart = now;
       this.nextBlink = Math.random() < 0.15 ? now + 300 : now + 2500 + Math.random() * 3500;
+    }
+    // 夜は、何もしていないとときどきあくびをする (3〜5 分に 1 回)
+    if (!fx && now >= this.nextYawn) {
+      if (this.drowsy(now, ex) && !this.saver) this.effect("yawn", 1.8);
+      this.nextYawn = now + 180_000 + Math.random() * 120_000;
     }
     if (this.activity === "search") { this.lookXT = Math.sin(t * 3) * 0.8; this.lookYT = 0.3; this.tiltT = 0; }
     else if (ex === "think") { this.lookXT = 0.6; this.lookYT = -0.7; this.tiltT = 5; }
@@ -142,7 +169,7 @@ export class Face {
       : this.activity ? this.activity + Math.floor(t * 20) + "," + Math.round(this.progress * 100)
       : this.saver ? "saver" + Math.floor(t * 15)
       : this.shell && !this.speaking ? "sh" + Math.floor(t * 2) : "";
-    const state = [anim, ex, this.speaking, Math.round(Math.sin(t * breathe) * 4), Math.round(this.blink(now) * 6),
+    const state = [anim, ex, this.mood(now), this.speaking, Math.round(Math.sin(t * breathe) * 4), Math.round(this.blink(now) * 6),
       Math.round(this.lookX * 12), Math.round(this.lookY * 12), Math.round(this.tilt), Math.round(this.eyeScale * 20),
       Math.round(this.open * 30), (ex === "think" || ex === "listen" || ex === "sleep") ? Math.floor(t * 12) : ""].join(",");
     const changed = state !== this.lastState;
@@ -237,12 +264,16 @@ export class Face {
         ctx.restore();
       }
       else if (fxName !== "surprised" && (ex === "happy" || fxName === "charge" || fxName === "eat" && fxT > 1.2)) ellipseArc(ctx, x, y + 10, 34, 30, 200, 140);
-      else if (fxName !== "surprised" && ex === "sleep") ellipseArc(ctx, x, y - 8, 32, 22, 30, 120);
+      else if (fxName !== "surprised" && (ex === "sleep" || fxName === "yawn")) ellipseArc(ctx, x, y - 8, 32, 22, 30, 120);
       else {
-        const r = 30 * this.eyeScale, hh = r * (1 - blink);
-        if (hh < 4) line(ctx, x - r, y, x + r, y);
+        // 夜は半分閉じた眠そうな目 (上にまぶたの線)、朝は少し大きな目
+        const sleepy = this.drowsy(now, ex) && !fx;
+        const r = 30 * this.eyeScale * (this.mood(now) === "morning" && ex === "normal" ? 1.08 : 1);
+        const hh = r * (1 - blink) * (sleepy ? 0.5 : 1), ey = sleepy ? y + r * 0.3 : y;
+        if (hh < 4) line(ctx, x - r, ey, x + r, ey);
         else {
-          ctx.beginPath(); ctx.ellipse(x, y, r, hh, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(x, ey, r, hh, 0, 0, Math.PI * 2); ctx.fill();
+          if (sleepy) line(ctx, x - r - 6, ey - hh, x + r + 6, ey - hh);
           if (hh > r * 0.5) {   // 目のハイライト
             ctx.save(); ctx.fillStyle = c.bg;
             ctx.beginPath(); ctx.arc(x + r * 0.41, y - hh * 0.55 + r * 0.16, r * 0.16, 0, Math.PI * 2); ctx.fill();
@@ -279,6 +310,10 @@ export class Face {
     if (this.activity === "download") drawProgress(ctx, my, this.progress, c);
     else if (fxName === "eat") drawEating(ctx, my, fxT, c);
     else if (fxName === "charge") drawCharge(ctx, my, fxT, c);
+    else if (fxName === "yawn" && !this.speaking) {   // あくび: 口が縦に大きく開く
+      const o = Math.sin(Math.min(1, fxT / 1.8) * Math.PI);
+      ctx.beginPath(); ctx.ellipse(0, my + 6, 18 + o * 14, 8 + o * 36, 0, 0, Math.PI * 2); ctx.stroke();
+    }
     else if (fxName === "surprised" && !this.speaking) {   // 「お」の口
       ctx.beginPath(); ctx.ellipse(0, my + 4, 20, 28, 0, 0, Math.PI * 2); ctx.stroke();
     }
@@ -291,7 +326,7 @@ export class Face {
       ctx.beginPath(); ctx.moveTo(-24, my); ctx.bezierCurveTo(-8, my - 14, 8, my + 14, 24, my); ctx.stroke();
     } else if (ex === "sad") ellipseArc(ctx, 0, my + 21, 40, 25, 210, 120);
     else if (ex === "sleep") { ctx.beginPath(); ctx.ellipse(0, my + 2, 10, 8, 0, 0, Math.PI * 2); ctx.stroke(); }
-    else if (ex === "happy") ellipseArc(ctx, 0, my - 17, 64, 45, 25, 130);
+    else if (ex === "happy" || this.mood(now) === "morning") ellipseArc(ctx, 0, my - 17, 64, 45, 25, 130);   // 朝はにっこり
     else ellipseArc(ctx, 0, my - 14, 52, 36, 30, 120);
 
     // 考え中: 跳ねる 3 つの点

@@ -9,7 +9,6 @@ import (
 	"strings"
 )
 
-
 // ---- 新しいバージョンのお知らせ ----
 
 // a が b より新しいか ("1.2.0" と "1.10.0" も数として比べる。-beta などは同じ番号なら古いとみなす)
@@ -135,5 +134,6 @@ func (l *Lumi) sendAppearance() {
 		"faceSize":  l.s.GetInt("face_size", 60),
 		"fontSize":  l.s.GetInt("font_size", 15),
 		"font":      l.s.Get("font", ""),
+		"timeFaces": l.s.On("time_faces", "on"),
 	})
 }

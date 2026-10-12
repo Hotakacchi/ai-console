@@ -107,31 +107,47 @@ func (l *Lumi) installVisionCmd() {
 
 // ---- スクリーンショット ----
 
-// AI の <screen/> と /screen: 画面を撮って JPEG で返す (screen が ask なら毎回確認)。
-// だめなときは AI に返す説明を返す
-func (l *Lumi) screenTool() ([]byte, string) {
-	if ok, why := l.canSeeImages(); !ok {
-		l.write(why+"\n", "yellow")
-		return nil, why
-	}
+// AI の <screen/> と /screen: 画面を撮って、JPEG (AI が画像を読めるとき) と、読み取った文字 (OCR) を返す
+// (screen が ask なら毎回確認)。画像を読めない AI でも、文字だけは渡せる。だめなときは AI に返す説明を返す
+func (l *Lumi) screenTool() (jpg []byte, text string, why string) {
+	canSee, _ := l.canSeeImages()
 	switch strings.ToLower(l.s.Get("screen", "ask")) {
 	case "off":
-		return nil, T("screen.off")
+		return nil, "", T("screen.off")
 	case "ask":
-		if a := strings.ToLower(l.ask(T("screen.ask"))); a != "y" && a != "a" {
+		q := T("screen.ask")
+		if !canSee {
+			q = T("screen.askText")
+		}
+		if a := strings.ToLower(l.ask(q)); a != "y" && a != "a" {
 			l.write(T("web.stopped")+"\n", "dim")
-			return nil, T("web.denied")
+			return nil, "", T("web.denied")
 		}
 	}
 	img, err := l.captureScreen()
 	l.fx("shutter", 0.5) // カシャッ
 	if err != nil {
 		l.errorText(T("screen.failed", err.Error()))
-		return nil, T("screen.failed", err.Error())
+		return nil, "", T("screen.failed", err.Error())
 	}
-	l.write(T("screen.taken", img.Bounds().Dx(), img.Bounds().Dy())+"\n\n", "cyan")
+	l.write(T("screen.taken", img.Bounds().Dx(), img.Bounds().Dy())+"\n", "cyan")
 	l.taint() // 画面に映っている文章も、外から来たもの
-	return encodeJPEG(img), ""
+	text, err = ocrImage(img, currentLang())
+	switch {
+	case err != nil:
+		l.write(T("ocr.failed", err.Error())+"\n", "yellow")
+	case text == "":
+		l.write(T("ocr.none")+"\n", "dim")
+	default:
+		l.write(T("ocr.read", len(strings.Split(text, "\n")))+"\n", "cyan")
+	}
+	l.write("\n", "dim")
+	if canSee {
+		jpg = encodeJPEG(img)
+	} else if text == "" {
+		return nil, "", T("ocr.nothing")
+	}
+	return jpg, clipOCR(text, 4000), ""
 }
 
 // ルミの窓が写り込まないよう、少しの間隠してから撮る

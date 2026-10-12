@@ -58,7 +58,7 @@ func TestVoicevoxRestart(t *testing.T) {
 		if err := voicevox.Start(base); err != nil {
 			t.Fatal(err)
 		}
-		wav, _, err := voicevox.Synthesize("テストです。", voicevox.pickStyle(-1), 1)
+		wav, _, err := voicevox.Synthesize("テストです。", voicevox.pickStyle(-1), 1, "")
 		if err != nil || len(wav) < 1000 || !voicevox.Running() {
 			t.Fatalf("round %d: %v %d", i, err, len(wav))
 		}

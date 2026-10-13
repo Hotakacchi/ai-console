@@ -22,9 +22,16 @@ func TestOCRFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	start := time.Now()
-	text, err := ocrImage(img, "ja")
+	lines, err := ocrRead(img, "ja")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("%s\n%s", time.Since(start).Round(time.Millisecond), text)
+	t.Logf("%s", time.Since(start).Round(time.Millisecond))
+	for _, l := range lines {
+		t.Logf("%q (%d words, first at %.0f,%.0f)", l.T, len(l.Words), l.Words[0].X, l.Words[0].Y)
+	}
+	for _, q := range []string{"保存しますか", "いいえ", "Cannot find path", "report", "ありません"} {
+		x, y, n := findText(lines, q)
+		t.Logf("find %q → (%.0f, %.0f) ×%d", q, x, y, n)
+	}
 }

@@ -21,7 +21,7 @@ var settingGroups = []struct {
 }{
 	{"general", []string{"language", "background", "startup", "hotkey", "update_check", "keep_history", "long_memory", "idle_unload"}},
 	{"ai", []string{"provider", "model", "endpoint", "api_key_env", "command", "max_tokens", "effort", "local_gpu", "system_prompt"}},
-	{"pc", []string{"pc_control", "auto_run", "shell", "web_search", "search_url", "clipboard", "screen", "pc_watch", "done_notice", "game_quiet"}},
+	{"pc", []string{"pc_control", "auto_run", "shell", "web_search", "search_url", "clipboard", "screen", "ui_control", "pc_watch", "done_notice", "game_quiet"}},
 	{"voice", []string{"voice_input", "wake_word", "wake_mode", "voice_debug", "stt", "whisper_model", "whisper_gpu", "tts", "voice", "voice_rate", "voicevox_voice", "voice_emotion"}},
 	{"look", []string{"face_color", "face_size", "font_size", "font", "peek_position", "time_faces"}},
 	{"link", []string{"phone", "phone_port", "discord", "discord_app_id", "weather_location"}},

@@ -571,7 +571,7 @@ var settingKeys = []settingKey{
 	{"face_size", "#int:20:100"},
 	{"font_size", "#int:10:28"},
 	{"font", ""},
-	{"done_notice", "on,off"}, {"game_quiet", "on,off"}, {"time_faces", "on,off"}, {"voice_emotion", "on,off"},
+	{"done_notice", "on,off"}, {"ui_control", "on,off"}, {"game_quiet", "on,off"}, {"time_faces", "on,off"}, {"voice_emotion", "on,off"},
 }
 
 // 言語は入っている翻訳から選ぶ
@@ -977,6 +977,9 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 				continue
 			case "copy":
 				report.WriteString(l.copyTool(r))
+				continue
+			case "ui":
+				report.WriteString(l.uiTool(r)) // 画面操作 (自動モードでも必ず許可を取る)
 				continue
 			case "automation":
 				report.WriteString(l.automationTool(r))

@@ -44,6 +44,7 @@ func settingsTemplate(provider string) string {
   "web_search": "on",
   "clipboard": "ask",
   "screen": "ask",
+  "ui_control": "on",
   "hotkey": "CmdOrCtrl+Alt+L",
   "update_check": "on",
   "weather_location": "",
@@ -242,6 +243,9 @@ func (s *Settings) SystemPrompt() string {
 	p += "\n\n" + notesPrompt()
 	if s.Get("screen", "ask") != "off" {
 		p += "\n\n" + T("prompt.screen")
+	}
+	if s.On("ui_control", "on") {
+		p += "\n\n" + T("prompt.ui")
 	}
 	// 表情・リマインダー (今の時刻つき)・記憶
 	p += "\n\n" + T("prompt.face")

@@ -35,6 +35,12 @@ func TestRiskyCommand(t *testing.T) {
 		`systemctl poweroff`,
 		`pmset sleepnow`,
 		`osascript -e 'tell application "System Events" to shut down'`,
+		// キーやマウスをまねる (画面操作の確認をすり抜けないように)
+		`$w = New-Object -ComObject WScript.Shell; $w.AppActivate('メモ帳'); $w.SendKeys('こんにちは')`,
+		`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('hello')`,
+		`xdotool type hello`,
+		`osascript -e 'tell application "System Events" to keystroke "hello"'`,
+		`[System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point(10,10)`,
 	}
 	safe := []string{
 		`Get-PSDrive -PSProvider FileSystem`,

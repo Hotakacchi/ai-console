@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -49,10 +50,19 @@ func parsePoint(s string) (float64, float64, bool) {
 	return fx, fy, err1 == nil && err2 == nil
 }
 
-// <ui> の中身を操作の並びにする (1 行に 1 つ)
+// 「wait 2type こんにちは」のように、数字の引数のすぐあとに次の操作が続いているところで区切る
+// (小さいモデルは改行を落とすことがある)
+var uiGlued = regexp.MustCompile(`(?i)((?:wait|scroll(?:\s+(?:up|down))?)\s*[\d.]+)\s*((?:doubleclick|rightclick|click|type|key|scroll|wait)\b)`)
+
+// <ui> の中身を操作の並びにする (1 行か「;」で 1 つ)
 func parseUIActions(body string) ([]uiAction, error) {
 	var out []uiAction
-	for _, line := range strings.Split(strings.ReplaceAll(body, "\r", ""), "\n") {
+	body = strings.ReplaceAll(body, "\r", "")
+	for i := 0; i < 5 && uiGlued.MatchString(body); i++ {
+		body = uiGlued.ReplaceAllString(body, "$1\n$2")
+	}
+	body = strings.ReplaceAll(body, ";", "\n")
+	for _, line := range strings.Split(body, "\n") {
 		line = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "-・*0123456789.)"))
 		if line == "" {
 			continue

@@ -67,6 +67,10 @@ var riskyPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)-encodedcommand\b|\s-enc\s`),
 	// 動いているものを強制的に止める (保存していない作業が消える)
 	regexp.MustCompile(`(?i)\b(stop-process|kill|taskkill|pkill|killall)\b`),
+	// キーボード・マウスをまねる (画面操作は <ui> で、必ず許可を取ってから)
+	regexp.MustCompile(`(?i)sendkeys|appactivate|keybd_event|mouse_event|sendinput|setcursorpos|sendmessage|postmessage|\bxdotool\b|\bydotool\b|\bwtype\b|autohotkey|\bahk\b|nircmd`),
+	regexp.MustCompile(`(?i)(keystroke|key\s+code|click\s+at|click\s+button|click\s+menu)\b.*system events|system events.*(keystroke|key\s+code|click)`),
+	regexp.MustCompile(`(?i)system\.windows\.forms\.cursor|\[cursor\]::position|ui\s*automation|uiautomationclient`),
 	// フォークボム
 	regexp.MustCompile(`:\(\)\s*\{`),
 }

@@ -1035,6 +1035,9 @@ func (l *Lumi) respond(userText string, screenFirst bool) {
 			l.face("think")
 			// 管理者として動き始めたら、終わるまで顔の色を変える
 			l.emit("running", map[string]any{"on": true, "cmd": r.Command})
+			if l.longMemory() {
+				appendArchive("command", r.Command) // 何を実行したか、あとで確かめられるように
+			}
 			result, ok := runCommand(r.Command, r.Admin || answer == "a", l.cancelChan(), func() { l.emit("admin", true) })
 			l.emit("running", map[string]any{"on": false})
 			l.emit("admin", l.elevated)

@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseUIActions(t *testing.T) {
 	loadLocales()
@@ -49,4 +52,31 @@ func TestFindText(t *testing.T) {
 	check("Ｓａｖｅ　Ａｓ", 160, 110, 1)
 	check("イル", 160, 310, 1) // 単語の一部は文字の割合で見積もる
 	check("ない", 0, 0, 0)
+}
+
+// 記録の間に実行したコマンドが入っても、話しかけた文と返事をまとめられる
+func TestArchiveItemsSkipCommands(t *testing.T) {
+	loadLocales()
+	items := archiveItems([]historyEntry{
+		{Role: "user", Text: "メモ帳を開いて"}, {Role: "command", Text: "Start-Process notepad"}, {Role: "assistant", Text: "開きました"},
+		{Role: "user", Text: "ありがとう"},
+	})
+	if len(items) != 2 || !strings.Contains(items[0], "開きました") || strings.Contains(items[1], "開きました") {
+		t.Errorf("%q", items)
+	}
+}
+
+// 小さいモデルが改行を落としても読める
+func TestParseUIGlued(t *testing.T) {
+	loadLocales()
+	for _, body := range []string{"wait 2type こんにちは", "wait 2; type こんにちは", "scroll down 3click 保存"} {
+		acts, err := parseUIActions(body)
+		if err != nil || len(acts) != 2 {
+			t.Errorf("%q: %v %v", body, acts, err)
+		}
+	}
+	acts, _ := parseUIActions("wait 2type こんにちは")
+	if acts[0] != (uiAction{"wait", "2"}) || acts[1] != (uiAction{"type", "こんにちは"}) {
+		t.Errorf("%v", acts)
+	}
 }

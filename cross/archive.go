@@ -93,8 +93,12 @@ func archiveItems(all []historyEntry) []string {
 			continue
 		}
 		item := e.At.Format("2006-01-02") + " " + T("recall.you") + ": " + oneLine(e.Text, 300)
-		if i+1 < len(all) && all[i+1].Role == "assistant" {
-			item += " / " + T("recall.lumi") + ": " + oneLine(all[i+1].Text, 400)
+		// 間に実行したコマンド (role "command") が入っていることがある
+		for j := i + 1; j < len(all) && all[j].Role != "user"; j++ {
+			if all[j].Role == "assistant" {
+				item += " / " + T("recall.lumi") + ": " + oneLine(all[j].Text, 400)
+				break
+			}
 		}
 		items = append(items, item)
 	}

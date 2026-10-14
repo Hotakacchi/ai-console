@@ -188,9 +188,9 @@ func runCommand(command string, admin bool, cancel <-chan struct{}, onElevated f
 			if _, err := exec.LookPath("pkexec"); err != nil {
 				return T("run.noPkexec"), false
 			}
-			cmd = exec.CommandContext(ctx, "pkexec", "/bin/bash", "-c", touch+cdHome+command) // 認証画面が出る
+			cmd = exec.CommandContext(ctx, "pkexec", posixShell("bash"), "-c", touch+cdHome+command) // 認証画面が出る
 		} else {
-			cmd = exec.CommandContext(ctx, "/bin/bash", "-c", command)
+			cmd = exec.CommandContext(ctx, posixShell("bash"), "-c", command)
 		}
 	}
 	cmd.Dir = home

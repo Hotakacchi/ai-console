@@ -23,6 +23,7 @@
   "local.startFailed": "ローカルAIの起動に失敗しました。詳しくは local/server.log を見てください",
   "local.timeout": "ローカルAIの起動がタイムアウトしました",
   "local.noBuild": "この環境 (%s) 用のローカルAIはありません",
+  "local.termux": "Termux では、先に pkg install llama-cpp で llama.cpp を入れてください (モデルはルミがダウンロードします)。",
   "local.dlEngine": "AIエンジン (llama.cpp) をダウンロード中",
   "local.extracting": "AIエンジンを展開中",
   "local.dlModel": "AIモデル (%s) をダウンロード中",

@@ -219,7 +219,7 @@ func (s *Settings) SystemPrompt() string {
 		p += "\n" + T("prompt.pcExample", T("prompt.pcAskDisk"), disk)
 		p += "\n" + T("prompt.pcExample", T("prompt.pcAskFolder"), folder)
 		p += "\n" + T("prompt.pcPlaces", homeDir(), strings.Join(drives(), " "))
-		p += "\n" + T("prompt.pcBook") + "\n" + T("pcbook."+runtime.GOOS)
+		p += "\n" + T("prompt.pcBook") + "\n" + T("pcbook."+bookOS())
 		if mine := userCommands(); mine != "" {
 			p += "\n" + T("prompt.pcMine") + "\n" + mine
 		}
@@ -277,6 +277,8 @@ func osName() string {
 		return windowsName()
 	case "darwin":
 		return "Mac"
+	case "android":
+		return "Android (Termux)"
 	}
 	return "Linux"
 }
@@ -332,4 +334,12 @@ func aiLabel(s *Settings) string {
 		return "Claude (Claude Code, " + model + ")"
 	}
 	return T("self.offline")
+}
+
+// コマンドの手引き (pcbook.*) の OS。Termux (Android) は Linux と同じ
+func bookOS() string {
+	if runtime.GOOS == "android" {
+		return "linux"
+	}
+	return runtime.GOOS
 }

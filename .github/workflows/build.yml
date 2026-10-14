@@ -161,9 +161,63 @@ jobs:
           name: linux-${{ matrix.arch }}
           path: cross/dist/*
 
+  # Termux (Android) 用のターミナル版。Android では cgo なしでビルドできるのは aarch64 だけ
+  termux:
+    needs: version
+    runs-on: ubuntu-24.04-arm
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      TEST: ${{ needs.version.outputs.test }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cross/go.mod
+          cache-dependency-path: cross/go.sum
+      - name: ビルド (Android / aarch64)
+        env:
+          GOOS: android
+          GOARCH: arm64
+          CGO_ENABLED: "0"
+        run: go build -tags production -ldflags "-s -w -X main.version=$VERSION -X main.testBuild=$TEST" -o lumi-termux .
+      - name: Termux 用の .deb を作る
+        run: |
+          root=termux-pkg
+          install -Dm755 lumi-termux $root/data/data/com.termux/files/usr/bin/lumi
+          mkdir -p $root/DEBIAN dist
+          sed -e "s/@VERSION@/$VERSION/" build/termux/control > $root/DEBIAN/control
+          dpkg-deb --build --root-owner-group $root dist/lumi_${VERSION}_termux_aarch64.deb
+      - name: Termux の中で入れて動かしてみる
+        run: |
+          docker run --rm --privileged -e VERSION -v "$PWD/dist:/dist:ro" termux/termux-docker:aarch64 \
+            bash -c 'dpkg -i /dist/*.deb && command -v lumi && printf "/settings\nexit\n" | lumi | tee /tmp/out.txt && grep -q "Version $VERSION" /tmp/out.txt' 2>&1 | tail -40
+          test "${PIPESTATUS[0]}" = 0
+      - name: 手元に apt リポジトリを作って、Termux の中で pkg install lumi してみる
+        env:
+          GPG_KEY: ${{ secrets.TERMUX_GPG_KEY }}
+        run: |
+          bash build/termux/make-repo.sh dist repo
+          cp build/termux/lumi.asc repo/lumi.asc
+          (cd repo && python3 -m http.server 8765 >/dev/null 2>&1 &)
+          sleep 2
+          signed=""
+          [ -n "$GPG_KEY" ] || signed="[trusted=yes] "
+          docker run --rm --privileged --network host -e VERSION -e SIGNED="$signed" termux/termux-docker:aarch64 bash -c '
+            set -e
+            curl -fsS http://127.0.0.1:8765/lumi.asc -o $PREFIX/etc/apt/trusted.gpg.d/lumi.asc
+            echo "deb ${SIGNED}http://127.0.0.1:8765 stable main" > $PREFIX/etc/apt/sources.list.d/lumi.list
+            pkg update -y >/dev/null 2>&1 || apt update
+            pkg install -y lumi
+            printf "exit\n" | lumi | grep "Version $VERSION"' 2>&1 | tail -40
+          test "${PIPESTATUS[0]}" = 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: termux
+          path: cross/dist/*.deb
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [version, windows, macos, linux]
+    needs: [version, windows, macos, linux, termux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -188,3 +242,66 @@ jobs:
             notes=(--notes-file "release-notes/$GITHUB_REF_NAME.md")
           fi
           gh release create "$GITHUB_REF_NAME" out/* --repo "$GITHUB_REPOSITORY" --title "Lumi $GITHUB_REF_NAME" "${notes[@]}"
+
+
+  # Termux の apt リポジトリ (GitHub Pages の gh-pages の termux/) を新しい版にする。
+  # 使う人は termux/install.sh でリポジトリを登録すると、pkg install lumi / pkg upgrade で入る
+  termux-repo:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [version, termux, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+      - uses: actions/download-artifact@v4
+        with:
+          name: termux
+          path: incoming
+      - uses: actions/checkout@v4
+        with:
+          path: src
+          sparse-checkout: cross/build/termux
+      - name: リポジトリを作り直して署名する
+        env:
+          GPG_KEY: ${{ secrets.TERMUX_GPG_KEY }}
+        run: bash src/cross/build/termux/make-repo.sh incoming termux
+      - name: gh-pages に載せる
+        run: |
+          rm -rf incoming src
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Termux: lumi $VERSION"
+          git push
+
+  # 公開されたリポジトリから、Termux の中で pkg install lumi できるか確かめる
+  termux-check:
+    needs: [version, termux-repo]
+    runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: .
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: GitHub Pages に新しい版が出るのを待つ
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fsS https://hotakacchi.github.io/ai-console/termux/dists/stable/main/binary-aarch64/Packages | grep -q "Version: $VERSION"; then exit 0; fi
+            sleep 15
+          done
+          echo "the new version did not appear on GitHub Pages" >&2
+          exit 1
+      - name: Termux で pkg install lumi
+        run: |
+          docker run --rm --privileged termux/termux-docker:aarch64 \
+            bash -c 'curl -fsSL https://hotakacchi.github.io/ai-console/termux/install.sh | sh && printf "exit\n" | lumi | grep "Version"' 2>&1 | tail -40
+          test "${PIPESTATUS[0]}" = 0

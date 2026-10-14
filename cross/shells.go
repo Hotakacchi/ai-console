@@ -58,6 +58,20 @@ func availableShells() []shellSpec {
 	return list
 }
 
+// bash / sh の場所 (ふつうは /bin の下。Termux (Android) では $PREFIX/bin の下)
+func posixShell(name string) string {
+	if _, err := os.Stat("/bin/" + name); err == nil {
+		return "/bin/" + name
+	}
+	if p := lookPath(name); p != "" {
+		return p
+	}
+	if p := lookPath("sh"); p != "" {
+		return p
+	}
+	return "/system/bin/sh"
+}
+
 func lookPath(name string) string {
 	if p, err := exec.LookPath(name); err == nil {
 		return p
@@ -93,7 +107,7 @@ func gitBashPath() string {
 func pickShell(want string) (shellSpec, bool) {
 	list := availableShells()
 	if len(list) == 0 {
-		return shellSpec{"sh", "/bin/sh", "sh"}, false
+		return shellSpec{"sh", posixShell("sh"), "sh"}, false
 	}
 	want = strings.ToLower(strings.TrimSpace(want))
 	if want != "" && want != "auto" {

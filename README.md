@@ -36,6 +36,13 @@
 | Windows 10 / 11 | `Lumi-Windows-Setup-<バージョン>.exe` | 「自分だけ (管理者権限なし)」か「すべてのユーザー」かを選べます。新しい版を実行すると上書き更新になります。 |
 | macOS 11 以降 | `lumi-mac-<バージョン>.dmg` | Lumi.app を「アプリケーション」に入れます。署名していないので、初回は右クリック →「開く」で起動してください。 |
 | Linux (x64 / arm64) | `lumi_*.deb` / `lumi-linux-*.tar.gz` | GTK4・WebKitGTK 6.0 が必要です (Ubuntu 24.04 以降など)。 |
+| Android ([Termux](https://termux.dev/)、aarch64) | 下のコマンドで `pkg install lumi` | ターミナル版です (声・顔・小窓はありません)。 |
+
+**Termux** — 次のコマンドでルミのリポジトリを登録して入れます。あとは `pkg upgrade` で新しい版になります。ローカルAIを使うときは、先に `pkg install llama-cpp` を入れてください (モデルはルミがダウンロードします)。
+
+```bash
+curl -fsSL https://hotakacchi.github.io/ai-console/termux/install.sh | sh
+```
 
 インストーラーで「ローカルAIもダウンロードする」を選ぶと、初回起動時に、PC のメモリと GPU を調べて合ったローカルAI (0.8B〜9B、約0.6〜6GB) をダウンロードします。あとから `/install-local` でも入れられます (`/install-local list` で、おすすめと PC の性能が見られます)。
 ローカルAI・VOICEVOX・Whisper は使うときに読み込み、1分使わなければ外してメモリを空けます (`/set idle_unload 分` で変更、`0` でずっと読み込んだまま)。
@@ -211,4 +218,4 @@ Lumi is a console-style assistant with an animated face in the background that a
 
 It also changes its expression to match what it says, sets **timers and reminders** ("remind me in 5 minutes"), **remembers** things you tell it (`/memory`), keeps the **conversation history** across restarts, can read your **clipboard** when asked, reads **files you drop onto the window** (text, PDF, Word, Excel, PowerPoint, images), can **operate other apps on screen** (clicking buttons by their text and typing; it always asks first, even in auto mode), can **look at your screen** when you ask (`/screen`, always after asking; it also reads the text on screen, so even AIs that can't see images can read error messages), **copies its last reply** (`/copy`), **tells you when a long command finishes**, **stays quiet while a game or video is fullscreen** (Windows), looks **cheerful in the morning and sleepy at night**, toggles with a **global hotkey** (`Ctrl+Alt+L`), lets you change its **colors, size and fonts**, checks for and installs **updates** (`/update`), runs **routines** ("good morning" → weather and reminders; `/routines`), and lets you **talk from your phone** on the same Wi-Fi (`/phone`). Optional downloads: `/install-voicevox` for natural Japanese voices with lip-sync ([VOICEVOX](https://voicevox.hiroshiba.jp/)) and `/install-whisper` for more accurate speech recognition ([Whisper](https://github.com/openai/whisper); on Windows PCs with a graphics card it uses large-v3-turbo on the GPU).
 
-Download `Lumi-Windows-Setup-<version>.exe` (Windows), `lumi-mac-<version>.dmg` (macOS) or the `.deb` / `.tar.gz` (Linux) from [Releases](https://github.com/Hotakacchi/ai-console/releases/latest), then type `/help`.
+Download `Lumi-Windows-Setup-<version>.exe` (Windows), `lumi-mac-<version>.dmg` (macOS) or the `.deb` / `.tar.gz` (Linux) from [Releases](https://github.com/Hotakacchi/ai-console/releases/latest), then type `/help`. On Android, the terminal version installs in [Termux](https://termux.dev/) with `curl -fsSL https://hotakacchi.github.io/ai-console/termux/install.sh | sh` (then `pkg upgrade` keeps it up to date).

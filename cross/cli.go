@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +37,9 @@ type cliUI struct {
 
 // ターミナル版で動かすか: --cli か、lumi-cli という名前で起動されたとき
 func wantCLI(args []string) bool {
+	if runtime.GOOS == "android" {
+		return true // Termux など (窓は出せない)
+	}
 	for _, a := range args {
 		if a == "--cli" {
 			return true

@@ -23,6 +23,7 @@
   "local.startFailed": "The local AI failed to start. See local/server.log for details",
   "local.timeout": "The local AI took too long to start",
   "local.noBuild": "There's no local AI build for this platform (%s)",
+  "local.termux": "On Termux, install llama.cpp first with pkg install llama-cpp (Lumi downloads the model).",
   "local.dlEngine": "Downloading the AI engine (llama.cpp)",
   "local.extracting": "Unpacking the AI engine",
   "local.dlModel": "Downloading the AI model (%s)",

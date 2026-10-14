@@ -1,0 +1,9 @@
+Package: lumi
+Version: @VERSION@
+Architecture: aarch64
+Maintainer: Hotakacchi <Hotakacchi@users.noreply.github.com>
+Homepage: https://github.com/Hotakacchi/ai-console
+Suggests: llama-cpp
+Description: Console-style AI assistant (terminal version)
+ Lumi (ルミ) for Termux. Talk with Claude, ChatGPT or a local AI in the
+ terminal; it can run commands on the device after asking first.

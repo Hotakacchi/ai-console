@@ -572,7 +572,7 @@ func shellCommand(command string) *exec.Cmd {
 	if runtime.GOOS == "windows" {
 		return exec.Command("cmd.exe", "/d", "/s", "/c", command)
 	}
-	return exec.Command("/bin/sh", "-c", command)
+	return exec.Command(posixShell("sh"), "-c", command)
 }
 
 // ---------------- オフライン (AI なし) ----------------

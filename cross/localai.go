@@ -86,6 +86,9 @@ func serverExe(base string) string {
 		}
 		return nil
 	})
+	if found == "" && runtime.GOOS == "android" {
+		found = lookPath("llama-server") // Termux の pkg install llama-cpp
+	}
 	return found
 }
 
@@ -100,6 +103,13 @@ var errCancelled = errors.New("cancelled")
 // llama.cpp とモデル m をダウンロードする。progress(説明, 0〜1)
 func installLocal(base string, m localModel, progress func(string, float64), cancelled func() bool) error {
 	la, ok := llamaAsset()
+	if !ok && runtime.GOOS == "android" {
+		// Termux: llama.cpp は pkg で入れてもらい、モデルだけダウンロードする
+		if serverExe(base) == "" {
+			return errors.New(T("local.termux"))
+		}
+		la, ok = asset{}, true
+	}
 	if !ok {
 		return errors.New(T("local.noBuild", runtime.GOOS+"/"+runtime.GOARCH))
 	}

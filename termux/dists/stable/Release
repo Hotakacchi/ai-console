@@ -1,0 +1,23 @@
+Architectures: aarch64
+Codename: stable
+Components: main
+Date: Wed, 14 Oct 2026 05:48:00 +0000
+Label: Lumi
+Origin: Lumi
+Suite: stable
+MD5Sum:
+ 4932a6db26071edf316833d62af13601              134 Release
+ a2fd1850c5804b8f08ce083b55f092c9              607 main/binary-aarch64/Packages
+ 444347cdacb2407579e16409ab44fed9              464 main/binary-aarch64/Packages.gz
+SHA1:
+ 626eb375fad9e3c067fbf7c5b406490b40f1223a              134 Release
+ 70f32f281df5b2a0e80b922ac30ed361d4a07589              607 main/binary-aarch64/Packages
+ 2c1bbc374f95e2513e1b73d6947fedbb440f496d              464 main/binary-aarch64/Packages.gz
+SHA256:
+ acea59a2f6f43bd88ece4254afa1b3d7561e95e7df9b14d3806787e5a0edb35c              134 Release
+ abfe024205467685658715046c743eec338f13b557c8d6bc15669d01ed82b242              607 main/binary-aarch64/Packages
+ e9e6533209c963efc07b65e326faf765718bd54a0818de840ab3fbf1915931da              464 main/binary-aarch64/Packages.gz
+SHA512:
+ 64269831f61d2dfa6ccf3e729751e3b8cf4731e1d802c66a0d5fa1e0015b29aec966804651098ff6cf00452dc19a8e7269df0fbfafeb1f78c536af0ff0f4accd              134 Release
+ 6e06ce72f9b65ec49012abbca6165cb32565f1bcccb4eb7896b7590b25ce3c28f55932a672c904d453af96bfb0c8d71688e0d2ae3bfe99fad1cd0d65cd2159d1              607 main/binary-aarch64/Packages
+ 42cc17779d991da50c428f518f39d654ff8d76d94cbacc24327a4d347c3be69485ae64859f0bb8dc5aecbc19761bebe90413e6977b41ee94842cb69af9c4ec66              464 main/binary-aarch64/Packages.gz

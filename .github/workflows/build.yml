@@ -204,6 +204,7 @@ jobs:
           [ -n "$GPG_KEY" ] || signed="[trusted=yes] "
           docker run --rm --privileged --network host -e VERSION -e SIGNED="$signed" termux/termux-docker:aarch64 bash -c '
             set -e
+            mkdir -p $PREFIX/etc/apt/sources.list.d $PREFIX/etc/apt/trusted.gpg.d
             curl -fsS http://127.0.0.1:8765/lumi.asc -o $PREFIX/etc/apt/trusted.gpg.d/lumi.asc
             echo "deb ${SIGNED}http://127.0.0.1:8765 stable main" > $PREFIX/etc/apt/sources.list.d/lumi.list
             pkg update -y >/dev/null 2>&1 || apt update

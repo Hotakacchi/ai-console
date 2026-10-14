@@ -1,13 +1,13 @@
 Package: lumi
-Version: 1.8.0
+Version: 1.7.2
 Architecture: aarch64
 Maintainer: Hotakacchi <Hotakacchi@users.noreply.github.com>
 Suggests: llama-cpp
-Filename: pool/main/lumi_1.8.0_termux_aarch64.deb
-Size: 4235068
-MD5sum: 313e7554b1367393de4b59f5efa8041f
-SHA1: 46eea02ce86fbaeb326407670177e101315084c9
-SHA256: 0802775c367f2656ffc66699b07551147ae4dacf4f9a0796cb64faa26f7a18c4
+Filename: pool/main/lumi_1.7.2_termux_aarch64.deb
+Size: 4235096
+MD5sum: c867d8e0d4911e79135b7013b5d29d0c
+SHA1: 708ac0fcf58b8d9ad36a5188eed948d948f43675
+SHA256: 9184c6b11d9346be4d6e980c240fc7892700d52bce029c9b45efa0c40b7272e7
 Homepage: https://github.com/Hotakacchi/ai-console
 Description: Console-style AI assistant (terminal version)
  Lumi (ルミ) for Termux. Talk with Claude, ChatGPT or a local AI in the

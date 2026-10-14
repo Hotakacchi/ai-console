@@ -190,7 +190,7 @@ jobs:
       - name: Termux の中で入れて動かしてみる
         run: |
           docker run --rm --privileged -e VERSION -v "$PWD/dist:/dist:ro" termux/termux-docker:aarch64 \
-            bash -c 'dpkg -i /dist/*.deb && command -v lumi && printf "/settings\nexit\n" | lumi | tee /tmp/out.txt && grep -q "Version $VERSION" /tmp/out.txt' 2>&1 | tail -40
+            bash -c 'dpkg -i /dist/*.deb && command -v lumi && printf "/settings\nexit\n" | lumi | tee $TMPDIR/out.txt && grep -q "Version $VERSION" $TMPDIR/out.txt' 2>&1 | tail -40
           test "${PIPESTATUS[0]}" = 0
       - name: 手元に apt リポジトリを作って、Termux の中で pkg install lumi してみる
         env:
